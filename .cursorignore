@@ -50,4 +50,3 @@
 
 # スタック固有のパターンをここに追加する
 # （references/stack-profiles.md の「スタック別の機密ファイルパターン」を参照）
-{{STACK_SPECIFIC_PATTERNS}}
