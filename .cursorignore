@@ -1,0 +1,53 @@
+# .cursorignore — エージェントのコンテキストから除外する
+#
+# これは衛生管理であって境界ではない。ターミナルと MCP には効かない。
+# 決定論的な境界は sandbox.json（ローカル）と egress 制御（Cloud）で作る。
+#
+# ここに "!" で始まる否定パターンを追加しない。除外の穴になる。
+
+# 認証情報
+# **/.env.* は使わない（.env.template / .env.example まで隠すため）。
+# 機密になりやすい env ファイルを個別に列挙する。
+**/.env
+**/.env.local
+**/.env.development
+**/.env.development.local
+**/.env.production
+**/.env.production.local
+**/.env.staging
+**/.env.test
+**/.env.test.local
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx
+**/id_rsa*
+**/id_ed25519*
+**/credentials.json
+**/secrets.json
+**/secrets.yaml
+**/.netrc
+**/.htpasswd
+
+# クラウド・インフラの認証情報
+**/.aws/**
+**/.config/gcloud/**
+**/.azure/**
+**/.kube/**
+**/kubeconfig
+**/*.tfvars
+**/*.tfstate
+**/*.tfstate.backup
+
+# 本番設定
+**/*.prod.env
+**/production.yml
+**/production.yaml
+
+# 監査ログ（プロンプトやツール引数を含みうる）
+.cursor-audit.jsonl
+.cursor-audit.log
+
+# スタック固有のパターンをここに追加する
+# （references/stack-profiles.md の「スタック別の機密ファイルパターン」を参照）
+{{STACK_SPECIFIC_PATTERNS}}

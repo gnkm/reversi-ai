@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "hooks": {
+    "beforeReadFile": [
+      {
+        "command": ".cursor/hooks/guard-read.sh",
+        "failClosed": true
+      }
+    ],
+    "beforeShellExecution": [
+      {
+        "command": ".cursor/hooks/guard-shell.sh",
+        "failClosed": true
+      }
+    ],
+    "preToolUse": [
+      {
+        "command": ".cursor/hooks/guard-write.sh",
+        "failClosed": true
+      },
+      {
+        "command": ".cursor/hooks/audit.sh",
+        "failClosed": true
+      }
+    ],
+    "postToolUse": [
+      {
+        "command": ".cursor/hooks/inspect-tool-output.sh",
+        "failClosed": true
+      }
+    ],
+    "afterFileEdit": [{ "command": ".cursor/hooks/audit.sh" }],
+    "stop": [{ "command": ".cursor/hooks/audit.sh" }]
+  }
+}

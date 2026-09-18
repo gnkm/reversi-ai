@@ -1,0 +1,9 @@
+{
+  "install": "{{INSTALL_CMD}}",
+  "terminals": [
+    {
+      "name": "dev",
+      "command": "{{START_CMD}}"
+    }
+  ]
+}

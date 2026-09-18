@@ -1,0 +1,37 @@
+# .github/CODEOWNERS
+#
+# エージェントの行動を規定するファイルは、リポジトリ内にあるため PR で変更されうる。
+# .cursorignore を削除する PR や hooks を無効化する PR が、無審査で通ってはいけない。
+#
+# @owner を実際のユーザー名またはチーム名に置き換えること。
+# ブランチ保護で「Require review from Code Owners」を有効にしないと効かない。
+
+# エージェントの行動を規定するもの
+/.cursor/               @owner
+/.cursorignore          @owner
+/.agents/               @owner
+/.claude/               @owner
+/.codex/                @owner
+/AGENTS.md              @owner
+**/AGENTS.md            @owner
+**/.cursor/             @owner
+
+# ソース・オブ・トゥルース（人間のみ編集。AI は read-only）
+/docs/source-of-truth/  @owner
+
+# 承認・検証の基準
+/.github/               @owner
+/.github/CODEOWNERS     @owner
+
+# 検査の閾値。緩める変更を必ずレビューに通すため
+# プロジェクトで実際に使っている設定ファイルに置き換えること。
+# 例: pyproject.toml / .importlinter / eslint.config.js / .dependency-cruiser.js
+#     .golangci.yml / .rubocop.yml / deptrac.yaml / clippy.toml
+{{LINT_CONFIG_FILES}}   @owner
+
+# git hooks（無効化・緩和をレビューに通す）
+/lefthook.yml           @owner
+
+# 信頼判断より前に実行されうるもの
+/.devcontainer/         @owner
+/.envrc                 @owner

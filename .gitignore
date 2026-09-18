@@ -1,0 +1,4 @@
+.firecrawl/
+node_modules/
+.env
+.cursor-audit.jsonl

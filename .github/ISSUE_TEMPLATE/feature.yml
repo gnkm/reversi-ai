@@ -1,0 +1,57 @@
+name: Feature
+description: 実証可能な振る舞いと検証手順を持つ機能 Issue
+title: "[F] "
+labels: ["feature"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        完了基準は本 Issue です。**verifier が検証コマンドを実行して通るまでクローズしないでください。**
+        正本の ID は GitHub の Issue 番号です。機能 ID（任意）は人間向けの短いラベルです。
+
+  - type: input
+    id: feature-id
+    attributes:
+      label: 機能 ID
+      description: "任意。例: F001。正本の ID は Issue 番号を使う。"
+      placeholder: F001
+    validations:
+      required: false
+
+  - type: textarea
+    id: description
+    attributes:
+      label: 説明
+      description: 機能の概要。
+      placeholder: 有効な資格情報でのログインを提供する
+    validations:
+      required: true
+
+  - type: textarea
+    id: behavior
+    attributes:
+      label: 実証可能な振る舞い
+      description: 「認証を実装する」ではなく、観測可能な結果を書く。
+      placeholder: "有効な資格情報で POST /login が 200 と JWT を返す"
+    validations:
+      required: true
+
+  - type: textarea
+    id: verification
+    attributes:
+      label: 検証
+      description: 検証コマンドまたは手順。
+      placeholder: pnpm test -k test_login_success
+    validations:
+      required: true
+
+  - type: textarea
+    id: blocked-by
+    attributes:
+      label: Blocked by
+      description: "依存する Issue。無い場合は「なし」。形式は `blocked by #12`。"
+      placeholder: |
+        blocked by #12
+        なし
+    validations:
+      required: true
