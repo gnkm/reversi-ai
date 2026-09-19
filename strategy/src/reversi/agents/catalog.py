@@ -7,9 +7,11 @@ from dataclasses import dataclass
 from random import Random
 
 from reversi.agents import (
+    extra_genai,
     jev,
     minimax,
     most_flips,
+    nn,
     opening,
     positional,
     random_uniform,
@@ -24,6 +26,7 @@ __all__ = [
     "JEV",
     "MINIMAX",
     "MOST_FLIPS",
+    "NN",
     "OPENING",
     "POSITIONAL",
     "RANDOM_UNIFORM",
@@ -81,6 +84,12 @@ RL = CatalogItem(
     display_name=rl.DISPLAY_NAME,
     description=rl.DESCRIPTION,
 )
+NN = CatalogItem(
+    specimen_id=nn.SPECIMEN_ID,
+    category=nn.CATEGORY,
+    display_name=nn.DISPLAY_NAME,
+    description=nn.DESCRIPTION,
+)
 JEV = CatalogItem(
     specimen_id=jev.SPECIMEN_ID,
     category=jev.CATEGORY,
@@ -88,30 +97,70 @@ JEV = CatalogItem(
     description=jev.DESCRIPTION,
 )
 
-# 一覧と着手関数は同じ登録から作る。
-_REGISTRY: tuple[tuple[CatalogItem, Chooser], ...] = (
+# 一覧と着手関数は同じ登録から作る。追加の生成 AI は data/genai.json から足す。
+_BUILTIN: tuple[tuple[CatalogItem, Chooser], ...] = (
     (RANDOM_UNIFORM, random_uniform.choose_move),
     (MOST_FLIPS, most_flips.choose_move),
     (POSITIONAL, positional.choose_move),
     (MINIMAX, minimax.choose_move),
     (OPENING, opening.choose_move),
     (RL, rl.choose_move),
+    (NN, nn.choose_move),
     (JEV, jev.choose_move),
 )
-_BY_ID: dict[str, tuple[CatalogItem, Chooser]] = {
-    item.specimen_id: (item, chooser) for item, chooser in _REGISTRY
-}
+
+
+def _extra_entries() -> tuple[tuple[CatalogItem, Chooser], ...]:
+    extras: list[tuple[CatalogItem, Chooser]] = []
+    names = {item.display_name for item, _ in _BUILTIN}
+    ids = {item.specimen_id for item, _ in _BUILTIN}
+    for extra in extra_genai.load():
+        if extra.display_name in names:
+            raise extra_genai.ConfigError(
+                "表示名はカタログ内で一意でなければなりません"
+            )
+        if extra.specimen_id in ids:
+            raise extra_genai.ConfigError(
+                "個体 ID はカタログ内で一意でなければなりません"
+            )
+        names.add(extra.display_name)
+        ids.add(extra.specimen_id)
+        extras.append(
+            (
+                CatalogItem(
+                    specimen_id=extra.specimen_id,
+                    category=extra_genai.CATEGORY,
+                    display_name=extra.display_name,
+                    description=extra.description,
+                ),
+                extra.choose_move,
+            )
+        )
+    return tuple(extras)
+
+
+def _registry() -> tuple[tuple[CatalogItem, Chooser], ...]:
+    """追加設定の失敗は組込み個体から切り離す。"""
+    try:
+        extras = _extra_entries()
+    except extra_genai.ConfigError:
+        return _BUILTIN
+    return _BUILTIN + extras
+
+
+def _by_id() -> dict[str, tuple[CatalogItem, Chooser]]:
+    return {item.specimen_id: (item, chooser) for item, chooser in _registry()}
 
 
 def items() -> tuple[CatalogItem, ...]:
     """登録されている個体。"""
-    return tuple(item for item, _ in _REGISTRY)
+    return tuple(item for item, _ in _registry())
 
 
 def get(specimen_id: str) -> CatalogItem:
     """個体 ID でカタログ項目を返す。"""
     try:
-        item, _ = _BY_ID[specimen_id]
+        item, _ = _by_id()[specimen_id]
     except KeyError:
         raise KeyError(specimen_id) from None
     return item
@@ -124,7 +173,7 @@ def choose_move(
 ) -> Place | None:
     """指定した個体に着手を選ばせる。未知の個体は KeyError。"""
     try:
-        _, chooser = _BY_ID[specimen_id]
+        _, chooser = _by_id()[specimen_id]
     except KeyError:
         raise KeyError(specimen_id) from None
     return chooser(position, rng)
