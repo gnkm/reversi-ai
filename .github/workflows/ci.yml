@@ -1,0 +1,43 @@
+# 資格情報が無い CI では生成 AI を試験ダブルのままにする。
+# OpenRouter の secret は渡さない（docs/tech-stack.md 3.7、SRS 第 4 章）。
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  strategy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v10.1.0
+      - name: pytest
+        run: uv run --directory strategy pytest
+      - name: import lint
+        run: uv run --directory strategy lint-imports
+      - name: complexity
+        run: uv run --directory strategy xenon --max-absolute C --max-modules B --max-average A src
+      - name: ruff
+        run: uv run --directory strategy ruff check src tests
+
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: 依存を入れる
+        run: pnpm install --frozen-lockfile
+      - name: Vitest
+        run: pnpm test
+      - name: Biome
+        run: pnpm exec biome check .
+      - name: 層の import
+        run: pnpm exec depcruise --config .dependency-cruiser.cjs web
