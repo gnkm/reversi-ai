@@ -2,7 +2,7 @@
 
 実装の置き方とプロセス分割。要求（shall）の正本は `docs/source-of-truth/` と GitHub Issue であり、本ファイルはそれらを変えない。
 
-対象: F001（対局エンジン）、F008（Issue #9、盤の入力符号化）と F021（Issue #22）。後続の実装 Issue は本ファイルと `docs/openapi.yml` に従う。
+対象: F001（対局エンジン）、F008（Issue #9、盤の入力符号化）、F009（WTHOR 棋譜）、F021（Issue #22）。後続の実装 Issue は本ファイルと `docs/openapi.yml` に従う。
 
 ## 1. 目的
 
@@ -62,7 +62,13 @@ ML / RL / NN が共有する盤の入力は `strategy/src/reversi/encode.py` に
 
 符号化は黒・白・空の 3 平面 × 8×8 の 0/1 である。座標はエンジンと同じ（`[rank][file]`、a1 が `[0][0]`）。手番は盤の入力に含めない。数値目標は置かない。
 
-## 8. リポジトリ構成
+## 8. 学習棋譜（WTHOR）
+
+学習入力は `strategy/src/reversi/train/wthor.py` が読む。原本は `data/wthor/` の `.wtb` であり、HTTP の静的ファイルとしては出さない。リポジトリには入れない。
+
+ヘッダの盤サイズが 0 または 8 のファイルだけを 8×8 として扱う。それ以外と、8×8 規則で再生できないレコードは学習入力に含めない。再生は対局エンジンと同じ関数を呼ぶ。WTHOR はパスを符号に持たないので、合法手が無い側ではエンジンのパスを挿入する。
+
+## 9. リポジトリ構成
 
 ```
 docs/
@@ -70,15 +76,20 @@ docs/
   openapi.yml          # 対局 API の契約（OpenAPI 3.1）
   source-of-truth/     # 要求の正本（人間のみ編集）
     01-seed.md
+data/
+  wthor/               # WTHOR 原本。.wtb は Git に入れない。HTTP で出さない。
 strategy/
   src/reversi/engine/
     board.py
     rules.py
     score.py
   src/reversi/encode.py
+  src/reversi/train/
+    wthor.py
   tests/
     test_engine.py
     test_encode.py
+    test_wthor.py
 ```
 
 アプリケーション本体（Hono / FastAPI のパッケージ）のディレクトリは、実装 Issue でこの tree に足す。
