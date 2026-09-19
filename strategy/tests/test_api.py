@@ -21,6 +21,7 @@ from reversi.api.schemas import (
     IllegalMoveNotApplied,
     MoveApplied,
 )
+from reversi.api.session import GameStore
 from reversi.engine.rules import initial_position, legal_places
 
 _API_DIR = Path(__file__).resolve().parents[1] / "src" / "reversi" / "api"
@@ -45,8 +46,8 @@ _GAME_KEYS = {
 
 
 @pytest.fixture
-def client() -> TestClient:
-    return TestClient(create_app())
+def client(tmp_path: Path) -> TestClient:
+    return TestClient(create_app(GameStore(db_path=tmp_path / "games.sqlite")))
 
 
 def _problem(response, status: int, code: str) -> dict:
@@ -291,12 +292,13 @@ def test_catalog_includes_jev(client: TestClient) -> None:
 
 def test_jev_failure_on_start_does_not_leave_partial_game(
     monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
     def boom(_position, _legal):
         raise ExternalModelError("試験用の失敗")
 
     monkeypatch.setattr("reversi.agents.jev._call_openrouter", boom)
-    client = TestClient(create_app())
+    client = TestClient(create_app(GameStore(db_path=tmp_path / "games.sqlite")))
     response = client.post(
         "/api/games",
         json={"black": _JEV, "white": _HUMAN},
@@ -309,6 +311,7 @@ def test_jev_failure_on_start_does_not_leave_partial_game(
 
 def test_jev_failure_after_human_move_marks_unplayable_without_adopting_model_move(
     monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
     from reversi.engine.board import Square
 
@@ -316,7 +319,7 @@ def test_jev_failure_after_human_move_marks_unplayable_without_adopting_model_mo
         return Square.parse("a1")
 
     monkeypatch.setattr("reversi.agents.jev._call_openrouter", illegal)
-    client = TestClient(create_app())
+    client = TestClient(create_app(GameStore(db_path=tmp_path / "games.sqlite")))
     game = _create(client, _HUMAN, _JEV)
     before_board = game.board
     legal = game.legal_moves[0]

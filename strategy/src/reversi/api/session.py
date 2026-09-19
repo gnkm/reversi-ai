@@ -1,8 +1,9 @@
-"""メモリ上の同時 1 局。規則は engine、着手選択は catalog。"""
+"""メモリ上の同時 1 局。規則は engine、着手選択は catalog。終局だけ SQLite。"""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from pathlib import Path
 from random import Random
 from threading import Lock
 from uuid import uuid4
@@ -16,11 +17,18 @@ from reversi.api.errors import (
     game_not_found,
     specimen_not_found,
 )
+from reversi.api.persist import (
+    DEFAULT_DB_PATH,
+    MODE_AGENT_VS_AGENT,
+    MODE_HUMAN_VS_AGENT,
+    save_if_over,
+)
 from reversi.api.schemas import (
     Cell,
     CreateGameRequest,
     GameResult,
     GameState,
+    HumanPlayer,
     Move,
     OfficialScore,
     PassMove,
@@ -49,7 +57,7 @@ _MAX_AUTO_PLIES = 128
 
 @dataclass
 class Game:
-    """進行中または終局した 1 局。"""
+    """進行中または終局した 1 局。着手列は終局の永続化用。"""
 
     id: str
     position: Position
@@ -57,6 +65,7 @@ class Game:
     black: PlayerSpec
     white: PlayerSpec
     unplayable_reason: str | None = None
+    moves: list[Move] = field(default_factory=list)
 
 
 def _player_on(game: Game, color: Color) -> PlayerSpec:
@@ -88,6 +97,43 @@ def _to_engine_move(move: Move) -> Place | EnginePass:
 
 def _from_engine_place(place: Place) -> PlaceMove:
     return PlaceMove(type="place", square=place.square.algebraic)
+
+
+def _player_payload(player: PlayerSpec) -> dict[str, str]:
+    if isinstance(player, HumanPlayer):
+        return {"kind": "human"}
+    assert isinstance(player, SpecimenPlayer)
+    return {"kind": "specimen", "specimen_id": player.specimen_id}
+
+
+def _move_payload(move: Move) -> dict[str, str]:
+    if isinstance(move, PassMove):
+        return {"type": "pass"}
+    return {"type": "place", "square": move.square}
+
+
+def _game_mode(game: Game) -> str:
+    if game.black.kind == "specimen" and game.white.kind == "specimen":
+        return MODE_AGENT_VS_AGENT
+    return MODE_HUMAN_VS_AGENT
+
+
+def _record_move(game: Game, move: Move, engine_move: Place | EnginePass) -> None:
+    game.position = play(game.position, engine_move)
+    game.last_move = move
+    game.moves.append(move)
+
+
+def _copy_game(game: Game) -> Game:
+    return Game(
+        id=game.id,
+        position=game.position,
+        last_move=game.last_move,
+        black=game.black,
+        white=game.white,
+        unplayable_reason=game.unplayable_reason,
+        moves=list(game.moves),
+    )
 
 
 def _board_cells(position: Position) -> list[list[Cell]]:
@@ -157,12 +203,10 @@ def _apply_specimen_choice(game: Game, rng: Random | None) -> bool:
     assert isinstance(player, SpecimenPlayer)
     chosen = catalog.choose_move(player.specimen_id, game.position, rng)
     if chosen is not None:
-        game.position = play(game.position, chosen)
-        game.last_move = _from_engine_place(chosen)
+        _record_move(game, _from_engine_place(chosen), chosen)
         return True
     if pass_is_legal(game.position):
-        game.position = play(game.position, EnginePass())
-        game.last_move = PassMove(type="pass")
+        _record_move(game, PassMove(type="pass"), EnginePass())
         return True
     return False
 
@@ -183,10 +227,27 @@ def advance_specimens(game: Game, rng: Random | None) -> None:
 class GameStore:
     """進行中の局はメモリ上で同時 1。新しい開始は既存を置き換える。"""
 
-    def __init__(self, rng: Random | None = None) -> None:
+    def __init__(
+        self,
+        rng: Random | None = None,
+        db_path: Path | None = DEFAULT_DB_PATH,
+    ) -> None:
         self._rng = rng
+        self._db_path = db_path
         self._lock = Lock()
         self._game: Game | None = None
+
+    def _persist_finished(self, game: Game) -> None:
+        if self._db_path is None:
+            return
+        save_if_over(
+            game.position,
+            mode=_game_mode(game),
+            black=_player_payload(game.black),
+            white=_player_payload(game.white),
+            moves=tuple(_move_payload(move) for move in game.moves),
+            db_path=self._db_path,
+        )
 
     def catalog(self) -> list[catalog.CatalogItem]:
         return list(catalog.items())
@@ -211,6 +272,7 @@ class GameStore:
         if game.unplayable_reason is not None:
             raise external_model_failed()
         with self._lock:
+            self._persist_finished(game)
             self._game = game
         return to_game_state(game)
 
@@ -225,13 +287,15 @@ class GameStore:
                     snapshot,
                     "外部モデルの呼出しに失敗し、この対局は継続できない",
                 )
+            updated = _copy_game(game)
             try:
-                game.position = play(game.position, _to_engine_move(move))
+                _record_move(updated, move, _to_engine_move(move))
             except IllegalMoveError as exc:
                 raise MoveRejected(
                     snapshot,
                     "違法な着手は盤に適用しない",
                 ) from exc
-            game.last_move = move
-            advance_specimens(game, self._rng)
-            return to_game_state(game)
+            advance_specimens(updated, self._rng)
+            self._persist_finished(updated)
+            self._game = updated
+            return to_game_state(updated)
