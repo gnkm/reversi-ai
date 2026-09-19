@@ -891,7 +891,7 @@ def test_ml_training_fits_sklearn_on_wthor_and_persisted_games(tmp_path: Path) -
         db_path=db_path,
     )
     assert written is True
-    _write_wtb(wthor_dir / "played.wtb", (squares[:8],))
+    _write_wtb(wthor_dir / "played.wtb", (squares[:60],))
 
     model = train_and_write(out, wthor=wthor_dir, games=db_path)
     loaded = json.loads(out.read_text(encoding="utf-8"))
@@ -906,6 +906,16 @@ def test_ml_training_requires_wthor_or_persisted_games(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="学習例"):
         train(wthor=tmp_path / "missing-wthor", games=tmp_path / "missing.sqlite")
+
+
+def test_ml_training_skips_unfinished_wthor(tmp_path: Path) -> None:
+    from reversi.train.ml import train
+
+    wthor_dir = tmp_path / "wthor"
+    wthor_dir.mkdir()
+    _write_wtb(wthor_dir / "cut.wtb", ((Square.parse("f5"),),))
+    with pytest.raises(ValueError, match="学習例"):
+        train(wthor=wthor_dir, games=tmp_path / "missing.sqlite")
 
 
 def _spec_leaf_score(board: Board, root: Color) -> int:

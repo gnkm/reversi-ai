@@ -15,11 +15,12 @@ from sklearn.linear_model import Ridge
 
 from reversi.agents.ml import ALGORITHM, LinearModel, load_model
 from reversi.encode import VECTOR_SIZE, encode
-from reversi.engine.board import Board, Square
+from reversi.engine.board import Board, Color, Square
 from reversi.engine.rules import (
     IllegalMoveError,
     PassMove,
     Place,
+    Position,
     initial_position,
     is_over,
     pass_is_legal,
@@ -74,8 +75,17 @@ def _afterstates_from_squares(squares: tuple[Square, ...]) -> tuple[Board, ...] 
     return tuple(boards)
 
 
+def _finished_boards(boards: tuple[Board, ...] | None) -> tuple[Board, ...] | None:
+    """終局していない再生は学習に使わない。"""
+    if boards is None:
+        return None
+    if not is_over(Position(boards[-1], Color.BLACK)):
+        return None
+    return boards
+
+
 def _examples_from_wthor_game(game: TrainingGame) -> tuple[tuple[np.ndarray, float], ...]:
-    boards = _afterstates_from_squares(game.squares)
+    boards = _finished_boards(_afterstates_from_squares(game.squares))
     if boards is None:
         return ()
     label = _black_label(None, boards[-1])
@@ -135,7 +145,7 @@ def _examples_from_games(db_path: Path) -> tuple[tuple[np.ndarray, float], ...]:
             moves = tuple(json.loads(str(moves_json)))
         except json.JSONDecodeError:
             continue
-        boards = _replay_persisted_moves(moves)
+        boards = _finished_boards(_replay_persisted_moves(moves))
         if boards is None:
             continue
         label = _black_label(str(winner), boards[-1])
