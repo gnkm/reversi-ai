@@ -21,5 +21,8 @@ pre-commit:
       glob: "strategy/**/*.py"
       run: uv run --directory strategy xenon --max-absolute C --max-modules B --max-average A src
     dependency-cruiser:
-      glob: "web/**/*.{ts,tsx}"
-      run: pnpm exec depcruise --config .dependency-cruiser.cjs web
+      glob:
+        - "web/**/*.{ts,tsx}"
+        - ".dependency-cruiser.cjs"
+      # web/ は初版の目標配置であり、未作成のあいだは設定変更だけで落とさない。
+      run: test ! -d web || pnpm exec depcruise --config .dependency-cruiser.cjs web
