@@ -6,7 +6,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from random import Random
 
-from reversi.agents import minimax, most_flips, positional, random_uniform, rl
+from reversi.agents import minimax, most_flips, opening, positional, random_uniform, rl
 from reversi.engine.rules import Place, Position
 
 Chooser = Callable[[Position, Random | None], Place | None]
@@ -15,6 +15,7 @@ Chooser = Callable[[Position, Random | None], Place | None]
 __all__ = [
     "MINIMAX",
     "MOST_FLIPS",
+    "OPENING",
     "POSITIONAL",
     "RANDOM_UNIFORM",
     "RL",
@@ -59,6 +60,12 @@ MINIMAX = CatalogItem(
     display_name=minimax.DISPLAY_NAME,
     description=minimax.DESCRIPTION,
 )
+OPENING = CatalogItem(
+    specimen_id=opening.SPECIMEN_ID,
+    category=opening.CATEGORY,
+    display_name=opening.DISPLAY_NAME,
+    description=opening.DESCRIPTION,
+)
 RL = CatalogItem(
     specimen_id=rl.SPECIMEN_ID,
     category=rl.CATEGORY,
@@ -72,6 +79,7 @@ _REGISTRY: tuple[tuple[CatalogItem, Chooser], ...] = (
     (MOST_FLIPS, most_flips.choose_move),
     (POSITIONAL, positional.choose_move),
     (MINIMAX, minimax.choose_move),
+    (OPENING, opening.choose_move),
     (RL, rl.choose_move),
 )
 _BY_ID: dict[str, tuple[CatalogItem, Chooser]] = {
