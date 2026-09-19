@@ -665,6 +665,15 @@ def test_opening_after_pass_matches_positional() -> None:
     assert opening.choose_move(passed) == positional.choose_move(passed)
 
 
+def test_opening_stays_off_book_after_pass_then_place() -> None:
+    passed = play(_almost_full_white_with_black_on_b1(), PassMove())
+    assert passed.passed is True
+    after_place = play(passed, Place(Square.parse("a1")))
+    assert after_place.passed is True
+    assert after_place.placed == (Square.parse("a1"),)
+    assert opening.choose_move(after_place) == positional.choose_move(after_place)
+
+
 def test_opening_does_not_move_when_no_legal_places() -> None:
     assert opening.choose_move(_almost_full_white_with_black_on_b1()) is None
     assert opening.choose_move(_both_sides_cannot_place()) is None
