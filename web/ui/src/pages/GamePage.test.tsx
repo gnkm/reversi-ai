@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type { Cell, GameState } from "../types.ts";
-import { GamePage } from "./GamePage.tsx";
+import { GamePage, illegalMoveMessage } from "./GamePage.tsx";
 
 function emptyBoard(): Cell[][] {
   return Array.from({ length: 8 }, () =>
@@ -68,5 +68,13 @@ describe("GamePage", () => {
     expect(screen.getByText("黒の勝ちです。")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "カタログへ戻る" }));
     expect(backs).toEqual(["back"]);
+  });
+
+  it("違法手の案内は illegal_move のときだけ出す", () => {
+    expect(illegalMoveMessage("illegal_move")).toBe(
+      "その手は打てません。別のマスを指定してください。",
+    );
+    expect(illegalMoveMessage("external_model_failed")).toBeNull();
+    expect(illegalMoveMessage(undefined)).toBeNull();
   });
 });

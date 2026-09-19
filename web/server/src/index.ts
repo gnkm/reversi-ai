@@ -10,6 +10,7 @@ import {
   publicOrigin,
   strategyBaseUrl,
   strategyTimeoutMs,
+  uiRoot,
 } from "./listen.ts";
 import { createStrategyGateway } from "./strategy.ts";
 
@@ -25,6 +26,7 @@ export function startServer(
       fetch,
       strategyTimeoutMs(env),
     ),
+    uiRoot: uiRoot(env),
   });
   return serve({
     fetch: app.fetch,

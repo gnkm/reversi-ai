@@ -6,6 +6,7 @@ export const DEFAULT_STRATEGY_BASE_URL = "http://127.0.0.1:8000";
 export const DEFAULT_STRATEGY_TIMEOUT_MS = 60_000;
 export const DEFAULT_CERT_FILE = "data/certs/cert.pem";
 export const DEFAULT_KEY_FILE = "data/certs/key.pem";
+export const DEFAULT_UI_ROOT = "web/ui/dist";
 
 export function listenPort(env: NodeJS.ProcessEnv = process.env): number {
   const raw = env.PORT;
@@ -52,4 +53,12 @@ export function certPaths(env: NodeJS.ProcessEnv = process.env): {
     cert: env.TLS_CERT_FILE ?? DEFAULT_CERT_FILE,
     key: env.TLS_KEY_FILE ?? DEFAULT_KEY_FILE,
   };
+}
+
+export function uiRoot(env: NodeJS.ProcessEnv = process.env): string {
+  const raw = env.UI_ROOT;
+  if (raw === undefined || raw === "") {
+    return DEFAULT_UI_ROOT;
+  }
+  return raw;
 }

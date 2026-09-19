@@ -58,6 +58,13 @@ export function resultMessage(game: GameState): string | null {
   return "白の勝ちです。";
 }
 
+export function illegalMoveMessage(code: string | undefined): string | null {
+  if (code === "illegal_move") {
+    return "その手は打てません。別のマスを指定してください。";
+  }
+  return null;
+}
+
 export function GamePage({
   game,
   specimenNames,
@@ -89,7 +96,10 @@ export function GamePage({
     } catch (error) {
       if (error instanceof MoveRejectedError) {
         onGame(error.game);
-        setMessage("その手は打てません。別のマスを指定してください。");
+        const text = illegalMoveMessage(error.code);
+        if (text !== null) {
+          setMessage(text);
+        }
       } else {
         setMessage("着手を送れませんでした。");
       }

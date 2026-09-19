@@ -11,12 +11,14 @@ import {
   gameStateSchema,
   moveSchema,
 } from "./schemas.ts";
+import { mountUi } from "./spa.ts";
 import { gameEventsResponse } from "./sse.ts";
 import type { StrategyGateway } from "./strategy.ts";
 
 export type CreateAppOptions = {
   publicOrigin: string;
   strategy: StrategyGateway;
+  uiRoot?: string;
 };
 
 export const PUBLIC_API_ROUTES = [
@@ -105,7 +107,7 @@ async function getGameEvents(
 
 export function createApp(options: CreateAppOptions): Hono {
   const app = new Hono();
-  const { publicOrigin, strategy } = options;
+  const { publicOrigin, strategy, uiRoot } = options;
   app.use("*", async (c, next) => {
     if (
       isStateChangingMethod(c.req.method) &&
@@ -122,5 +124,8 @@ export function createApp(options: CreateAppOptions): Hono {
   );
   app.post("/api/games/:id/moves", (c) => postMove(c, strategy));
   app.get("/api/games/:id/events", (c) => getGameEvents(c, strategy));
+  if (uiRoot !== undefined && uiRoot !== "") {
+    mountUi(app, uiRoot);
+  }
   return app;
 }

@@ -39,6 +39,7 @@ export class MoveRejectedError extends Error {
   constructor(
     readonly game: GameState,
     detail: string,
+    readonly code?: string,
   ) {
     super(detail);
     this.name = "MoveRejectedError";
@@ -55,6 +56,7 @@ export async function playMove(id: string, move: Move): Promise<GameState> {
     applied?: boolean;
     game?: GameState;
     detail?: string;
+    code?: string;
   };
   if (body.game === undefined) {
     throw new Error("着手に失敗しました。");
@@ -63,6 +65,7 @@ export async function playMove(id: string, move: Move): Promise<GameState> {
     throw new MoveRejectedError(
       body.game,
       body.detail ?? "その手は打てません。",
+      body.code,
     );
   }
   return body.game;
