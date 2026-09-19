@@ -17,6 +17,11 @@ Cursor Cloud Agents 向けの作業ルール。アプリ固有のルールはプ
 - 要求 ID は再利用しない。版を上げ、改訂履歴に 1 行足す。
 - シードに無い数値や義務を shall として発明しない。決まらなければ TBD にする。
 
+## 設計
+
+- 配置と層の正は `docs/ARCHITECTURE.md`。言語・ライブラリ・コンテナの選定は `docs/tech-stack.md`。
+- 設計判断（言語、配置、層数など、shall を変えない判断）では `docs/srs.md` を編集しない。
+
 ## タスク管理
 
 - タスクと完了基準は **GitHub Issue** のみ。着手前に対象 Issue を読む（`gh issue view`）。

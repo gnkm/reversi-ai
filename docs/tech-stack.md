@@ -1,7 +1,7 @@
 ---
 title: 技術スタック
 product: Reversi Agents
-version: 0.2.6
+version: 0.2.7
 status: working
 date: 2026-09-19
 source: docs/srs.md
@@ -14,7 +14,7 @@ srs_version: 0.1.22
 | --- | --- |
 | 文書識別 | reversi-ai-tech-stack |
 | 対象ソフトウェア | Reversi Agents |
-| 版 | 0.2.6 |
+| 版 | 0.2.7 |
 | 状態 | 現行（設計。要求ではない） |
 | 日付 | 2026-09-19 |
 | 入力 | [`docs/srs.md`](srs.md) 0.1.22 |
@@ -111,7 +111,7 @@ flowchart LR
 
 ### 2.3 リポジトリ配置
 
-ディレクトリ名は言語ではなく、プロセスの責務にする。ルートの `package.json` はウェブアプリ用。戦略プロセスは `strategy/pyproject.toml`。pnpm workspace は初版では使わない。
+ディレクトリ名は言語ではなく、プロセスの責務にする。ルートの `package.json` はウェブアプリ用。戦略プロセスは `strategy/pyproject.toml`。pnpm workspace は初版では使わない。ファイル単位の置き場と目的は [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) を正とする。
 
 ```
 web/                 利用者向けウェブアプリ（ブラウザが話す相手）
@@ -452,6 +452,7 @@ OpenRouter の API キーは `podman secret create` でホストに置く。名�
 
 | 版 | 日付 | 内容 |
 | --- | --- | --- |
+| 0.2.7 | 2026-09-19 | ファイル単位の配置は `docs/ARCHITECTURE.md` を正とする |
 | 0.2.6 | 2026-09-19 | 対局の既定起動を Podman とし、OpenRouter の API キーを Podman secret で渡す |
 | 0.2.5 | 2026-09-19 | ディレクトリを責務名に改め、ウェブアプリを `web/`、戦略プロセスを `strategy/` とする |
 | 0.2.4 | 2026-09-19 | Python に import-linter / radon / xenon、TypeScript に dependency-cruiser と Biome の複雑度ゲートを加える |
