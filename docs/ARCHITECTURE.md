@@ -1,7 +1,7 @@
 ---
 title: アーキテクチャ
 product: Reversi Agents
-version: 0.1.3
+version: 0.1.4
 status: working
 date: 2026-09-20
 source: docs/srs.md
@@ -16,7 +16,7 @@ tech_stack_version: 0.2.8
 | --- | --- |
 | 文書識別 | reversi-ai-architecture |
 | 対象ソフトウェア | Reversi Agents |
-| 版 | 0.1.3 |
+| 版 | 0.1.4 |
 | 状態 | 現行（設計。要求ではない） |
 | 日付 | 2026-09-19 |
 | 入力 | [`docs/srs.md`](srs.md) 0.1.22、[`docs/tech-stack.md`](tech-stack.md) 0.2.8 |
@@ -109,6 +109,10 @@ reversi-ai/
 │   ├── tech-stack.md                  # 言語・ライブラリ・コンテナの選定
 │   ├── ARCHITECTURE.md                # 本ファイル。配置と層
 │   ├── openapi.yml                    # 対局 API の契約（OpenAPI 3.1）
+│   ├── benchmarks/
+│   │   ├── round-robin.json           # 総当たり基準結果。数値の正本
+│   │   ├── round-robin.md             # GitHub 閲覧用。JSON から生成
+│   │   └── render.py                  # round-robin.md を JSON から書く
 │   └── source-of-truth/
 │       └── 01-seed.md                 # シード。AI は編集禁止
 │
@@ -442,6 +446,7 @@ Issue の検証欄と CI は、この節の生コマンドを使う。ラッパ�
 
 | 版 | 日付 | 内容 |
 | --- | --- | --- |
+| 0.1.4 | 2026-09-20 | 総当たり基準結果を `docs/benchmarks/` に置く |
 | 0.1.3 | 2026-09-20 | web はコンテナ内で `0.0.0.0` を聞き、ホストへ出す口は `127.0.0.1` のままにする |
 | 0.1.2 | 2026-09-19 | Biome の検査対象を CI と同じ `web` にする |
 | 0.1.1 | 2026-09-19 | 対局と学習の起動を Podman に揃え、試験はホストとするコマンドを書く |
