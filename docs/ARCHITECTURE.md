@@ -2,7 +2,7 @@
 
 実装の置き方とプロセス分割。要求（shall）の正本は `docs/source-of-truth/` と GitHub Issue であり、本ファイルはそれらを変えない。
 
-対象: F001（対局エンジン）、F002（ランダム個体）、F008（Issue #9、盤の入力符号化）、F009（WTHOR 棋譜）、F021（Issue #22）。後続の実装 Issue は本ファイルと `docs/openapi.yml` に従う。
+対象: F001（対局エンジン）、F002（ランダム個体）、F003（ルールベース個体）、F008（Issue #9、盤の入力符号化）、F009（WTHOR 棋譜）、F021（Issue #22）。後続の実装 Issue は本ファイルと `docs/openapi.yml` に従う。
 
 ## 1. 目的
 
@@ -64,8 +64,13 @@ TypeScript 側は Zod、Python 側は Pydantic で実行時の形を検証する
 | --- | --- |
 | `catalog.py` | 個体の識別・カテゴリ・表示名・説明文の一覧。選択は個体 ID |
 | `random_uniform.py` | 手番の合法手を等確率で 1 つ選ぶ。合法手が無ければ着手しない |
+| `most_flips.py` | 裏返す相手石が最大の合法手。置いた自分の石は数えない。同点は a1…h8 |
+| `positional.py` | 着手直後の自分の石の点数合計が最大の合法手。同点は a1…h8 |
+| `position_table.py` | 位置評価の点数表。対局中は変わらない。座標はエンジンと同じ |
 
 カテゴリ `random` は「ランダム」である。表示名「ランダム (一様)」の個体は、対局中に WTHOR も学習済みモデルも参照しない。
+
+カテゴリ `rule_based` は「ルールベース」である。表示名「ルールベース (最多取り)」と「ルールベース (位置評価)」は説明文が互いに異なり、対局中に学習済みモデルも OpenRouter も呼ばない。点数表は対局中に変わらない。
 
 ## 8. 盤の入力符号化
 
@@ -97,6 +102,9 @@ strategy/
   src/reversi/agents/
     catalog.py
     random_uniform.py
+    most_flips.py
+    positional.py
+    position_table.py
   src/reversi/encode.py
   src/reversi/train/
     wthor.py
