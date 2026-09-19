@@ -10,7 +10,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from reversi.agents import jev
+from reversi.agents import chat_completions, extra_genai, jev
 from reversi.api import openrouter_key
 from reversi.engine.board import Square
 from reversi.engine.rules import initial_position, legal_places
@@ -214,3 +214,119 @@ def test_jev_rejects_choice_outside_legal_from_response(
     monkeypatch.setattr(jev, "OpenRouter", _fake_openrouter(illegal))
     with pytest.raises(jev.ExternalModelError, match="合法手"):
         jev.choose_move(position)
+
+
+def _fake_chat_openrouter(
+    responder: Callable[[dict[str, object]], SimpleNamespace],
+) -> type:
+    class Fake:
+        last_init: dict[str, object] | None = None
+        last_send: dict[str, object] | None = None
+
+        def __init__(self, **kwargs: object) -> None:
+            type(self).last_init = kwargs
+            self.chat = self
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args: object) -> bool:
+            return False
+
+        def send(self, **kwargs: object) -> SimpleNamespace:
+            type(self).last_send = kwargs
+            return responder(kwargs)
+
+    return Fake
+
+
+def test_extra_genai_chat_uses_https_and_given_model_id(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    secret = tmp_path / "openrouter-api-key"
+    secret.write_text(_API_KEY, encoding="utf-8")
+    monkeypatch.setattr(chat_completions, "SECRET_PATH", secret)
+    monkeypatch.setenv("OPENROUTER_API_KEY", _ENV_KEY)
+    position = initial_position()
+    places = legal_places(position)
+    chosen = places[0]
+    model_id = "vendor/extra-chat-model"
+
+    def respond(kwargs: dict[str, object]) -> SimpleNamespace:
+        del kwargs
+        return SimpleNamespace(
+            choices=[
+                SimpleNamespace(
+                    message=SimpleNamespace(content=chosen.algebraic, role="assistant")
+                )
+            ]
+        )
+
+    fake = _fake_chat_openrouter(respond)
+    monkeypatch.setattr(chat_completions, "OpenRouter", fake)
+    move = chat_completions.choose_move(position, model_id)
+    assert move is not None
+    assert move.square == chosen
+    init = fake.last_init
+    assert isinstance(init, dict)
+    assert init["api_key"] == _API_KEY
+    assert init["server_url"] == "https://openrouter.ai"
+    assert init["timeout_ms"] == chat_completions.CHAT_TIMEOUT_MS == 55_000
+    send = fake.last_send
+    assert isinstance(send, dict)
+    assert send["model"] == model_id
+    assert send["timeout_ms"] == chat_completions.CHAT_TIMEOUT_MS
+    retries = send["retries"]
+    assert getattr(retries, "strategy", None) == "none"
+    messages = send["messages"]
+    assert isinstance(messages, list)
+    assert messages[0]["role"] == "system"
+    assert chosen.algebraic in messages[1]["content"] or "legal_places" in messages[1]["content"]
+
+
+def test_extra_genai_chat_http_error_is_unplayable(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    secret = tmp_path / "openrouter-api-key"
+    secret.write_text(_API_KEY, encoding="utf-8")
+    monkeypatch.setattr(chat_completions, "SECRET_PATH", secret)
+
+    def boom(kwargs: dict[str, object]) -> SimpleNamespace:
+        del kwargs
+        raise RuntimeError(f"401 unauthorized {_API_KEY}")
+
+    monkeypatch.setattr(chat_completions, "OpenRouter", _fake_chat_openrouter(boom))
+    with pytest.raises(jev.ExternalModelError) as err:
+        chat_completions.choose_move(initial_position(), "vendor/extra-chat-model")
+    assert _API_KEY not in str(err.value)
+
+
+def test_extra_genai_chat_rejects_choice_outside_legal(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    secret = tmp_path / "openrouter-api-key"
+    secret.write_text(_API_KEY, encoding="utf-8")
+    monkeypatch.setattr(chat_completions, "SECRET_PATH", secret)
+    position = initial_position()
+    assert Square.parse("a1") not in legal_places(position)
+
+    def illegal(kwargs: dict[str, object]) -> SimpleNamespace:
+        del kwargs
+        return SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content="a1"))]
+        )
+
+    monkeypatch.setattr(chat_completions, "OpenRouter", _fake_chat_openrouter(illegal))
+    with pytest.raises(jev.ExternalModelError, match="合法手"):
+        chat_completions.choose_move(position, "vendor/extra-chat-model")
+
+
+def test_extra_genai_config_path_is_gitignored_data_file() -> None:
+    assert extra_genai.CONFIG_PATH.name == "genai.json"
+    assert extra_genai.CONFIG_PATH.parent.name == "data"
+    assert extra_genai.CONFIG_PATH == (
+        Path(__file__).resolve().parents[2] / "data" / "genai.json"
+    )
