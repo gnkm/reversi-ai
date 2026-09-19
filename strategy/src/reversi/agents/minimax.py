@@ -93,10 +93,8 @@ def _max_value(
             alpha,
             beta,
         )
-        if child_value > value:
-            value = child_value
-        if value > alpha:
-            alpha = value
+        value = max(value, child_value)
+        alpha = max(alpha, value)
         if alpha >= beta:
             break
     return value
@@ -120,10 +118,8 @@ def _min_value(
             alpha,
             beta,
         )
-        if child_value < value:
-            value = child_value
-        if value < beta:
-            beta = value
+        value = min(value, child_value)
+        beta = min(beta, value)
         if alpha >= beta:
             break
     return value
