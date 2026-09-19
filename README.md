@@ -37,7 +37,13 @@ mkcert -cert-file data/certs/cert.pem -key-file data/certs/key.pem 127.0.0.1
 続けて Podman secret を作ります。起動に必要です。生成 AI を使うときは OpenRouter の API キーを、使わないときは空でない適当な文字列を、標準入力から渡します。
 
 ```bash
-podman secret create openrouter-api-key -
+podman secret create openrouter-api-key-reversi -
+```
+
+1Password CLI を使う場合は以下のとおりです。
+
+```bash
+op item get 'OpenRouter API Key - reversi' --field '認証情報' --reveal | podman secret create openrouter-api-key-reversi -
 ```
 
 入力したあと、改行して Ctrl+D で確定します。API キーをリポジトリや `.env` に置かないでください。
@@ -45,7 +51,7 @@ podman secret create openrouter-api-key -
 ## 起動する
 
 ```bash
-podman compose up --build
+podman-compose up --build
 ```
 
 Google Chrome で次を開きます。
@@ -59,7 +65,7 @@ https://127.0.0.1:3000/
 止めるときは次を実行します。
 
 ```bash
-podman compose down
+podman-compose down
 ```
 
 ## 対局する

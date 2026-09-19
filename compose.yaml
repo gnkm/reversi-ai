@@ -32,8 +32,9 @@ services:
       - ./data:/data
       - ./models:/models
     secrets:
-      - openrouter-api-key
+      - source: openrouter-api-key-reversi
+        target: /run/secrets/openrouter-api-key
 
 secrets:
-  openrouter-api-key:
+  openrouter-api-key-reversi:
     external: true
