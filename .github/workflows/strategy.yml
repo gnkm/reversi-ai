@@ -19,6 +19,8 @@ jobs:
         run: uv run --directory strategy pytest tests/test_encode.py -q
       - name: WTHOR の 8×8 棋譜
         run: uv run --directory strategy pytest tests/test_wthor.py -q
+      - name: 戦略 API の 1 局
+        run: uv run --directory strategy pytest tests/test_api.py -q
       - name: import lint
         run: uv run --directory strategy lint-imports
       - name: complexity
