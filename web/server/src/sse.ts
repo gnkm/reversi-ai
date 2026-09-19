@@ -20,11 +20,21 @@ function gameOverEvent(game: GameState) {
   return { type: "game_over" as const, game };
 }
 
+function unplayableView(game: GameState): GameState {
+  return {
+    ...game,
+    status: "unplayable",
+    continuation_possible: false,
+    unplayable_reason: "external_model_failed",
+  };
+}
+
 function unplayableEvent(game: GameState) {
+  const view = unplayableView(game);
   return {
     type: "unplayable" as const,
-    reason: game.unplayable_reason ?? "external_model_failed",
-    game,
+    reason: view.unplayable_reason ?? "external_model_failed",
+    game: view,
   };
 }
 
@@ -82,7 +92,7 @@ export async function streamLiveGameEvents(
   sleep: (ms: number) => Promise<void>,
   aborted: () => boolean,
   initial: GameState,
-  followUp: () => Promise<GameState | undefined>,
+  followUp: () => Promise<GameState | null>,
   pollIntervalMs: number,
 ): Promise<void> {
   await write("snapshot", snapshotEvent(initial));
@@ -93,7 +103,8 @@ export async function streamLiveGameEvents(
       return;
     }
     const next = await followUp();
-    if (next === undefined) {
+    if (next === null) {
+      await write("unplayable", unplayableEvent(previous));
       return;
     }
     await emitMoveApplied(write, previous, next);

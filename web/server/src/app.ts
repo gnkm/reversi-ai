@@ -115,10 +115,10 @@ async function readStrategyGame(
 async function followStrategyGame(
   strategy: StrategyGateway,
   id: string,
-): Promise<GameState | undefined> {
+): Promise<GameState | null> {
   const got = await readStrategyGame(strategy, id);
   if (got instanceof Response) {
-    return undefined;
+    return null;
   }
   return got;
 }

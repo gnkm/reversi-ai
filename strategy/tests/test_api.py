@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -17,13 +18,15 @@ from reversi.agents.random_uniform import SPECIMEN_ID
 from reversi.api import create_app
 from reversi.api.schemas import (
     Catalog,
+    CreateGameRequest,
     GameState,
     GameUnplayable,
     IllegalMoveNotApplied,
     MoveApplied,
+    SpecimenPlayer,
 )
 from reversi.api.session import GameStore
-from reversi.engine.rules import initial_position, legal_places
+from reversi.engine.rules import Place, initial_position, legal_places
 
 _API_DIR = Path(__file__).resolve().parents[1] / "src" / "reversi" / "api"
 _HUMAN = {"kind": "human"}
@@ -242,6 +245,44 @@ def test_agent_vs_agent_completes_without_waiting_for_human(
         json={"type": "place", "square": "d3"},
     )
     assert rejected.status_code == 409
+
+
+def test_agent_vs_agent_choice_does_not_block_snapshot(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    entered = threading.Event()
+    release = threading.Event()
+
+    def blocked_choose(_specimen_id, position, _rng=None):
+        entered.set()
+        assert release.wait(timeout=2)
+        places = legal_places(position)
+        return Place(places[0]) if places else None
+
+    monkeypatch.setattr("reversi.api.session.catalog.choose_move", blocked_choose)
+    store = GameStore(db_path=tmp_path / "games.sqlite")
+    specimen = SpecimenPlayer(kind="specimen", specimen_id=SPECIMEN_ID)
+    opening = store.start(CreateGameRequest(black=specimen, white=specimen))
+    assert entered.wait(timeout=2)
+    seen: dict[str, GameState] = {}
+
+    def read_snapshot() -> None:
+        seen["game"] = store.snapshot(opening.id)
+
+    reader = threading.Thread(target=read_snapshot)
+    try:
+        reader.start()
+        reader.join(timeout=1)
+        assert reader.is_alive() is False
+        got = seen["game"]
+        assert got.id == opening.id
+        assert got.is_over is False
+    finally:
+        release.set()
+        thread = store._autoplay_thread
+        if thread is not None:
+            thread.join(timeout=5)
 
 
 def test_new_game_can_start_during_or_after(client: TestClient) -> None:
