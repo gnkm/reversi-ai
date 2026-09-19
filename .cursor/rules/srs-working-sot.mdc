@@ -1,0 +1,12 @@
+---
+description: docs/srs.md は開発中の要求正本。shall 変更は Issue 経由で混ぜない。
+alwaysApply: true
+---
+
+# 開発中の要求正本（`docs/srs.md`）
+
+- ソフトウェア要求の正本は `docs/srs.md`。シードは `docs/source-of-truth/`（AI は編集禁止）。
+- 設計判断（言語、配置、層数など）では `docs/srs.md` を編集しない。
+- shall の追加・変更・撤回、または新しい TBD は、対象 GitHub Issue を読んでから行う。実装だけの PR に混ぜない。
+- シードに無い数値や義務を shall として発明しない。決まらなければ TBD にする。
+- 要求 ID は再利用しない。版を上げ、改訂履歴に 1 行足す。

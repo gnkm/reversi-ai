@@ -24,7 +24,6 @@ from reversi.api.schemas import (
 from reversi.engine.board import Color, Square
 from reversi.engine.rules import (
     IllegalMoveError,
-    PassMove as EnginePass,
     Place,
     Position,
     initial_position,
@@ -32,6 +31,9 @@ from reversi.engine.rules import (
     legal_places,
     pass_is_legal,
     play,
+)
+from reversi.engine.rules import (
+    PassMove as EnginePass,
 )
 from reversi.engine.score import official_score, stone_counts
 

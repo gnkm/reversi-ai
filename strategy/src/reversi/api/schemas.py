@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Literal, Union
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -67,7 +67,7 @@ class SpecimenPlayer(_Strict):
 
 
 PlayerSpec = Annotated[
-    Union[HumanPlayer, SpecimenPlayer],
+    HumanPlayer | SpecimenPlayer,
     Field(discriminator="kind"),
 ]
 
@@ -86,7 +86,7 @@ class PassMove(_Strict):
     type: Literal["pass"]
 
 
-Move = Annotated[Union[PlaceMove, PassMove], Field(discriminator="type")]
+Move = Annotated[PlaceMove | PassMove, Field(discriminator="type")]
 
 
 class OfficialScore(_Strict):

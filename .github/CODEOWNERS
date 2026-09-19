@@ -18,12 +18,17 @@
 # ソース・オブ・トゥルース（人間のみ編集。AI は read-only）
 /docs/source-of-truth/  @gnkm
 
+# 開発中のソフトウェア要求の正本（shall の変更は CODEOWNERS レビュー）
+/docs/srs.md            @gnkm
+
 # 承認・検証の基準
 /.github/               @gnkm
 /.github/CODEOWNERS     @gnkm
 
 # 検査の閾値。緩める変更を必ずレビューに通すため
-/strategy/pyproject.toml @gnkm
+/biome.json                 @gnkm
+/.dependency-cruiser.cjs    @gnkm
+/strategy/pyproject.toml    @gnkm
 
 # git hooks（無効化・緩和をレビューに通す）
 /lefthook.yml           @gnkm
