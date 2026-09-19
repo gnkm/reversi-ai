@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import dataclass
 from pathlib import Path
 from random import Random
@@ -48,6 +49,10 @@ class LinearPolicy:
             raise ValueError(
                 f"重みの長さは {VECTOR_SIZE} でなければなりません"
             )
+        if not math.isfinite(self.bias):
+            raise ValueError("bias は有限値でなければなりません")
+        if any(not math.isfinite(weight) for weight in self.weights):
+            raise ValueError("重みは有限値でなければなりません")
 
 
 _CACHED: LinearPolicy | None = None
