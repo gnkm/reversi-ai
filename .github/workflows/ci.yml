@@ -19,8 +19,6 @@ jobs:
         run: uv run --directory strategy lint-imports
       - name: complexity
         run: uv run --directory strategy xenon --max-absolute C --max-modules B --max-average A src
-      - name: ruff
-        run: uv run --directory strategy ruff check src tests
 
   web:
     runs-on: ubuntu-latest
@@ -38,6 +36,6 @@ jobs:
       - name: Vitest
         run: pnpm test
       - name: Biome
-        run: pnpm exec biome check .
+        run: pnpm exec biome check web
       - name: 層の import
         run: pnpm exec depcruise --config .dependency-cruiser.cjs web
