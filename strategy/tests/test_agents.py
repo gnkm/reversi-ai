@@ -1,4 +1,4 @@
-"""カタログと戦略個体（ランダム・最多取り・位置評価・強化学習）。"""
+"""カタログと戦略個体（ランダム・最多取り・位置評価・ミニマックス・強化学習）。"""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from random import Random
 
 import pytest
 
-from reversi.agents import most_flips, positional
+from reversi.agents import minimax, most_flips, positional
 from reversi.agents.catalog import CatalogItem, get, items
 from reversi.agents.catalog import choose_move as catalog_choose
 from reversi.agents.position_table import POSITION_SCORES, score_at
@@ -31,6 +31,7 @@ from reversi.engine.rules import (
     flips_for,
     initial_position,
     is_over,
+    legal_moves,
     legal_places,
     pass_is_legal,
     play,
@@ -402,7 +403,21 @@ def _linear_policy(black_squares: dict[str, float], bias: float = 0.0):
     for algebraic, value in black_squares.items():
         square = Square.parse(algebraic)
         weights[_black_feature_index(square)] = value
-    return LinearPolicy(tuple(weights), bias)
+    return LinearPolicy(
+        weights=tuple(float(value) for value in weights),
+        bias=float(bias),
+    )
+
+
+def test_rl_policy_rejects_non_finite_values() -> None:
+    from reversi.agents.rl import LinearPolicy
+
+    with pytest.raises(ValueError, match="有限"):
+        LinearPolicy(tuple(0.0 for _ in range(VECTOR_SIZE)), float("nan"))
+    inf_weights = [0.0] * VECTOR_SIZE
+    inf_weights[0] = float("inf")
+    with pytest.raises(ValueError, match="有限"):
+        LinearPolicy(tuple(inf_weights), 0.0)
 
 
 def test_catalog_lists_rl_self_play() -> None:
@@ -536,4 +551,197 @@ def test_rl_training_does_not_read_wthor(tmp_path: Path, monkeypatch: pytest.Mon
 
     assert load_policy(out).weights == policy.weights
 
+
+def test_rl_td_update_moves_weights_toward_terminal_reward() -> None:
+    import numpy as np
+
+    from reversi.train.rl import _features, _td_update
+
+    board = initial_position().board
+    phi = _features(board)
+    zeros = np.zeros(VECTOR_SIZE, dtype=np.float64)
+    alpha = 0.5
+    toward_win, bias_win = _td_update(zeros.copy(), 0.0, (board,), 1.0, alpha)
+    np.testing.assert_allclose(toward_win, alpha * phi)
+    assert bias_win == pytest.approx(alpha)
+
+    toward_loss, bias_loss = _td_update(zeros.copy(), 0.0, (board,), -1.0, alpha)
+    np.testing.assert_allclose(toward_loss, -alpha * phi)
+    assert bias_loss == pytest.approx(-alpha)
+
+    later = empty_board()
+    updated, _ = _td_update(zeros.copy(), 0.0, (board, later), 1.0, alpha)
+    # 先頭局面の TD 目標は次局面の価値 0 なので動かず、終端報酬は末局面だけに乗る。
+    np.testing.assert_allclose(updated, alpha * _features(later))
+
+
+def _spec_leaf_score(board: Board, root: Color) -> int:
+    """SRS-FUN-026 の葉評価。位置評価の点数表の差。"""
+    return positional.own_stone_score(board, root) - positional.own_stone_score(
+        board, root.opponent
+    )
+
+
+def _plain_minimax_value(position: Position, depth: int, root: Color) -> int:
+    """アルファベータ無しのミニマックス。パスも 1 深さ。"""
+    if depth >= 4 or is_over(position):
+        return _spec_leaf_score(position.board, root)
+    moves = legal_moves(position)
+    if not moves:
+        return _spec_leaf_score(position.board, root)
+    values = tuple(
+        _plain_minimax_value(play(position, move), depth + 1, root) for move in moves
+    )
+    if position.side_to_move is root:
+        return max(values)
+    return min(values)
+
+
+def _plain_minimax_choose(position: Position) -> Place | None:
+    root = position.side_to_move
+    best_square = None
+    best_value: int | None = None
+    for square in legal_places(position):
+        value = _plain_minimax_value(play(position, Place(square)), 1, root)
+        if best_value is None or value > best_value:
+            best_value = value
+            best_square = square
+    if best_square is None:
+        return None
+    return Place(best_square)
+
+
+def test_catalog_lists_minimax() -> None:
+    item = _item_by_display_name("ルールベース (ミニマックス)")
+    assert item.specimen_id == minimax.SPECIMEN_ID == "minimax"
+    assert item.category == minimax.CATEGORY == "rule_based"
+    assert item.display_name == minimax.DISPLAY_NAME
+    assert item.description == minimax.DESCRIPTION
+    assert item.description.strip()
+    assert _JAPANESE.search(item.description)
+    assert "ミニマックス" in item.description
+    assert "深さ 4" in item.description
+    assert "点数表" in item.description
+    assert get(minimax.SPECIMEN_ID) == item
+    with pytest.raises(KeyError):
+        get("rule_based")
+
+
+def test_minimax_leaf_score_is_root_minus_opponent_table() -> None:
+    board = empty_board().replacing(
+        {
+            Square.parse("a1"): Stone.BLACK,
+            Square.parse("b1"): Stone.WHITE,
+            Square.parse("c3"): Stone.BLACK,
+        }
+    )
+    assert score_at(Square.parse("a1")) == 100
+    assert score_at(Square.parse("b1")) == -20
+    assert score_at(Square.parse("c3")) == 1
+    assert minimax.leaf_score(board, Color.BLACK) == 100 + 1 - (-20)
+    assert minimax.leaf_score(board, Color.WHITE) == -20 - (100 + 1)
+    assert minimax.leaf_score(board, Color.BLACK) == _spec_leaf_score(board, Color.BLACK)
+    assert minimax.leaf_score(board, Color.BLACK) != positional.own_stone_score(
+        board, Color.BLACK
+    )
+
+
+def test_minimax_picks_depth_4_value_with_a1_h8_ties() -> None:
+    position = initial_position()
+    places = legal_places(position)
+    assert tuple(square.algebraic for square in places) == ("d3", "c4", "f5", "e6")
+    values = {
+        square.algebraic: _plain_minimax_value(
+            play(position, Place(square)), 1, Color.BLACK
+        )
+        for square in places
+    }
+    best = max(values.values())
+    first_best = next(square for square in places if values[square.algebraic] == best)
+    move = minimax.choose_move(position)
+    assert move == Place(first_best)
+    assert move == _plain_minimax_choose(position)
+    via_catalog = catalog_choose(minimax.SPECIMEN_ID, position)
+    assert via_catalog == move
+    assert minimax.choose_move(position, Random(0)) == move
+
+
+def test_minimax_looks_ahead_past_immediate_positional() -> None:
+    """初手 d3 のあと、位置評価は c3、深さ 4 は e3 を選ぶ。"""
+    after_d3 = play(initial_position(), Place(Square.parse("d3")))
+    places = legal_places(after_d3)
+    assert tuple(square.algebraic for square in places) == ("c3", "e3", "c5")
+    assert positional.choose_move(after_d3) == Place(Square.parse("c3"))
+    move = minimax.choose_move(after_d3)
+    assert move == Place(Square.parse("e3"))
+    assert move == _plain_minimax_choose(after_d3)
+    assert move != positional.choose_move(after_d3)
+
+
+def test_minimax_matches_plain_search_on_corner_and_pass_lines() -> None:
+    corner = _position_from_rank8_rows(_CORNER_VS_TWO_FLIPS, Color.BLACK)
+    assert minimax.choose_move(corner) == _plain_minimax_choose(corner)
+    assert minimax.choose_move(corner) is not None
+
+    # 白番なら a1 のみ。探索中に黒はパスし、白の着手で終局する。
+    almost_full = _almost_full_white_with_black_on_b1()
+    white_to_move = Position(almost_full.board, Color.WHITE)
+    assert legal_places(white_to_move) == (Square.parse("a1"),)
+    assert pass_is_legal(Position(almost_full.board, Color.BLACK))
+    assert minimax.choose_move(white_to_move) == Place(Square.parse("a1"))
+    assert minimax.choose_move(white_to_move) == _plain_minimax_choose(white_to_move)
+
+    # 黒が 2 手持ち、一方の後は白がパスする局面でも素朴探索と一致する。
+    two_empties = empty_board().replacing(
+        {
+            Square.parse("b1"): Stone.BLACK,
+            Square.parse("g8"): Stone.BLACK,
+            **{
+                Square(file=file, rank=rank): Stone.WHITE
+                for rank in range(8)
+                for file in range(8)
+                if (file, rank) not in {(0, 0), (1, 0), (6, 7), (7, 7)}
+            },
+        }
+    )
+    branched = Position(two_empties, Color.WHITE)
+    places = legal_places(branched)
+    assert Square.parse("a1") in places
+    assert Square.parse("h8") in places
+    assert minimax.choose_move(branched) == _plain_minimax_choose(branched)
+
+
+def test_minimax_does_not_move_when_no_legal_places() -> None:
+    assert minimax.choose_move(_almost_full_white_with_black_on_b1()) is None
+    assert minimax.choose_move(_both_sides_cannot_place()) is None
+
+
+def test_minimax_depth_stays_four_during_play() -> None:
+    assert minimax.SEARCH_DEPTH == 4
+    snapshot = minimax.SEARCH_DEPTH
+    position = initial_position()
+    first = minimax.choose_move(position)
+    assert first is not None
+    after = play(position, first)
+    minimax.choose_move(after)
+    minimax.choose_move(_position_from_rank8_rows(_CORNER_VS_TWO_FLIPS, Color.BLACK))
+    assert minimax.SEARCH_DEPTH == snapshot == 4
+
+
+def test_minimax_source_does_not_call_models() -> None:
+    for filename in (
+        "minimax.py",
+        "position_table.py",
+        "catalog.py",
+    ):
+        source = _module_source(filename)
+        roots = _imported_roots(source)
+        assert roots.isdisjoint(_FORBIDDEN_IMPORT_ROOTS)
+        tree = ast.parse(source)
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Constant) and isinstance(node.value, str):
+                lowered = node.value.lower()
+                assert "ffothello.org" not in lowered
+                assert ".wtb" not in lowered
+                assert "openrouter.ai" not in lowered
 
