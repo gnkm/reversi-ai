@@ -31,7 +31,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: "bash e2e/start-stack.sh",
+    command: "podman compose up --build",
     url: "https://127.0.0.1:3000",
     reuseExistingServer: true,
     ignoreHTTPSErrors: true,
