@@ -1,4 +1,4 @@
-"""カタログと戦略個体（ランダム・最多取り・位置評価・ミニマックス・強化学習・生成 AI）。"""
+"""カタログと戦略個体（ランダム・最多取り・位置評価・ミニマックス・定石・強化学習・生成 AI）。"""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from random import Random
 
 import pytest
 
-from reversi.agents import jev, minimax, most_flips, positional
+from reversi.agents import jev, minimax, most_flips, opening, positional
 from reversi.agents.catalog import CatalogItem, get, items
 from reversi.agents.catalog import choose_move as catalog_choose
 from reversi.agents.position_table import POSITION_SCORES, score_at
@@ -848,4 +848,138 @@ def test_minimax_source_does_not_call_models() -> None:
                 assert "ffothello.org" not in lowered
                 assert ".wtb" not in lowered
                 assert "openrouter.ai" not in lowered
+
+
+def _play_algebraic(*names: str) -> Position:
+    position = initial_position()
+    for name in names:
+        position = play(position, Place(Square.parse(name)))
+    return position
+
+
+def test_catalog_lists_opening_specimen() -> None:
+    item = _item_by_display_name("ルールベース (定石)")
+    assert item.specimen_id == opening.SPECIMEN_ID == "opening"
+    assert item.category == opening.CATEGORY == "rule_based"
+    assert item.display_name == opening.DISPLAY_NAME
+    assert item.description == opening.DESCRIPTION
+    assert item.description.strip()
+    assert _JAPANESE.search(item.description)
+    assert "定石" in item.description
+    assert "位置評価" in item.description
+    assert get(opening.SPECIMEN_ID) == item
+    with pytest.raises(KeyError):
+        get("rule_based")
+
+
+def test_opening_book_lines_are_tiger_cow_mouse_and_fixed() -> None:
+    expected = (
+        ("f5", "d6", "c3", "d3", "c4"),
+        ("f5", "f6", "e6", "d6", "c5"),
+        ("f5", "f4", "e3", "f6", "d3"),
+    )
+    snapshot = tuple(tuple(square.algebraic for square in line) for line in opening.BOOK_LINES)
+    assert snapshot == expected
+    assert isinstance(opening.BOOK_LINES, tuple)
+    assert all(isinstance(line, tuple) for line in opening.BOOK_LINES)
+    opening.choose_move(initial_position())
+    opening.choose_move(_play_algebraic("f5"))
+    opening.choose_move(_play_algebraic("f5", "d6", "c4"))
+    after = tuple(tuple(square.algebraic for square in line) for line in opening.BOOK_LINES)
+    assert after == snapshot == expected
+    assert len(opening.BOOK_LINES) == 3
+
+
+def test_opening_initial_picks_d3_among_four_symmetric_first_moves() -> None:
+    position = initial_position()
+    places = legal_places(position)
+    assert [square.algebraic for square in places] == ["d3", "c4", "f5", "e6"]
+    move = opening.choose_move(position)
+    assert move == Place(Square.parse("d3"))
+    assert opening.choose_move(position, Random(0)) == move
+    via_catalog = catalog_choose(opening.SPECIMEN_ID, position)
+    assert via_catalog == move
+
+
+def test_opening_after_f5_picks_f4_by_a1_to_h8_order() -> None:
+    # 虎 d6・牛 f6・鼠 f4。FUN-014 は a1, b1, …, h1, a2, …, h8 なので f4。
+    position = _play_algebraic("f5")
+    places = legal_places(position)
+    assert [square.algebraic for square in places] == ["f4", "d6", "f6"]
+    move = opening.choose_move(position)
+    assert move == Place(Square.parse("f4"))
+    assert positional.choose_move(position) == Place(Square.parse("f6"))
+    assert move != positional.choose_move(position)
+    assert catalog_choose(opening.SPECIMEN_ID, position) == move
+
+
+def test_opening_follows_each_canonical_line() -> None:
+    assert opening.choose_move(_play_algebraic("f5", "d6")) == Place(Square.parse("c3"))
+    assert opening.choose_move(_play_algebraic("f5", "f6")) == Place(Square.parse("e6"))
+    assert opening.choose_move(_play_algebraic("f5", "f4")) == Place(Square.parse("e3"))
+    assert opening.choose_move(_play_algebraic("f5", "d6", "c3")) == Place(Square.parse("d3"))
+    assert opening.choose_move(_play_algebraic("f5", "f6", "e6")) == Place(Square.parse("d6"))
+    assert opening.choose_move(_play_algebraic("f5", "f4", "e3")) == Place(Square.parse("f6"))
+
+
+def test_opening_symmetric_c4_first_move_stays_on_book() -> None:
+    position = _play_algebraic("c4")
+    places = legal_places(position)
+    assert Square.parse("c3") in places
+    move = opening.choose_move(position)
+    assert move == Place(Square.parse("c3"))
+    assert move.square in places
+
+
+def test_opening_off_book_matches_positional() -> None:
+    position = _play_algebraic("f5", "d6", "c4")
+    move = opening.choose_move(position)
+    assert move == positional.choose_move(position)
+    assert move == positional.choose_move(position, Random(1))
+    assert catalog_choose(opening.SPECIMEN_ID, position) == move
+
+
+def test_opening_after_complete_line_matches_positional() -> None:
+    tiger = _play_algebraic("f5", "d6", "c3", "d3", "c4")
+    cow = _play_algebraic("f5", "f6", "e6", "d6", "c5")
+    mouse = _play_algebraic("f5", "f4", "e3", "f6", "d3")
+    assert opening.choose_move(tiger) == positional.choose_move(tiger)
+    assert opening.choose_move(cow) == positional.choose_move(cow)
+    assert opening.choose_move(mouse) == positional.choose_move(mouse)
+
+
+def test_opening_after_pass_matches_positional() -> None:
+    passed = play(_almost_full_white_with_black_on_b1(), PassMove())
+    assert legal_places(passed)
+    assert opening.choose_move(passed) == positional.choose_move(passed)
+
+
+def test_opening_stays_off_book_after_pass_then_place() -> None:
+    passed = play(_almost_full_white_with_black_on_b1(), PassMove())
+    assert passed.passed is True
+    after_place = play(passed, Place(Square.parse("a1")))
+    assert after_place.passed is True
+    assert after_place.placed == (Square.parse("a1"),)
+    assert opening.choose_move(after_place) == positional.choose_move(after_place)
+
+
+def test_opening_does_not_move_when_no_legal_places() -> None:
+    assert opening.choose_move(_almost_full_white_with_black_on_b1()) is None
+    assert opening.choose_move(_both_sides_cannot_place()) is None
+
+
+def test_opening_source_does_not_call_models_or_wthor() -> None:
+    for filename in ("opening.py", "catalog.py"):
+        source = _module_source(filename)
+        roots = _imported_roots(source)
+        assert roots.isdisjoint(_FORBIDDEN_IMPORT_ROOTS)
+        assert "wthor" not in roots
+        tree = ast.parse(source)
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Constant) and isinstance(node.value, str):
+                lowered = node.value.lower()
+                assert "ffothello.org" not in lowered
+                assert ".wtb" not in lowered
+                assert "openrouter.ai" not in lowered
+                assert "wthor" not in lowered
 
