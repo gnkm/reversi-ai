@@ -1,0 +1,690 @@
+# 対局 API の契約（正本）。F021 / Issue #22。
+# 利用者向け Hono（/api/*）と、それが中継する戦略 FastAPI の JSON を表す。
+# Pydantic と Zod は components と同じ形にする。
+openapi: "3.1.0"
+info:
+  title: Reversi AI 対局 API
+  version: "0.1.0"
+  summary: カタログ・対局・着手・SSE の HTTP 契約
+  description: |
+    リソースは名詞の複数形。利用者向け Hono は `/api/*` を公開する（文書ルートの `servers`）。
+    戦略 FastAPI は `/decide` のみを公開し、パス項目の `servers` で Hono と混ぜない。
+    中継する JSON は同じ `components` である。
+
+    JSON は snake_case。対局の公開識別子 `id` は UUID v4（小文字・ハイフン）。
+    スキーマ `GameId` の `pattern` がこの形を制約する。
+
+    盤の代数表記は列 a–h が左から右、行 1–8 が上から下（a1 が左上）。
+    `board[0][0]` が a1、`board[0][7]` が h1、`board[7][0]` が a8。
+    開始配置は d4・e5 が白、e4・d5 が黒。
+
+    違法な着手は盤に適用しない。外部モデルが失敗した対局は継続できない。
+
+    ブラウザへ OpenAPI を公開することは要求ではない。本ファイルが契約の正本である。
+servers:
+  - url: http://127.0.0.1:3000
+    description: 利用者向け Hono。`/api/*` のみ。`/decide` は公開しない。
+tags:
+  - name: catalog
+    description: 対局に出せる戦略個体の一覧
+  - name: games
+    description: 対局の作成・着手・状態
+  - name: strategy
+    description: 戦略プロセス内部。Hono が中継する JSON
+paths:
+  /api/catalog:
+    $ref: "#/components/pathItems/catalog"
+  /api/games:
+    $ref: "#/components/pathItems/games"
+  /api/games/{id}:
+    $ref: "#/components/pathItems/game"
+  /api/games/{id}/moves:
+    $ref: "#/components/pathItems/gameMoves"
+  /api/games/{id}/events:
+    $ref: "#/components/pathItems/gameEvents"
+  /decide:
+    servers:
+      - url: http://127.0.0.1:8000
+        description: 戦略 FastAPI。`/decide` のみ。`/api/*` は公開しない。
+    post:
+      operationId: decideMove
+      tags: [strategy]
+      summary: 戦略個体が着手を返す
+      description: |
+        Hono が中継する内部 JSON。`specimen_id` と対局状態は
+        カタログ・対局と同じ components である。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DecideRequest"
+      responses:
+        "200":
+          description: 選んだ着手。まだ盤には適用していない。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Move"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ExternalModelFailed"
+        "500":
+          $ref: "#/components/responses/InternalError"
+components:
+  parameters:
+    GameId:
+      name: id
+      in: path
+      required: true
+      description: 対局 ID
+      schema:
+        $ref: "#/components/schemas/GameId"
+  responses:
+    BadRequest:
+      description: リクエストの形が契約と違う
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemBadRequest"
+    NotFound:
+      description: 対局または個体が無い
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemNotFound"
+    IllegalMoveNotApplied:
+      description: 違法な着手。盤面には適用せず、対局状態はリクエスト前のまま。
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/IllegalMoveNotApplied"
+    GameUnplayable:
+      description: 外部モデル失敗などにより対局を継続できない
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/GameUnplayable"
+    ExternalModelFailed:
+      description: 外部モデルの呼び出しに失敗し、この対局は継続不能
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemExternalModelFailed"
+    InternalError:
+      description: サーバ内部の失敗
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemInternalError"
+  pathItems:
+    catalog:
+      get:
+        operationId: listCatalog
+        tags: [catalog]
+        summary: 戦略個体のカタログ
+        responses:
+          "200":
+            description: カタログ
+            content:
+              application/json:
+                schema:
+                  $ref: "#/components/schemas/Catalog"
+          "500":
+            $ref: "#/components/responses/InternalError"
+    games:
+      post:
+        operationId: createGame
+        tags: [games]
+        summary: 対局を開始する
+        requestBody:
+          required: true
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateGameRequest"
+        responses:
+          "201":
+            description: 開始した対局
+            headers:
+              Location:
+                description: 作成した対局のパス
+                schema:
+                  type: string
+                  format: uri-reference
+            content:
+              application/json:
+                schema:
+                  $ref: "#/components/schemas/GameState"
+          "400":
+            $ref: "#/components/responses/BadRequest"
+          "404":
+            $ref: "#/components/responses/NotFound"
+          "422":
+            $ref: "#/components/responses/ExternalModelFailed"
+          "500":
+            $ref: "#/components/responses/InternalError"
+    game:
+      parameters:
+        - $ref: "#/components/parameters/GameId"
+      get:
+        operationId: getGame
+        tags: [games]
+        summary: 対局状態を返す
+        responses:
+          "200":
+            description: 対局状態
+            content:
+              application/json:
+                schema:
+                  $ref: "#/components/schemas/GameState"
+          "404":
+            $ref: "#/components/responses/NotFound"
+          "500":
+            $ref: "#/components/responses/InternalError"
+    gameMoves:
+      parameters:
+        - $ref: "#/components/parameters/GameId"
+      post:
+        operationId: playMove
+        tags: [games]
+        summary: 着手を指定する
+        description: |
+          合法なら適用したあとの対局状態を返す。
+          違法なら適用せず、リクエスト前の対局状態を 409 で返す。
+          継続不能な対局への着手は 409 で `GameUnplayable` を返す。
+        requestBody:
+          required: true
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Move"
+        responses:
+          "200":
+            description: 着手を適用した
+            content:
+              application/json:
+                schema:
+                  $ref: "#/components/schemas/MoveApplied"
+          "400":
+            $ref: "#/components/responses/BadRequest"
+          "404":
+            $ref: "#/components/responses/NotFound"
+          "409":
+            description: 違法で非適用、または継続不能
+            content:
+              application/json:
+                schema:
+                  oneOf:
+                    - $ref: "#/components/schemas/IllegalMoveNotApplied"
+                    - $ref: "#/components/schemas/GameUnplayable"
+                  discriminator:
+                    propertyName: code
+                    mapping:
+                      illegal_move: "#/components/schemas/IllegalMoveNotApplied"
+                      external_model_failed: "#/components/schemas/GameUnplayable"
+          "500":
+            $ref: "#/components/responses/InternalError"
+    gameEvents:
+      parameters:
+        - $ref: "#/components/parameters/GameId"
+      get:
+        operationId: streamGameEvents
+        tags: [games]
+        summary: 対局イベントを SSE で流す
+        description: |
+          `Content-Type: text/event-stream`。
+          各イベントの `event` は `GameEvent.type` と一致し、`data` は GameEvent の JSON。
+        responses:
+          "200":
+            description: イベントストリーム
+            content:
+              text/event-stream:
+                schema:
+                  $ref: "#/components/schemas/GameEvent"
+          "404":
+            $ref: "#/components/responses/NotFound"
+          "500":
+            $ref: "#/components/responses/InternalError"
+  schemas:
+    GameId:
+      type: string
+      format: uuid
+      pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+      description: 対局の公開識別子。UUID v4、小文字、ハイフン区切り。
+    SpecimenId:
+      type: string
+      minLength: 1
+      description: 戦略個体の ID
+    Color:
+      type: string
+      enum: [black, white]
+      description: 石の色。黒が先手。
+    Cell:
+      type: string
+      enum: [empty, black, white]
+      description: 1 マスの状態
+    Square:
+      type: string
+      pattern: "^[a-h][1-8]$"
+      description: 代数表記。a1 が左上。
+      examples: [d3, e6]
+    Category:
+      type: string
+      enum:
+        - random
+        - rule_based
+        - machine_learning
+        - reinforcement_learning
+        - neural_network
+      description: 戦略個体のカテゴリ
+    ErrorCode:
+      type: string
+      enum:
+        - validation_error
+        - game_not_found
+        - specimen_not_found
+        - illegal_move
+        - game_already_over
+        - external_model_failed
+        - internal_error
+    Problem:
+      type: object
+      additionalProperties: false
+      required: [type, title, status, detail, code]
+      description: |
+        RFC 9457 Problem Details。`detail` にスタックトレース、内部パス、秘密を入れない。
+      properties:
+        type:
+          type: string
+          format: uri
+          description: "`urn:reversi-ai:error:{code}`"
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        code:
+          $ref: "#/components/schemas/ErrorCode"
+    ProblemBadRequest:
+      allOf:
+        - $ref: "#/components/schemas/Problem"
+        - type: object
+          properties:
+            status:
+              const: 400
+            code:
+              const: validation_error
+    ProblemNotFound:
+      allOf:
+        - $ref: "#/components/schemas/Problem"
+        - type: object
+          properties:
+            status:
+              const: 404
+            code:
+              enum: [game_not_found, specimen_not_found]
+    ProblemExternalModelFailed:
+      allOf:
+        - $ref: "#/components/schemas/Problem"
+        - type: object
+          properties:
+            status:
+              const: 422
+            code:
+              const: external_model_failed
+    ProblemInternalError:
+      allOf:
+        - $ref: "#/components/schemas/Problem"
+        - type: object
+          properties:
+            status:
+              const: 500
+            code:
+              const: internal_error
+    CatalogItem:
+      type: object
+      additionalProperties: false
+      required: [specimen_id, category, display_name, description]
+      description: カタログの 1 個体
+      properties:
+        specimen_id:
+          $ref: "#/components/schemas/SpecimenId"
+        category:
+          $ref: "#/components/schemas/Category"
+        display_name:
+          type: string
+          minLength: 1
+          description: 表示名
+        description:
+          type: string
+          description: 説明文
+    Catalog:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/CatalogItem"
+    HumanPlayer:
+      type: object
+      additionalProperties: false
+      required: [kind]
+      properties:
+        kind:
+          type: string
+          const: human
+    SpecimenPlayer:
+      type: object
+      additionalProperties: false
+      required: [kind, specimen_id]
+      properties:
+        kind:
+          type: string
+          const: specimen
+        specimen_id:
+          $ref: "#/components/schemas/SpecimenId"
+    PlayerSpec:
+      description: 一方の対局者。人間またはカタログの個体。
+      oneOf:
+        - $ref: "#/components/schemas/HumanPlayer"
+        - $ref: "#/components/schemas/SpecimenPlayer"
+      discriminator:
+        propertyName: kind
+        mapping:
+          human: "#/components/schemas/HumanPlayer"
+          specimen: "#/components/schemas/SpecimenPlayer"
+    CreateGameRequest:
+      type: object
+      additionalProperties: false
+      required: [black, white]
+      properties:
+        black:
+          $ref: "#/components/schemas/PlayerSpec"
+        white:
+          $ref: "#/components/schemas/PlayerSpec"
+    BoardRow:
+      type: array
+      minItems: 8
+      maxItems: 8
+      items:
+        $ref: "#/components/schemas/Cell"
+    Board:
+      type: array
+      minItems: 8
+      maxItems: 8
+      description: 8×8。`board[rank-1][file-a]`。
+      items:
+        $ref: "#/components/schemas/BoardRow"
+    PlaceMove:
+      type: object
+      additionalProperties: false
+      required: [type, square]
+      description: マスへ打つ着手
+      properties:
+        type:
+          type: string
+          const: place
+        square:
+          $ref: "#/components/schemas/Square"
+    PassMove:
+      type: object
+      additionalProperties: false
+      required: [type]
+      description: パス。合法手が無く相手に合法手があるときにだけ合法。
+      properties:
+        type:
+          type: string
+          const: pass
+    Move:
+      description: 着手指定
+      oneOf:
+        - $ref: "#/components/schemas/PlaceMove"
+        - $ref: "#/components/schemas/PassMove"
+      discriminator:
+        propertyName: type
+        mapping:
+          place: "#/components/schemas/PlaceMove"
+          pass: "#/components/schemas/PassMove"
+    OfficialScore:
+      type: object
+      additionalProperties: false
+      required: [black, white]
+      description: |
+        公式スコア。終局後は空きマスを勝者へ加算した点数。
+        進行中は盤上の石数。
+      properties:
+        black:
+          type: integer
+          minimum: 0
+          maximum: 64
+        white:
+          type: integer
+          minimum: 0
+          maximum: 64
+    Outcome:
+      type: string
+      enum: [win, loss, draw]
+    GameResult:
+      type: object
+      additionalProperties: false
+      required: [winner, black, white]
+      description: 勝敗。終局していないときは GameState.result が null。
+      properties:
+        winner:
+          type: string
+          enum: [black, white, draw]
+        black:
+          $ref: "#/components/schemas/Outcome"
+        white:
+          $ref: "#/components/schemas/Outcome"
+    GameStatus:
+      type: string
+      enum: [in_progress, completed, unplayable]
+      description: |
+        in_progress は進行中。completed はルール上の終局。
+        unplayable は外部モデル失敗などで継続不能。
+    UnplayableReason:
+      type: string
+      const: external_model_failed
+      description: 継続不能の理由
+    GameState:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - board
+        - side_to_move
+        - legal_moves
+        - pass_is_legal
+        - last_move
+        - is_over
+        - official_score
+        - result
+        - status
+        - continuation_possible
+        - unplayable_reason
+        - black
+        - white
+      description: 対局状態
+      properties:
+        id:
+          $ref: "#/components/schemas/GameId"
+        board:
+          $ref: "#/components/schemas/Board"
+        side_to_move:
+          $ref: "#/components/schemas/Color"
+          description: 手番
+        legal_moves:
+          type: array
+          description: 手番側が打てるマス。パスは含めない。
+          items:
+            $ref: "#/components/schemas/Square"
+        pass_is_legal:
+          type: boolean
+          description: 手番側がパスできるか
+        last_move:
+          description: 直前着手。開始直後は null。
+          oneOf:
+            - $ref: "#/components/schemas/Move"
+            - type: "null"
+        is_over:
+          type: boolean
+          description: ルール上の終局なら true
+        official_score:
+          $ref: "#/components/schemas/OfficialScore"
+        result:
+          description: 勝敗。終局前と継続不能時は null。
+          oneOf:
+            - $ref: "#/components/schemas/GameResult"
+            - type: "null"
+        status:
+          $ref: "#/components/schemas/GameStatus"
+        continuation_possible:
+          type: boolean
+          description: false ならこれ以上着手できない（終局または継続不能）
+        unplayable_reason:
+          description: 継続不能でなければ null
+          oneOf:
+            - $ref: "#/components/schemas/UnplayableReason"
+            - type: "null"
+        black:
+          $ref: "#/components/schemas/PlayerSpec"
+        white:
+          $ref: "#/components/schemas/PlayerSpec"
+    MoveApplied:
+      type: object
+      additionalProperties: false
+      required: [applied, game]
+      description: 着手を適用した
+      properties:
+        applied:
+          type: boolean
+          const: true
+        game:
+          $ref: "#/components/schemas/GameState"
+    IllegalMoveNotApplied:
+      type: object
+      additionalProperties: false
+      required: [applied, code, detail, game]
+      description: 違法な着手は適用しない。game はリクエスト前と同一。
+      properties:
+        applied:
+          type: boolean
+          const: false
+        code:
+          type: string
+          const: illegal_move
+        detail:
+          type: string
+        game:
+          $ref: "#/components/schemas/GameState"
+    GameUnplayable:
+      type: object
+      additionalProperties: false
+      required: [applied, code, detail, continuation_possible, game]
+      description: 外部モデル失敗により継続不能。着手は適用しない。
+      properties:
+        applied:
+          type: boolean
+          const: false
+        code:
+          type: string
+          const: external_model_failed
+        detail:
+          type: string
+        continuation_possible:
+          type: boolean
+          const: false
+        game:
+          $ref: "#/components/schemas/GameState"
+    DecideRequest:
+      type: object
+      additionalProperties: false
+      required: [specimen_id, game]
+      description: 戦略プロセスへ渡す内部 JSON
+      properties:
+        specimen_id:
+          $ref: "#/components/schemas/SpecimenId"
+        game:
+          $ref: "#/components/schemas/GameState"
+    SnapshotEvent:
+      type: object
+      additionalProperties: false
+      required: [type, game]
+      properties:
+        type:
+          type: string
+          const: snapshot
+        game:
+          $ref: "#/components/schemas/GameState"
+    MoveAppliedEvent:
+      type: object
+      additionalProperties: false
+      required: [type, move, game]
+      properties:
+        type:
+          type: string
+          const: move_applied
+        move:
+          $ref: "#/components/schemas/Move"
+        game:
+          $ref: "#/components/schemas/GameState"
+    MoveRejectedEvent:
+      type: object
+      additionalProperties: false
+      required: [type, move, game]
+      description: 違法着手を受けたが適用していない
+      properties:
+        type:
+          type: string
+          const: move_rejected
+        move:
+          $ref: "#/components/schemas/Move"
+        game:
+          $ref: "#/components/schemas/GameState"
+    GameOverEvent:
+      type: object
+      additionalProperties: false
+      required: [type, game]
+      properties:
+        type:
+          type: string
+          const: game_over
+        game:
+          $ref: "#/components/schemas/GameState"
+    UnplayableEvent:
+      type: object
+      additionalProperties: false
+      required: [type, reason, game]
+      description: 外部モデル失敗により継続不能になった
+      properties:
+        type:
+          type: string
+          const: unplayable
+        reason:
+          $ref: "#/components/schemas/UnplayableReason"
+        game:
+          $ref: "#/components/schemas/GameState"
+    GameEvent:
+      description: SSE の data に載せる JSON
+      oneOf:
+        - $ref: "#/components/schemas/SnapshotEvent"
+        - $ref: "#/components/schemas/MoveAppliedEvent"
+        - $ref: "#/components/schemas/MoveRejectedEvent"
+        - $ref: "#/components/schemas/GameOverEvent"
+        - $ref: "#/components/schemas/UnplayableEvent"
+      discriminator:
+        propertyName: type
+        mapping:
+          snapshot: "#/components/schemas/SnapshotEvent"
+          move_applied: "#/components/schemas/MoveAppliedEvent"
+          move_rejected: "#/components/schemas/MoveRejectedEvent"
+          game_over: "#/components/schemas/GameOverEvent"
+          unplayable: "#/components/schemas/UnplayableEvent"
