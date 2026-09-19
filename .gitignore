@@ -8,3 +8,9 @@ __pycache__/
 .pytest_cache/
 .import_linter_cache/
 *.egg-info/
+
+# WTHOR 原本。試験フィクスチャ以外はリポジトリに入れない。
+/data/wthor/*.wtb
+/data/wthor/*.WTB
+/models/*.wtb
+/models/*.WTB

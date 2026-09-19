@@ -15,6 +15,10 @@ jobs:
         run: uv run --directory strategy pytest tests/test_engine.py -q
       - name: カタログとランダム個体
         run: uv run --directory strategy pytest tests/test_agents.py -q
+      - name: 盤の入力符号化
+        run: uv run --directory strategy pytest tests/test_encode.py -q
+      - name: WTHOR の 8×8 棋譜
+        run: uv run --directory strategy pytest tests/test_wthor.py -q
       - name: import lint
         run: uv run --directory strategy lint-imports
       - name: complexity

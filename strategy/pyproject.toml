@@ -27,10 +27,20 @@ pythonpath = ["src"]
 root_packages = ["reversi"]
 
 [[tool.importlinter.contracts]]
-name = "agents は engine の上に置き、engine は board の上に rules と score を置く"
+name = "agents と train は engine の上、engine は board の上に rules と score を置く"
 type = "layers"
 layers = [
-    "reversi.agents",
+    "reversi.agents | reversi.train",
     "reversi.engine.score | reversi.engine.rules",
     "reversi.engine.board",
+]
+
+[[tool.importlinter.contracts]]
+name = "engine は encode を読まない"
+type = "forbidden"
+source_modules = [
+    "reversi.engine",
+]
+forbidden_modules = [
+    "reversi.encode",
 ]
