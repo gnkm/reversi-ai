@@ -86,7 +86,8 @@ export function subscribeGameEvents(
   onGame: (game: GameState) => void,
   onFailure?: (code: GameStreamFailure) => void,
 ): () => void {
-  const source = new EventSource(`/api/games/${id}/events`);
+  const url = `/api/games/${id}/events`;
+  let source: EventSource | null = null;
   let closed = false;
   let terminal = false;
   const handle = (event: MessageEvent<string>) => {
@@ -103,6 +104,26 @@ export function subscribeGameEvents(
       return;
     }
   };
+  const connect = () => {
+    if (closed || terminal) {
+      return;
+    }
+    source?.close();
+    const next = new EventSource(url);
+    source = next;
+    next.addEventListener("snapshot", handle);
+    next.addEventListener("move_applied", handle);
+    next.addEventListener("game_over", handle);
+    next.addEventListener("unplayable", handle);
+    next.onerror = () => {
+      next.close();
+      void classify();
+    };
+  };
+  const fail = (code: GameStreamFailure) => {
+    source?.close();
+    onFailure?.(code);
+  };
   const classify = async () => {
     if (closed || terminal) {
       return;
@@ -113,31 +134,22 @@ export function subscribeGameEvents(
         const game = (await res.json()) as GameState;
         if (game.status !== "in_progress") {
           terminal = true;
+          onGame(game);
+          return;
         }
         onGame(game);
-        if (game.status === "in_progress") {
-          onFailure?.("internal_error");
-        }
+        connect();
         return;
       }
       const code = problemCode(await res.json());
-      onFailure?.(
-        code === "game_not_found" ? "game_not_found" : "internal_error",
-      );
+      fail(code === "game_not_found" ? "game_not_found" : "internal_error");
     } catch {
-      onFailure?.("internal_error");
+      fail("internal_error");
     }
   };
-  source.addEventListener("snapshot", handle);
-  source.addEventListener("move_applied", handle);
-  source.addEventListener("game_over", handle);
-  source.addEventListener("unplayable", handle);
-  source.onerror = () => {
-    source.close();
-    void classify();
-  };
+  connect();
   return () => {
     closed = true;
-    source.close();
+    source?.close();
   };
 }

@@ -55,6 +55,13 @@ function problemResponse(status: number, code: string): Response {
   );
 }
 
+function jsonResponse(body: unknown): Response {
+  return new Response(JSON.stringify(body), {
+    status: 200,
+    headers: { "content-type": "application/json" },
+  });
+}
+
 const names = new Map([["random_uniform", "ランダム (一様)"]]);
 
 class FakeEventSource {
@@ -210,6 +217,7 @@ describe("GamePage", () => {
     });
     expect(screen.queryByText(/外部モデル/)).toBeNull();
     expect(fetchMock).toHaveBeenCalledWith(`/api/games/${opening.id}`);
+    expect(FakeEventSource.instances).toHaveLength(1);
   });
 
   it("SSE 切断後の 500 は内部障害と案内し外部モデル失敗にしない", async () => {
@@ -226,6 +234,40 @@ describe("GamePage", () => {
       ).toBeTruthy();
     });
     expect(screen.queryByText(/外部モデル/)).toBeNull();
+    expect(FakeEventSource.instances).toHaveLength(1);
+  });
+
+  it("SSE 切断後も進行中なら再接続し盤面更新を続ける", async () => {
+    vi.stubGlobal("EventSource", FakeEventSource);
+    const { opening, seen } = renderAgents();
+    const progressed = game({
+      ...opening,
+      last_move: { type: "place", square: "f5" },
+      official_score: { black: 4, white: 1 },
+    });
+    const fetchMock = vi.fn(async () => jsonResponse(progressed));
+    vi.stubGlobal("fetch", fetchMock);
+    FakeEventSource.instances[0]?.error();
+    await waitFor(() => {
+      expect(FakeEventSource.instances).toHaveLength(2);
+    });
+    expect(fetchMock).toHaveBeenCalledWith(`/api/games/${opening.id}`);
+    expect(seen).toEqual([progressed]);
+    expect(screen.queryByText("対局の更新を取得できませんでした。")).toBeNull();
+    expect(screen.queryByText(/外部モデル/)).toBeNull();
+    const later = game({
+      ...progressed,
+      last_move: { type: "place", square: "d6" },
+      official_score: { black: 3, white: 3 },
+    });
+    FakeEventSource.instances[1]?.emit("move_applied", {
+      type: "move_applied",
+      move: later.last_move,
+      game: later,
+    });
+    expect(seen).toEqual([progressed, later]);
+    expect(FakeEventSource.instances[0]?.closed).toBe(true);
+    expect(FakeEventSource.instances[1]?.closed).toBe(false);
   });
 
   it("unplayable は外部モデル失敗として案内する", () => {
