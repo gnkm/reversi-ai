@@ -1,4 +1,4 @@
-"""カタログと戦略個体（ランダム・最多取り・位置評価・ミニマックス・定石・強化学習・生成 AI）。"""
+"""カタログと戦略個体（ランダム・最多取り・位置評価・ミニマックス・定石・強化学習・ニューラルネットワーク・生成 AI）。"""
 
 from __future__ import annotations
 
@@ -982,4 +982,151 @@ def test_opening_source_does_not_call_models_or_wthor() -> None:
                 assert ".wtb" not in lowered
                 assert "openrouter.ai" not in lowered
                 assert "wthor" not in lowered
+
+
+def _nn_item():
+    from reversi.agents import nn
+
+    return nn, _item_by_display_name("ニューラルネットワーク (棋譜)")
+
+
+def test_nn_catalog_lists_kifu_specimen() -> None:
+    nn, item = _nn_item()
+    assert item.specimen_id == nn.SPECIMEN_ID == "nn"
+    assert item.category == nn.CATEGORY == "neural_network"
+    assert item.display_name == nn.DISPLAY_NAME
+    assert item.description == nn.DESCRIPTION
+    assert item.description.strip()
+    assert "WTHOR" in item.description
+    assert "永続化" in item.description
+    assert "ニューラルネットワーク" in item.description
+    assert _JAPANESE.search(item.description)
+    assert get(nn.SPECIMEN_ID) == item
+    with pytest.raises(KeyError):
+        get("neural_network")
+
+
+def test_nn_choose_move_matches_masked_onnx_logits() -> None:
+    from reversi.agents import nn
+
+    assert nn.DEFAULT_MODEL_PATH.is_file()
+    position = initial_position()
+    logits = nn.infer_logits(position.board)
+    assert len(logits) == 64
+    move = nn.choose_move(position)
+    expected = nn.masked_place(position, logits)
+    assert move == expected
+    assert move is not None
+    assert move.square in legal_places(position)
+    via_catalog = catalog_choose(nn.SPECIMEN_ID, position)
+    assert via_catalog == move
+    assert nn.choose_move(position, Random(0)) == move
+
+
+def test_nn_masks_illegal_squares_with_highest_logit() -> None:
+    from reversi.agents import nn
+
+    position = initial_position()
+    places = legal_places(position)
+    assert Square.parse("a1") not in places
+    assert Square.parse("c4") in places
+    logits = [0.0] * 64
+    logits[nn.square_index(Square.parse("a1"))] = 100.0
+    logits[nn.square_index(Square.parse("c4"))] = 50.0
+    logits[nn.square_index(Square.parse("d3"))] = 1.0
+    move = nn.choose_move(position, logits=tuple(logits))
+    assert move == Place(Square.parse("c4"))
+
+
+def test_nn_tie_breaks_a1_to_h8_order() -> None:
+    from reversi.agents import nn
+
+    position = initial_position()
+    places = legal_places(position)
+    logits = tuple(0.0 for _ in range(64))
+    move = nn.choose_move(position, logits=logits)
+    assert move == Place(places[0])
+    assert move == Place(Square.parse("d3"))
+
+
+def test_nn_does_not_move_when_no_legal_places() -> None:
+    from reversi.agents import nn
+
+    logits = tuple(1.0 for _ in range(64))
+    assert nn.choose_move(_almost_full_white_with_black_on_b1(), logits=logits) is None
+    assert nn.choose_move(_both_sides_cannot_place(), logits=logits) is None
+
+
+def test_nn_default_onnx_plays_only_legal_moves_to_the_end() -> None:
+    from reversi.agents import nn
+
+    position = initial_position()
+    while not is_over(position):
+        if pass_is_legal(position):
+            position = play(position, PassMove())
+            continue
+        move = nn.choose_move(position)
+        assert move is not None
+        assert move.square in legal_places(position)
+        position = play(position, move)
+    assert is_over(position)
+
+
+def test_nn_source_uses_onnxruntime_cpu_not_torch() -> None:
+    source = _module_source("nn.py")
+    roots = _imported_roots(source)
+    assert "onnxruntime" in roots
+    assert "torch" not in roots
+    assert "sklearn" not in roots
+    assert "openrouter" not in roots
+    modules = set()
+    tree = ast.parse(source)
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            modules.update(alias.name for alias in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            modules.add(node.module)
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            assert node.value != "CUDAExecutionProvider"
+    assert "reversi.train" not in modules
+    assert all(not name.startswith("reversi.train") for name in modules)
+    assert "CPUExecutionProvider" in source
+
+
+def _write_nn_wtb(path: Path, squares: tuple[Square, ...]) -> Path:
+    from reversi.train.wthor import RECORD_SIZE_8X8, encode_8x8_move
+
+    header = bytearray(16)
+    header[0:4] = bytes((20, 26, 9, 19))
+    header[4:8] = (1).to_bytes(4, "little")
+    header[10:12] = (2026).to_bytes(2, "little")
+    header[12] = 8
+    record = bytearray(RECORD_SIZE_8X8)
+    for index, square in enumerate(squares):
+        record[8 + index] = encode_8x8_move(square)
+    path.write_bytes(bytes(header) + bytes(record))
+    return path
+
+
+def test_nn_training_reads_wthor_and_persisted_games(tmp_path: Path) -> None:
+    from reversi.api.persist import MODE_AGENT_VS_AGENT, save_if_over
+    from reversi.train.nn import collect_examples
+
+    wthor = tmp_path / "wthor"
+    wthor.mkdir()
+    _write_nn_wtb(wthor / "tiny.wtb", (Square.parse("f5"),))
+    db = tmp_path / "games.sqlite"
+    save_if_over(
+        _both_sides_cannot_place(),
+        mode=MODE_AGENT_VS_AGENT,
+        black={"kind": "specimen", "specimen_id": "nn"},
+        white={"kind": "specimen", "specimen_id": "rl"},
+        moves=({"type": "place", "square": "d3"},),
+        db_path=db,
+    )
+    examples = collect_examples(wthor, db)
+    labels = {example.square.algebraic for example in examples}
+    assert "f5" in labels
+    assert "d3" in labels
+    assert all(example.board == initial_position().board for example in examples)
 
