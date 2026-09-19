@@ -13,6 +13,8 @@ jobs:
       - uses: astral-sh/setup-uv@v10.1.0
       - name: 合法手・裏返し・パス・終局・公式スコア
         run: uv run --directory strategy pytest tests/test_engine.py -q
+      - name: WTHOR の 8×8 棋譜
+        run: uv run --directory strategy pytest tests/test_wthor.py -q
       - name: import lint
         run: uv run --directory strategy lint-imports
       - name: complexity
