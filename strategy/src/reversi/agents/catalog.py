@@ -11,6 +11,7 @@ from reversi.agents import (
     jev,
     minimax,
     most_flips,
+    nn,
     opening,
     positional,
     random_uniform,
@@ -25,6 +26,7 @@ __all__ = [
     "JEV",
     "MINIMAX",
     "MOST_FLIPS",
+    "NN",
     "OPENING",
     "POSITIONAL",
     "RANDOM_UNIFORM",
@@ -82,6 +84,12 @@ RL = CatalogItem(
     display_name=rl.DISPLAY_NAME,
     description=rl.DESCRIPTION,
 )
+NN = CatalogItem(
+    specimen_id=nn.SPECIMEN_ID,
+    category=nn.CATEGORY,
+    display_name=nn.DISPLAY_NAME,
+    description=nn.DESCRIPTION,
+)
 JEV = CatalogItem(
     specimen_id=jev.SPECIMEN_ID,
     category=jev.CATEGORY,
@@ -97,6 +105,7 @@ _BUILTIN: tuple[tuple[CatalogItem, Chooser], ...] = (
     (MINIMAX, minimax.choose_move),
     (OPENING, opening.choose_move),
     (RL, rl.choose_move),
+    (NN, nn.choose_move),
     (JEV, jev.choose_move),
 )
 
