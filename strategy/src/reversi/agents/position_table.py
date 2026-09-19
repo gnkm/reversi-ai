@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from reversi.engine.board import BOARD_SIZE, Square
 
-# 行は rank 1→8、列は file a→h。SRS-FUN-025 と同一（表の 1 行目が rank 8）。
+# 行は rank 1→8、列は file a→h。各点数は SRS-FUN-025 と同一。
 POSITION_SCORES: tuple[tuple[int, ...], ...] = (
     (100, -20, 10, 5, 5, 10, -20, 100),
     (-20, -50, -2, -2, -2, -2, -50, -20),
