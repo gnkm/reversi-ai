@@ -1,15 +1,16 @@
-"""カタログと戦略個体（ランダム・最多取り・位置評価）。"""
+"""カタログと戦略個体（ランダム・最多取り・位置評価・ミニマックス・定石・強化学習）。"""
 
 from __future__ import annotations
 
 import ast
+import json
 import re
 from pathlib import Path
 from random import Random
 
 import pytest
 
-from reversi.agents import most_flips, positional
+from reversi.agents import minimax, most_flips, opening, positional
 from reversi.agents.catalog import CatalogItem, get, items
 from reversi.agents.catalog import choose_move as catalog_choose
 from reversi.agents.position_table import POSITION_SCORES, score_at
@@ -20,14 +21,20 @@ from reversi.agents.random_uniform import (
     SPECIMEN_ID,
     choose_move,
 )
+from reversi.encode import VECTOR_SIZE
 from reversi.engine.board import Board, Color, Square, Stone, empty_board
 from reversi.engine.rules import (
+    PassMove,
     Place,
     Position,
     apply_place,
     flips_for,
     initial_position,
+    is_over,
+    legal_moves,
     legal_places,
+    pass_is_legal,
+    play,
 )
 
 _JAPANESE = re.compile(r"[\u3040-\u30ff\u4e00-\u9fff]")
@@ -383,4 +390,492 @@ def test_most_flips_and_positional_source_does_not_call_models() -> None:
                 assert "ffothello.org" not in lowered
                 assert ".wtb" not in lowered
                 assert "openrouter.ai" not in lowered
+
+
+def _black_feature_index(square: Square) -> int:
+    return square.rank * 8 + square.file
+
+
+def _linear_policy(black_squares: dict[str, float], bias: float = 0.0):
+    from reversi.agents.rl import LinearPolicy
+
+    weights = [0.0] * VECTOR_SIZE
+    for algebraic, value in black_squares.items():
+        square = Square.parse(algebraic)
+        weights[_black_feature_index(square)] = value
+    return LinearPolicy(
+        weights=tuple(float(value) for value in weights),
+        bias=float(bias),
+    )
+
+
+def test_rl_policy_rejects_non_finite_values() -> None:
+    from reversi.agents.rl import LinearPolicy
+
+    with pytest.raises(ValueError, match="有限"):
+        LinearPolicy(tuple(0.0 for _ in range(VECTOR_SIZE)), float("nan"))
+    inf_weights = [0.0] * VECTOR_SIZE
+    inf_weights[0] = float("inf")
+    with pytest.raises(ValueError, match="有限"):
+        LinearPolicy(tuple(inf_weights), 0.0)
+
+
+def test_catalog_lists_rl_self_play() -> None:
+    from reversi.agents import rl
+
+    item = _item_by_display_name("強化学習 (自己対局)")
+    assert item.specimen_id == rl.SPECIMEN_ID == "rl"
+    assert item.category == rl.CATEGORY == "reinforcement_learning"
+    assert item.display_name == rl.DISPLAY_NAME
+    assert item.description == rl.DESCRIPTION
+    assert item.description.strip()
+    assert "自己対局" in item.description
+    assert "強化学習" in item.description
+    assert _JAPANESE.search(item.description)
+    assert get(rl.SPECIMEN_ID) == item
+    with pytest.raises(KeyError):
+        get("reinforcement_learning")
+
+
+def test_rl_greedy_maximizes_black_value() -> None:
+    from reversi.agents import rl
+
+    position = initial_position()
+    policy = _linear_policy({"c4": 4.0, "d3": 1.0})
+    move = rl.choose_move(position, policy=policy)
+    assert move == Place(Square.parse("c4"))
+    assert move.square in legal_places(position)
+    via_catalog = catalog_choose(rl.SPECIMEN_ID, position)
+    assert via_catalog is not None
+    assert via_catalog.square in legal_places(position)
+
+
+def test_rl_white_minimizes_black_value() -> None:
+    from reversi.agents import rl
+    from reversi.agents.rl import LinearPolicy
+
+    after_black = play(initial_position(), Place(Square.parse("d3")))
+    assert after_black.side_to_move is Color.WHITE
+    places = legal_places(after_black)
+    assert len(places) >= 2
+    policy = LinearPolicy(tuple(float(index) for index in range(VECTOR_SIZE)), 0.0)
+    move = rl.choose_move(after_black, policy=policy)
+    assert move is not None
+    scored = {
+        square: rl.value_of(
+            apply_place(after_black.board, square, Color.WHITE),
+            policy,
+        )
+        for square in places
+    }
+    best = min(scored.values())
+    expected = next(square for square in places if scored[square] == best)
+    assert move.square == expected
+    assert scored[move.square] == best
+
+
+def test_rl_tie_breaks_a1_to_h8_order() -> None:
+    from reversi.agents import rl
+
+    position = initial_position()
+    places = legal_places(position)
+    policy = _linear_policy({})
+    values = [
+        rl.value_of(apply_place(position.board, square, Color.BLACK), policy)
+        for square in places
+    ]
+    assert values and len(set(values)) == 1
+    move = rl.choose_move(position, Random(0), policy=policy)
+    assert move == Place(places[0])
+    assert move == Place(Square.parse("d3"))
+
+
+def test_rl_does_not_move_when_no_legal_places() -> None:
+    from reversi.agents import rl
+
+    policy = _linear_policy({"a1": 1.0})
+    assert rl.choose_move(_almost_full_white_with_black_on_b1(), policy=policy) is None
+    assert rl.choose_move(_both_sides_cannot_place(), policy=policy) is None
+
+
+def test_rl_default_policy_plays_only_legal_moves_to_the_end() -> None:
+    from reversi.agents import rl
+
+    assert rl.DEFAULT_MODEL_PATH.is_file()
+    policy = rl.load_policy(rl.DEFAULT_MODEL_PATH)
+    assert len(policy.weights) == VECTOR_SIZE
+    position = initial_position()
+    while not is_over(position):
+        if pass_is_legal(position):
+            position = play(position, PassMove())
+            continue
+        move = rl.choose_move(position, policy=policy)
+        assert move is not None
+        assert move.square in legal_places(position)
+        position = play(position, move)
+    assert is_over(position)
+
+
+def test_rl_source_does_not_import_nn_or_openrouter() -> None:
+    source = _module_source("rl.py")
+    roots = _imported_roots(source)
+    assert roots.isdisjoint(_FORBIDDEN_IMPORT_ROOTS)
+    assert "torch" not in roots
+    assert "onnxruntime" not in roots
+    assert "openrouter" not in roots
+    tree = ast.parse(source)
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            lowered = node.value.lower()
+            assert "ffothello.org" not in lowered
+            assert ".wtb" not in lowered
+            assert "openrouter.ai" not in lowered
+
+
+def test_rl_training_does_not_read_wthor(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from reversi.train import wthor
+    from reversi.train.rl import train_and_write
+
+    def boom(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("強化学習は WTHOR を読んではならない")
+
+    monkeypatch.setattr(wthor, "training_games", boom)
+    monkeypatch.setattr(wthor, "replay", boom)
+    out = tmp_path / "rl.json"
+    policy = train_and_write(out, games=2, seed=1, alpha=0.001, epsilon=0.5)
+    loaded = json.loads(out.read_text(encoding="utf-8"))
+    assert loaded["algorithm"] == "linear_td"
+    assert len(loaded["weights"]) == VECTOR_SIZE
+    assert len(policy.weights) == VECTOR_SIZE
+    from reversi.agents.rl import load_policy
+
+    assert load_policy(out).weights == policy.weights
+
+
+def test_rl_td_update_moves_weights_toward_terminal_reward() -> None:
+    import numpy as np
+
+    from reversi.train.rl import _features, _td_update
+
+    board = initial_position().board
+    phi = _features(board)
+    zeros = np.zeros(VECTOR_SIZE, dtype=np.float64)
+    alpha = 0.5
+    toward_win, bias_win = _td_update(zeros.copy(), 0.0, (board,), 1.0, alpha)
+    np.testing.assert_allclose(toward_win, alpha * phi)
+    assert bias_win == pytest.approx(alpha)
+
+    toward_loss, bias_loss = _td_update(zeros.copy(), 0.0, (board,), -1.0, alpha)
+    np.testing.assert_allclose(toward_loss, -alpha * phi)
+    assert bias_loss == pytest.approx(-alpha)
+
+    later = empty_board()
+    updated, _ = _td_update(zeros.copy(), 0.0, (board, later), 1.0, alpha)
+    # 先頭局面の TD 目標は次局面の価値 0 なので動かず、終端報酬は末局面だけに乗る。
+    np.testing.assert_allclose(updated, alpha * _features(later))
+
+
+def _spec_leaf_score(board: Board, root: Color) -> int:
+    """SRS-FUN-026 の葉評価。位置評価の点数表の差。"""
+    return positional.own_stone_score(board, root) - positional.own_stone_score(
+        board, root.opponent
+    )
+
+
+def _plain_minimax_value(position: Position, depth: int, root: Color) -> int:
+    """アルファベータ無しのミニマックス。パスも 1 深さ。"""
+    if depth >= 4 or is_over(position):
+        return _spec_leaf_score(position.board, root)
+    moves = legal_moves(position)
+    if not moves:
+        return _spec_leaf_score(position.board, root)
+    values = tuple(
+        _plain_minimax_value(play(position, move), depth + 1, root) for move in moves
+    )
+    if position.side_to_move is root:
+        return max(values)
+    return min(values)
+
+
+def _plain_minimax_choose(position: Position) -> Place | None:
+    root = position.side_to_move
+    best_square = None
+    best_value: int | None = None
+    for square in legal_places(position):
+        value = _plain_minimax_value(play(position, Place(square)), 1, root)
+        if best_value is None or value > best_value:
+            best_value = value
+            best_square = square
+    if best_square is None:
+        return None
+    return Place(best_square)
+
+
+def test_catalog_lists_minimax() -> None:
+    item = _item_by_display_name("ルールベース (ミニマックス)")
+    assert item.specimen_id == minimax.SPECIMEN_ID == "minimax"
+    assert item.category == minimax.CATEGORY == "rule_based"
+    assert item.display_name == minimax.DISPLAY_NAME
+    assert item.description == minimax.DESCRIPTION
+    assert item.description.strip()
+    assert _JAPANESE.search(item.description)
+    assert "ミニマックス" in item.description
+    assert "深さ 4" in item.description
+    assert "点数表" in item.description
+    assert get(minimax.SPECIMEN_ID) == item
+    with pytest.raises(KeyError):
+        get("rule_based")
+
+
+def test_minimax_leaf_score_is_root_minus_opponent_table() -> None:
+    board = empty_board().replacing(
+        {
+            Square.parse("a1"): Stone.BLACK,
+            Square.parse("b1"): Stone.WHITE,
+            Square.parse("c3"): Stone.BLACK,
+        }
+    )
+    assert score_at(Square.parse("a1")) == 100
+    assert score_at(Square.parse("b1")) == -20
+    assert score_at(Square.parse("c3")) == 1
+    assert minimax.leaf_score(board, Color.BLACK) == 100 + 1 - (-20)
+    assert minimax.leaf_score(board, Color.WHITE) == -20 - (100 + 1)
+    assert minimax.leaf_score(board, Color.BLACK) == _spec_leaf_score(board, Color.BLACK)
+    assert minimax.leaf_score(board, Color.BLACK) != positional.own_stone_score(
+        board, Color.BLACK
+    )
+
+
+def test_minimax_picks_depth_4_value_with_a1_h8_ties() -> None:
+    position = initial_position()
+    places = legal_places(position)
+    assert tuple(square.algebraic for square in places) == ("d3", "c4", "f5", "e6")
+    values = {
+        square.algebraic: _plain_minimax_value(
+            play(position, Place(square)), 1, Color.BLACK
+        )
+        for square in places
+    }
+    best = max(values.values())
+    first_best = next(square for square in places if values[square.algebraic] == best)
+    move = minimax.choose_move(position)
+    assert move == Place(first_best)
+    assert move == _plain_minimax_choose(position)
+    via_catalog = catalog_choose(minimax.SPECIMEN_ID, position)
+    assert via_catalog == move
+    assert minimax.choose_move(position, Random(0)) == move
+
+
+def test_minimax_looks_ahead_past_immediate_positional() -> None:
+    """初手 d3 のあと、位置評価は c3、深さ 4 は e3 を選ぶ。"""
+    after_d3 = play(initial_position(), Place(Square.parse("d3")))
+    places = legal_places(after_d3)
+    assert tuple(square.algebraic for square in places) == ("c3", "e3", "c5")
+    assert positional.choose_move(after_d3) == Place(Square.parse("c3"))
+    move = minimax.choose_move(after_d3)
+    assert move == Place(Square.parse("e3"))
+    assert move == _plain_minimax_choose(after_d3)
+    assert move != positional.choose_move(after_d3)
+
+
+def test_minimax_matches_plain_search_on_corner_and_pass_lines() -> None:
+    corner = _position_from_rank8_rows(_CORNER_VS_TWO_FLIPS, Color.BLACK)
+    assert minimax.choose_move(corner) == _plain_minimax_choose(corner)
+    assert minimax.choose_move(corner) is not None
+
+    # 白番なら a1 のみ。探索中に黒はパスし、白の着手で終局する。
+    almost_full = _almost_full_white_with_black_on_b1()
+    white_to_move = Position(almost_full.board, Color.WHITE)
+    assert legal_places(white_to_move) == (Square.parse("a1"),)
+    assert pass_is_legal(Position(almost_full.board, Color.BLACK))
+    assert minimax.choose_move(white_to_move) == Place(Square.parse("a1"))
+    assert minimax.choose_move(white_to_move) == _plain_minimax_choose(white_to_move)
+
+    # 黒が 2 手持ち、一方の後は白がパスする局面でも素朴探索と一致する。
+    two_empties = empty_board().replacing(
+        {
+            Square.parse("b1"): Stone.BLACK,
+            Square.parse("g8"): Stone.BLACK,
+            **{
+                Square(file=file, rank=rank): Stone.WHITE
+                for rank in range(8)
+                for file in range(8)
+                if (file, rank) not in {(0, 0), (1, 0), (6, 7), (7, 7)}
+            },
+        }
+    )
+    branched = Position(two_empties, Color.WHITE)
+    places = legal_places(branched)
+    assert Square.parse("a1") in places
+    assert Square.parse("h8") in places
+    assert minimax.choose_move(branched) == _plain_minimax_choose(branched)
+
+
+def test_minimax_does_not_move_when_no_legal_places() -> None:
+    assert minimax.choose_move(_almost_full_white_with_black_on_b1()) is None
+    assert minimax.choose_move(_both_sides_cannot_place()) is None
+
+
+def test_minimax_depth_stays_four_during_play() -> None:
+    assert minimax.SEARCH_DEPTH == 4
+    snapshot = minimax.SEARCH_DEPTH
+    position = initial_position()
+    first = minimax.choose_move(position)
+    assert first is not None
+    after = play(position, first)
+    minimax.choose_move(after)
+    minimax.choose_move(_position_from_rank8_rows(_CORNER_VS_TWO_FLIPS, Color.BLACK))
+    assert minimax.SEARCH_DEPTH == snapshot == 4
+
+
+def test_minimax_source_does_not_call_models() -> None:
+    for filename in (
+        "minimax.py",
+        "position_table.py",
+        "catalog.py",
+    ):
+        source = _module_source(filename)
+        roots = _imported_roots(source)
+        assert roots.isdisjoint(_FORBIDDEN_IMPORT_ROOTS)
+        tree = ast.parse(source)
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Constant) and isinstance(node.value, str):
+                lowered = node.value.lower()
+                assert "ffothello.org" not in lowered
+                assert ".wtb" not in lowered
+                assert "openrouter.ai" not in lowered
+
+
+def _play_algebraic(*names: str) -> Position:
+    position = initial_position()
+    for name in names:
+        position = play(position, Place(Square.parse(name)))
+    return position
+
+
+def test_catalog_lists_opening_specimen() -> None:
+    item = _item_by_display_name("ルールベース (定石)")
+    assert item.specimen_id == opening.SPECIMEN_ID == "opening"
+    assert item.category == opening.CATEGORY == "rule_based"
+    assert item.display_name == opening.DISPLAY_NAME
+    assert item.description == opening.DESCRIPTION
+    assert item.description.strip()
+    assert _JAPANESE.search(item.description)
+    assert "定石" in item.description
+    assert "位置評価" in item.description
+    assert get(opening.SPECIMEN_ID) == item
+    with pytest.raises(KeyError):
+        get("rule_based")
+
+
+def test_opening_book_lines_are_tiger_cow_mouse_and_fixed() -> None:
+    expected = (
+        ("f5", "d6", "c3", "d3", "c4"),
+        ("f5", "f6", "e6", "d6", "c5"),
+        ("f5", "f4", "e3", "f6", "d3"),
+    )
+    snapshot = tuple(tuple(square.algebraic for square in line) for line in opening.BOOK_LINES)
+    assert snapshot == expected
+    assert isinstance(opening.BOOK_LINES, tuple)
+    assert all(isinstance(line, tuple) for line in opening.BOOK_LINES)
+    opening.choose_move(initial_position())
+    opening.choose_move(_play_algebraic("f5"))
+    opening.choose_move(_play_algebraic("f5", "d6", "c4"))
+    after = tuple(tuple(square.algebraic for square in line) for line in opening.BOOK_LINES)
+    assert after == snapshot == expected
+    assert len(opening.BOOK_LINES) == 3
+
+
+def test_opening_initial_picks_d3_among_four_symmetric_first_moves() -> None:
+    position = initial_position()
+    places = legal_places(position)
+    assert [square.algebraic for square in places] == ["d3", "c4", "f5", "e6"]
+    move = opening.choose_move(position)
+    assert move == Place(Square.parse("d3"))
+    assert opening.choose_move(position, Random(0)) == move
+    via_catalog = catalog_choose(opening.SPECIMEN_ID, position)
+    assert via_catalog == move
+
+
+def test_opening_after_f5_picks_f4_by_a1_to_h8_order() -> None:
+    # 虎 d6・牛 f6・鼠 f4。FUN-014 は a1, b1, …, h1, a2, …, h8 なので f4。
+    position = _play_algebraic("f5")
+    places = legal_places(position)
+    assert [square.algebraic for square in places] == ["f4", "d6", "f6"]
+    move = opening.choose_move(position)
+    assert move == Place(Square.parse("f4"))
+    assert positional.choose_move(position) == Place(Square.parse("f6"))
+    assert move != positional.choose_move(position)
+    assert catalog_choose(opening.SPECIMEN_ID, position) == move
+
+
+def test_opening_follows_each_canonical_line() -> None:
+    assert opening.choose_move(_play_algebraic("f5", "d6")) == Place(Square.parse("c3"))
+    assert opening.choose_move(_play_algebraic("f5", "f6")) == Place(Square.parse("e6"))
+    assert opening.choose_move(_play_algebraic("f5", "f4")) == Place(Square.parse("e3"))
+    assert opening.choose_move(_play_algebraic("f5", "d6", "c3")) == Place(Square.parse("d3"))
+    assert opening.choose_move(_play_algebraic("f5", "f6", "e6")) == Place(Square.parse("d6"))
+    assert opening.choose_move(_play_algebraic("f5", "f4", "e3")) == Place(Square.parse("f6"))
+
+
+def test_opening_symmetric_c4_first_move_stays_on_book() -> None:
+    position = _play_algebraic("c4")
+    places = legal_places(position)
+    assert Square.parse("c3") in places
+    move = opening.choose_move(position)
+    assert move == Place(Square.parse("c3"))
+    assert move.square in places
+
+
+def test_opening_off_book_matches_positional() -> None:
+    position = _play_algebraic("f5", "d6", "c4")
+    move = opening.choose_move(position)
+    assert move == positional.choose_move(position)
+    assert move == positional.choose_move(position, Random(1))
+    assert catalog_choose(opening.SPECIMEN_ID, position) == move
+
+
+def test_opening_after_complete_line_matches_positional() -> None:
+    tiger = _play_algebraic("f5", "d6", "c3", "d3", "c4")
+    cow = _play_algebraic("f5", "f6", "e6", "d6", "c5")
+    mouse = _play_algebraic("f5", "f4", "e3", "f6", "d3")
+    assert opening.choose_move(tiger) == positional.choose_move(tiger)
+    assert opening.choose_move(cow) == positional.choose_move(cow)
+    assert opening.choose_move(mouse) == positional.choose_move(mouse)
+
+
+def test_opening_after_pass_matches_positional() -> None:
+    passed = play(_almost_full_white_with_black_on_b1(), PassMove())
+    assert legal_places(passed)
+    assert opening.choose_move(passed) == positional.choose_move(passed)
+
+
+def test_opening_stays_off_book_after_pass_then_place() -> None:
+    passed = play(_almost_full_white_with_black_on_b1(), PassMove())
+    assert passed.passed is True
+    after_place = play(passed, Place(Square.parse("a1")))
+    assert after_place.passed is True
+    assert after_place.placed == (Square.parse("a1"),)
+    assert opening.choose_move(after_place) == positional.choose_move(after_place)
+
+
+def test_opening_does_not_move_when_no_legal_places() -> None:
+    assert opening.choose_move(_almost_full_white_with_black_on_b1()) is None
+    assert opening.choose_move(_both_sides_cannot_place()) is None
+
+
+def test_opening_source_does_not_call_models_or_wthor() -> None:
+    for filename in ("opening.py", "catalog.py"):
+        source = _module_source(filename)
+        roots = _imported_roots(source)
+        assert roots.isdisjoint(_FORBIDDEN_IMPORT_ROOTS)
+        assert "wthor" not in roots
+        tree = ast.parse(source)
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Constant) and isinstance(node.value, str):
+                lowered = node.value.lower()
+                assert "ffothello.org" not in lowered
+                assert ".wtb" not in lowered
+                assert "openrouter.ai" not in lowered
+                assert "wthor" not in lowered
 

@@ -47,10 +47,12 @@ Move = Place | PassMove
 
 @dataclass(frozen=True, slots=True)
 class Position:
-    """盤と手番。"""
+    """盤と手番。置いたマスの列と、パスが一度でもあったかも保持する。"""
 
     board: Board
     side_to_move: Color
+    placed: tuple[Square, ...] = ()
+    passed: bool = False
 
 
 def initial_position() -> Position:
@@ -146,6 +148,16 @@ def play(position: Position, move: Move) -> Position:
     if isinstance(move, PassMove):
         if not pass_is_legal(position):
             raise IllegalMoveError("パスは適用できません")
-        return Position(position.board, position.side_to_move.opponent)
+        return Position(
+            position.board,
+            position.side_to_move.opponent,
+            placed=position.placed,
+            passed=True,
+        )
     board = apply_place(position.board, move.square, position.side_to_move)
-    return Position(board, position.side_to_move.opponent)
+    return Position(
+        board,
+        position.side_to_move.opponent,
+        placed=(*position.placed, move.square),
+        passed=position.passed,
+    )
