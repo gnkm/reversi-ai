@@ -14,8 +14,8 @@ info:
     JSON は snake_case。対局の公開識別子 `id` は UUID v4（小文字・ハイフン）。
     スキーマ `GameId` の `pattern` がこの形を制約する。
 
-    盤の代数表記は列 a–h が左から右、行 1–8 が上から下（a1 が左上）。
-    `board[0][0]` が a1、`board[0][7]` が h1、`board[7][0]` が a8。
+    盤の代数表記は列 a–h が左から右、行 1–8 が黒側から白側（a1 が黒から見て左下）。
+    `board[0][0] が a1`、`board[0][7] が h1`、`board[7][0] が a8`。
     開始配置は d4・e5 が白、e4・d5 が黒。
 
     違法な着手は盤に適用しない。外部モデルが失敗した対局は継続できない。
@@ -270,7 +270,7 @@ components:
     Square:
       type: string
       pattern: "^[a-h][1-8]$"
-      description: 代数表記。a1 が左上。
+      description: 代数表記。a1 が黒から見て左下。
       examples: [d3, e6]
     Category:
       type: string
