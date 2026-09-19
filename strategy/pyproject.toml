@@ -7,10 +7,14 @@ name = "strategy"
 version = "0.1.0"
 description = "対局と学習が共有する 8×8 リバーシ規則"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn>=0.32",
+]
 
 [dependency-groups]
 dev = [
+    "httpx>=0.27",
     "import-linter>=2.15",
     "pytest>=8.3",
     "radon>=6.0.1",

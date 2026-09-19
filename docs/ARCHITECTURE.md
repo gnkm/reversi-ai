@@ -169,6 +169,7 @@ reversi-ai/
 │   │   ├── api/                       # 内部 FastAPI。ブラウザからは到達させない
 │   │   │   ├── __init__.py
 │   │   │   ├── app.py                 # アプリ組み立てと待ち受け
+│   │   │   ├── errors.py              # RFC 9457 の Problem と違法着手の 409
 │   │   │   ├── schemas.py             # 中継 JSON の Pydantic
 │   │   │   ├── routes.py              # カタログ取得、対局開始、着手、状態
 │   │   │   ├── session.py             # 進行中 1 局（メモリ）
@@ -185,6 +186,7 @@ reversi-ai/
 │       ├── test_agents.py
 │       ├── test_encode.py
 │       ├── test_wthor.py
+│       ├── test_api.py                # カタログと 1 局の開始・着手・違法拒否
 │       ├── test_persist.py
 │       └── test_layers.py             # ML/RL が NN ランタイムを import しないこと
 │
@@ -296,6 +298,9 @@ Pod 内 HTTP。TLS は Hono が担う。
 
 | ファイル | 機能 |
 | --- | --- |
+| `app.py` | アプリ組み立てと待ち受け。F006 ではカタログ・対局開始・着手の経路もここ |
+| `errors.py` | RFC 9457 の Problem と違法着手の 409 |
+| `schemas.py` | 中継 JSON の Pydantic。`docs/openapi.yml` の `components` と同じ形 |
 | `routes.py` | カタログ、対局開始、着手適用、状態取得。エージェント対エージェントは開始後に終局まで進める |
 | `session.py` | 進行中 1 局。同時対局は 1 |
 | `persist.py` | 終局時に対局モード、黒と白の主体、着手列、終局面、公式スコア、勝敗を書く。個人識別子の列は作らない |
