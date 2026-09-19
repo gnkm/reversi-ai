@@ -115,4 +115,4 @@ OpenRouter 上の別モデルをカタログに足すときは、`data/genai.jso
 
 ## 開発に参加する場合
 
-ブランチ命名とコミット規約は [CONTRIBUTING.md](CONTRIBUTING.md) を参照してください。
+ブランチ命名、コミット規約、試験・lint・ホットリロードは [CONTRIBUTING.md](CONTRIBUTING.md) を参照してください。

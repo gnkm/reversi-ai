@@ -21,6 +21,57 @@
 
 shall を変える PR は CODEOWNERS（`docs/srs.md`）のレビューを必須とする。草案の編集は作成者またはエージェントでよい。承認はオーナーが行う。要求 ID は再利用しない。シードの文言まで変える必要があれば、Issue で人間が `docs/source-of-truth/` を直す。
 
+## 起動・試験・lint
+
+対局と学習の起動、試験、検査の**コマンドの正本**は [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) の「起動とコマンド」である。Issue の検証欄と CI も、その節の生コマンドを使う。ラッパ（Makefile 等）は置かない。
+
+動かすもの（対局・学習）は Podman。測るもの（pytest、Vitest、Biome、Ruff、lefthook）はホストである。ホストの `pnpm dev` や `python -m reversi.api` を対局サービスの正にしない。利用者向けの起動と対局操作は [README.md](README.md) を参照する。
+
+### ホストの準備
+
+- ウェブ（Vitest、Biome、Playwright）: Node 24 と pnpm。ルートで `pnpm install`
+- 戦略（pytest、Ruff、import-linter、xenon）: Python 3.12 と uv。`uv run --directory strategy` が依存を解決する
+- コミット前検査: [`lefthook.yml`](lefthook.yml)（Biome の書式、osv-scanner、gitleaks、import-linter、xenon、dependency-cruiser）。Ruff はフックに含めず、次節のホストコマンドで走らせる
+
+証明書と Podman secret の一度きりの準備は、正本の 8.1 節および [README.md](README.md) の「準備」に従う。
+
+### ホットリロード
+
+対局の入口は運用者と同じである。
+
+```bash
+podman compose up --build
+```
+
+ホットリロードが要るときだけ、別スタックを増やさずオーバーレイを足す。
+
+```bash
+podman compose -f compose.yaml -f compose.dev.yaml up --build
+```
+
+`compose.dev.yaml` はソースの bind mount と reload だけを足す。secret・公開ポート・サービス名は `compose.yaml` のままにする。配置上の正は [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) である（リポジトリにまだ無い場合は、実装時にその配置どおり置く）。
+
+### 試験と検査（ホスト）
+
+```bash
+uv run --directory strategy pytest
+uv run --directory strategy lint-imports
+uv run --directory strategy xenon --max-absolute C --max-modules B --max-average A src
+uv run --directory strategy ruff check src tests
+pnpm test
+pnpm exec biome check .
+pnpm exec depcruise --config .dependency-cruiser.cjs web
+```
+
+E2E はアプリを Podman で上げ、Playwright はホストの Google Chrome で `https://127.0.0.1` を叩く。
+
+```bash
+podman compose up --build --wait
+pnpm exec playwright test --project=chrome
+```
+
+資格情報が無い環境では、生成 AI を試験ダブルのままにする。OpenRouter の secret は CI に渡さない。学習の起動は正本の 8.3 節を使う。ホストの `uv run` を学習の正にしない。
+
 ## Git ブランチ命名規則
 
 ブランチ名は **`<type>/<short-description>`** 形式で記述する。
