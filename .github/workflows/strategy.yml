@@ -21,6 +21,8 @@ jobs:
         run: uv run --directory strategy pytest tests/test_wthor.py -q
       - name: 戦略 API の 1 局
         run: uv run --directory strategy pytest tests/test_api.py -q
+      - name: 終局対局の SQLite 永続化
+        run: uv run --directory strategy pytest tests/test_persist.py -q
       - name: import lint
         run: uv run --directory strategy lint-imports
       - name: complexity

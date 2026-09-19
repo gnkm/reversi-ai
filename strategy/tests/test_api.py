@@ -18,6 +18,7 @@ from reversi.api.schemas import (
     IllegalMoveNotApplied,
     MoveApplied,
 )
+from reversi.api.session import GameStore
 from reversi.engine.rules import initial_position, legal_places
 
 _API_DIR = Path(__file__).resolve().parents[1] / "src" / "reversi" / "api"
@@ -42,8 +43,8 @@ _GAME_KEYS = {
 
 
 @pytest.fixture
-def client() -> TestClient:
-    return TestClient(create_app())
+def client(tmp_path: Path) -> TestClient:
+    return TestClient(create_app(GameStore(db_path=tmp_path / "games.sqlite")))
 
 
 def _problem(response, status: int, code: str) -> dict:
