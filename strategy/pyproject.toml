@@ -11,17 +11,29 @@ dependencies = []
 
 [dependency-groups]
 dev = [
-    "import-linter>=2.1",
+    "import-linter>=2.15",
     "pytest>=8.3",
-    "xenon>=0.9",
+    "radon>=6.0.1",
+    "ruff>=0.13",
+    "xenon>=0.9.3",
 ]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/reversi"]
 
+[tool.uv]
+package = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+
+[tool.ruff]
+src = ["src"]
+target-version = "py312"
+
+[tool.radon]
+exclude = "tests/*"
 
 [tool.importlinter]
 root_packages = ["reversi"]
@@ -43,4 +55,25 @@ source_modules = [
 ]
 forbidden_modules = [
     "reversi.encode",
+]
+
+[[tool.importlinter.contracts]]
+name = "Play-time layers"
+type = "layers"
+layers = [
+    "reversi.api",
+    "reversi.agents",
+    "reversi.engine",
+]
+
+[[tool.importlinter.contracts]]
+name = "Play-time must not import training"
+type = "forbidden"
+source_modules = [
+    "reversi.api",
+    "reversi.agents",
+    "reversi.engine",
+]
+forbidden_modules = [
+    "reversi.train",
 ]
