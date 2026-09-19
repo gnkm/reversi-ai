@@ -398,7 +398,7 @@ def _spec_leaf_score(board: Board, root: Color) -> int:
 
 def _plain_minimax_value(position: Position, depth: int, root: Color) -> int:
     """アルファベータ無しのミニマックス。パスも 1 深さ。"""
-    if depth >= minimax.SEARCH_DEPTH or is_over(position):
+    if depth >= 4 or is_over(position):
         return _spec_leaf_score(position.board, root)
     moves = legal_moves(position)
     if not moves:
@@ -478,6 +478,18 @@ def test_minimax_picks_depth_4_value_with_a1_h8_ties() -> None:
     via_catalog = catalog_choose(minimax.SPECIMEN_ID, position)
     assert via_catalog == move
     assert minimax.choose_move(position, Random(0)) == move
+
+
+def test_minimax_looks_ahead_past_immediate_positional() -> None:
+    """初手 d3 のあと、位置評価は c3、深さ 4 は e3 を選ぶ。"""
+    after_d3 = play(initial_position(), Place(Square.parse("d3")))
+    places = legal_places(after_d3)
+    assert tuple(square.algebraic for square in places) == ("c3", "e3", "c5")
+    assert positional.choose_move(after_d3) == Place(Square.parse("c3"))
+    move = minimax.choose_move(after_d3)
+    assert move == Place(Square.parse("e3"))
+    assert move == _plain_minimax_choose(after_d3)
+    assert move != positional.choose_move(after_d3)
 
 
 def test_minimax_matches_plain_search_on_corner_and_pass_lines() -> None:
