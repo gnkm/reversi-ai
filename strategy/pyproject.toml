@@ -34,3 +34,13 @@ layers = [
     "reversi.engine.score | reversi.engine.rules",
     "reversi.engine.board",
 ]
+
+[[tool.importlinter.contracts]]
+name = "engine は encode を読まない"
+type = "forbidden"
+source_modules = [
+    "reversi.engine",
+]
+forbidden_modules = [
+    "reversi.encode",
+]
