@@ -24,6 +24,9 @@ dev = [
     "ruff>=0.13",
     "xenon>=0.9.3",
 ]
+train = [
+    "torch>=2.4",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/reversi"]

@@ -63,7 +63,9 @@ def _require_torch():
     except ImportError as exc:
         raise RuntimeError(
             "NN の学習には PyTorch CPU が必要です。"
-            "同じ strategy イメージで `python -m reversi.train.nn` する前提です。"
+            "ホストでは `uv sync --directory strategy --group train` のあと "
+            "`python -m reversi.train.nn` を使います。"
+            "対局の正は Podman の strategy イメージです。"
         ) from exc
     return torch
 
@@ -123,6 +125,22 @@ def _examples_from_wthor(path: Path) -> tuple[Example, ...]:
     return tuple(examples)
 
 
+def _move_list_from_payload(payload: object) -> tuple[Mapping[str, str], ...] | None:
+    """1 局の着手列。壊れた JSON や形の違う行は捨てる。"""
+    try:
+        moves = json.loads(str(payload))
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(moves, list):
+        return None
+    parsed: list[Mapping[str, str]] = []
+    for move in moves:
+        if not isinstance(move, dict):
+            return None
+        parsed.append(move)
+    return tuple(parsed)
+
+
 def _finished_move_lists(db_path: Path) -> tuple[tuple[Mapping[str, str], ...], ...]:
     if not db_path.exists():
         return ()
@@ -133,9 +151,9 @@ def _finished_move_lists(db_path: Path) -> tuple[tuple[Mapping[str, str], ...], 
             return ()
     games: list[tuple[Mapping[str, str], ...]] = []
     for (payload,) in rows:
-        moves = json.loads(str(payload))
-        if isinstance(moves, list):
-            games.append(tuple(moves))
+        moves = _move_list_from_payload(payload)
+        if moves is not None:
+            games.append(moves)
     return tuple(games)
 
 

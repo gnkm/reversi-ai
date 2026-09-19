@@ -1130,3 +1130,21 @@ def test_nn_training_reads_wthor_and_persisted_games(tmp_path: Path) -> None:
     assert "d3" in labels
     assert all(example.board == initial_position().board for example in examples)
 
+
+def test_nn_training_skips_corrupt_persisted_games(tmp_path: Path) -> None:
+    import sqlite3
+
+    from reversi.train.nn import collect_examples
+
+    db = tmp_path / "games.sqlite"
+    with sqlite3.connect(db) as conn:
+        conn.execute("CREATE TABLE games (id INTEGER PRIMARY KEY, moves TEXT NOT NULL)")
+        conn.execute("INSERT INTO games (moves) VALUES (?)", ("not-json",))
+        conn.execute("INSERT INTO games (moves) VALUES (?)", ("[1, 2]",))
+        conn.execute(
+            "INSERT INTO games (moves) VALUES (?)",
+            ('[{"type": "place", "square": "f5"}]',),
+        )
+    examples = collect_examples(tmp_path / "missing-wthor", db)
+    assert [example.square.algebraic for example in examples] == ["f5"]
+
