@@ -10,6 +10,11 @@ __pycache__/
 .import_linter_cache/
 *.egg-info/
 
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+
 # 運用者ローカル（終局棋譜・WTHOR 原本・証明書）。Git 管理外。
 data/
 
