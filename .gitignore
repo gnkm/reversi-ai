@@ -2,3 +2,9 @@
 node_modules/
 .env
 .cursor-audit.jsonl
+__pycache__/
+*.py[oc]
+.venv/
+.pytest_cache/
+.import_linter_cache/
+*.egg-info/
