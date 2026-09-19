@@ -9,7 +9,7 @@ from random import Random
 
 import pytest
 
-from reversi.agents import most_flips, positional
+from reversi.agents import jev, most_flips, positional
 from reversi.agents.catalog import CatalogItem, get, items
 from reversi.agents.catalog import choose_move as catalog_choose
 from reversi.agents.position_table import POSITION_SCORES, score_at
@@ -189,6 +189,8 @@ def test_catalog_listed_specimens_match_choosers() -> None:
     position = initial_position()
     for specimen_id in listed_ids:
         get(specimen_id)
+        if specimen_id == jev.SPECIMEN_ID:
+            continue
         catalog_choose(specimen_id, position, Random(0))
 
 
@@ -223,6 +225,7 @@ def _position_from_rank8_rows(rows: tuple[str, ...], side: Color) -> Position:
     assert len(rows) == 8 and all(len(row) == 8 for row in rows)
     cells = tuple(tuple(_STONE[ch] for ch in row) for row in reversed(rows))
     return Position(Board(cells), side)
+
 
 # a1 は 1 枚、d2 は 2 枚裏返す。角 a1 の位置点は中央より高い。
 _CORNER_VS_TWO_FLIPS = (
@@ -351,7 +354,9 @@ def test_positional_tie_breaks_a1_to_h8_order() -> None:
     position = initial_position()
     places = legal_places(position)
     scores = [
-        positional.own_stone_score(apply_place(position.board, square, Color.BLACK), Color.BLACK)
+        positional.own_stone_score(
+            apply_place(position.board, square, Color.BLACK), Color.BLACK
+        )
         for square in places
     ]
     assert scores and len(set(scores)) == 1
@@ -384,3 +389,104 @@ def test_most_flips_and_positional_source_does_not_call_models() -> None:
                 assert ".wtb" not in lowered
                 assert "openrouter.ai" not in lowered
 
+
+def test_catalog_lists_jev_generative_ai_specimen() -> None:
+    item = _item_by_display_name("生成 AI (Jev)")
+    assert item.specimen_id == jev.SPECIMEN_ID == "jev"
+    assert item.category == jev.CATEGORY == "generative_ai"
+    assert item.display_name == jev.DISPLAY_NAME
+    assert item.description == jev.DESCRIPTION
+    assert item.description.strip()
+    assert _JAPANESE.search(item.description)
+    assert "OpenRouter" in item.description
+    assert "Jev" in item.description
+    assert jev.MODEL_ID == "typesafe/jev-1.13"
+    assert get(jev.SPECIMEN_ID) == item
+    with pytest.raises(KeyError):
+        get("generative_ai")
+
+
+def test_jev_picks_legal_place_from_decisions_double(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    position = initial_position()
+    places = legal_places(position)
+    assert places
+
+    def pick_second(_position, legal):
+        return legal[1]
+
+    monkeypatch.setattr(jev, "_call_openrouter", pick_second)
+    move = jev.choose_move(position)
+    assert move == Place(places[1])
+    assert move.square in places
+    via_catalog = catalog_choose(jev.SPECIMEN_ID, position)
+    assert via_catalog == move
+
+
+def test_jev_does_not_adopt_place_outside_legal_set(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    position = initial_position()
+    places = legal_places(position)
+    illegal = Square.parse("a1")
+    assert illegal not in places
+
+    def pick_illegal(_position, _legal):
+        return illegal
+
+    monkeypatch.setattr(jev, "_call_openrouter", pick_illegal)
+    with pytest.raises(jev.ExternalModelError, match="合法手"):
+        jev.choose_move(position)
+    with pytest.raises(jev.ExternalModelError):
+        catalog_choose(jev.SPECIMEN_ID, position)
+
+
+def test_jev_call_failure_is_unplayable_not_a_legal_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    position = initial_position()
+
+    def boom(_position, _legal):
+        raise jev.ExternalModelError("試験用の失敗")
+
+    monkeypatch.setattr(jev, "_call_openrouter", boom)
+    with pytest.raises(jev.ExternalModelError, match="失敗"):
+        jev.choose_move(position)
+
+
+def test_jev_does_not_move_when_no_legal_places(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    called = {"n": 0}
+
+    def should_not_run(_position, _legal):
+        called["n"] += 1
+        raise AssertionError("合法手が無い局面で OpenRouter を呼んではいけない")
+
+    monkeypatch.setattr(jev, "_call_openrouter", should_not_run)
+    assert jev.choose_move(_almost_full_white_with_black_on_b1()) is None
+    assert jev.choose_move(_both_sides_cannot_place()) is None
+    assert called["n"] == 0
+
+
+def test_jev_source_uses_jev_model_and_skips_wthor() -> None:
+    source = _module_source("jev.py")
+    assert "typesafe/jev-1.13" in source
+    assert "https://openrouter.ai" in source
+    roots = _imported_roots(source)
+    assert "wthor" not in roots
+    assert "reversi" in roots or "openrouter" in roots
+    tree = ast.parse(source)
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr in {"getenv", "putenv"}
+        ):
+            raise AssertionError("jev.py は環境変数から鍵を読んではいけない")
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            lowered = node.value.lower()
+            assert "ffothello.org" not in lowered
+            assert ".wtb" not in lowered
+            assert "openrouter_api_key" not in lowered

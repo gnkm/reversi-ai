@@ -8,7 +8,14 @@ from threading import Lock
 from uuid import uuid4
 
 from reversi.agents import catalog
-from reversi.api.errors import MoveRejected, game_not_found, specimen_not_found
+from reversi.agents.jev import ExternalModelError
+from reversi.api.errors import (
+    MoveRejected,
+    UnplayableGame,
+    external_model_failed,
+    game_not_found,
+    specimen_not_found,
+)
 from reversi.api.schemas import (
     Cell,
     CreateGameRequest,
@@ -49,6 +56,7 @@ class Game:
     last_move: Move | None
     black: PlayerSpec
     white: PlayerSpec
+    unplayable_reason: str | None = None
 
 
 def _player_on(game: Game, color: Color) -> PlayerSpec:
@@ -108,6 +116,19 @@ def _result_view(position: Position) -> GameResult | None:
 def to_game_state(game: Game) -> GameState:
     position = game.position
     over = is_over(position)
+    unplayable = game.unplayable_reason is not None
+    if unplayable:
+        status = "unplayable"
+        continuation = False
+        reason = "external_model_failed"
+    elif over:
+        status = "completed"
+        continuation = False
+        reason = None
+    else:
+        status = "in_progress"
+        continuation = True
+        reason = None
     return GameState(
         id=game.id,
         board=_board_cells(position),
@@ -118,9 +139,9 @@ def to_game_state(game: Game) -> GameState:
         is_over=over,
         official_score=_score_view(position),
         result=_result_view(position),
-        status="completed" if over else "in_progress",
-        continuation_possible=not over,
-        unplayable_reason=None,
+        status=status,
+        continuation_possible=continuation,
+        unplayable_reason=reason,
         black=game.black,
         white=game.white,
     )
@@ -128,6 +149,8 @@ def to_game_state(game: Game) -> GameState:
 
 def _apply_specimen_choice(game: Game, rng: Random | None) -> bool:
     """標本の 1 手を適用する。手番が標本でなければ False。"""
+    if game.unplayable_reason is not None:
+        return False
     player = _player_on(game, game.position.side_to_move)
     if player.kind != "specimen":
         return False
@@ -147,9 +170,13 @@ def _apply_specimen_choice(game: Game, rng: Random | None) -> bool:
 def advance_specimens(game: Game, rng: Random | None) -> None:
     """手番が標本であるあいだ、人手を待たず進める。"""
     for _ in range(_MAX_AUTO_PLIES):
-        if is_over(game.position):
+        if is_over(game.position) or game.unplayable_reason is not None:
             return
-        if not _apply_specimen_choice(game, rng):
+        try:
+            if not _apply_specimen_choice(game, rng):
+                return
+        except ExternalModelError:
+            game.unplayable_reason = "external_model_failed"
             return
 
 
@@ -181,6 +208,8 @@ class GameStore:
             white=request.white,
         )
         advance_specimens(game, self._rng)
+        if game.unplayable_reason is not None:
+            raise external_model_failed()
         with self._lock:
             self._game = game
         return to_game_state(game)
@@ -191,6 +220,11 @@ class GameStore:
             if game is None or game.id != game_id:
                 raise game_not_found()
             snapshot = to_game_state(game)
+            if game.unplayable_reason is not None:
+                raise UnplayableGame(
+                    snapshot,
+                    "外部モデルの呼出しに失敗し、この対局は継続できない",
+                )
             try:
                 game.position = play(game.position, _to_engine_move(move))
             except IllegalMoveError as exc:

@@ -9,6 +9,7 @@ description = "対局と学習が共有する 8×8 リバーシ規則"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115",
+    "openrouter>=1.2.1",
     "uvicorn>=0.32",
 ]
 

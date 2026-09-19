@@ -6,13 +6,14 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from random import Random
 
-from reversi.agents import most_flips, positional, random_uniform
+from reversi.agents import jev, most_flips, positional, random_uniform
 from reversi.engine.rules import Place, Position
 
 Chooser = Callable[[Position, Random | None], Place | None]
 
 
 __all__ = [
+    "JEV",
     "MOST_FLIPS",
     "POSITIONAL",
     "RANDOM_UNIFORM",
@@ -51,12 +52,19 @@ POSITIONAL = CatalogItem(
     display_name=positional.DISPLAY_NAME,
     description=positional.DESCRIPTION,
 )
+JEV = CatalogItem(
+    specimen_id=jev.SPECIMEN_ID,
+    category=jev.CATEGORY,
+    display_name=jev.DISPLAY_NAME,
+    description=jev.DESCRIPTION,
+)
 
 # 一覧と着手関数は同じ登録から作る。
 _REGISTRY: tuple[tuple[CatalogItem, Chooser], ...] = (
     (RANDOM_UNIFORM, random_uniform.choose_move),
     (MOST_FLIPS, most_flips.choose_move),
     (POSITIONAL, positional.choose_move),
+    (JEV, jev.choose_move),
 )
 _BY_ID: dict[str, tuple[CatalogItem, Chooser]] = {
     item.specimen_id: (item, chooser) for item, chooser in _REGISTRY
