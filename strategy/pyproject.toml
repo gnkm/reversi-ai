@@ -7,10 +7,13 @@ name = "strategy"
 version = "0.1.0"
 description = "対局と学習が共有する 8×8 リバーシ規則"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "fastapi>=0.115",
+]
 
 [dependency-groups]
 dev = [
+    "httpx>=0.27",
     "import-linter>=2.1",
     "pytest>=8.3",
     "xenon>=0.9",
@@ -27,9 +30,10 @@ pythonpath = ["src"]
 root_packages = ["reversi"]
 
 [[tool.importlinter.contracts]]
-name = "agents と train は engine の上、engine は board の上に rules と score を置く"
+name = "api は agents と train の上、engine は board の上に rules と score を置く"
 type = "layers"
 layers = [
+    "reversi.api",
     "reversi.agents | reversi.train",
     "reversi.engine.score | reversi.engine.rules",
     "reversi.engine.board",
@@ -43,4 +47,14 @@ source_modules = [
 ]
 forbidden_modules = [
     "reversi.encode",
+]
+
+[[tool.importlinter.contracts]]
+name = "api は train を読まない"
+type = "forbidden"
+source_modules = [
+    "reversi.api",
+]
+forbidden_modules = [
+    "reversi.train",
 ]
