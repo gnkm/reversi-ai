@@ -1,0 +1,156 @@
+:root {
+  color: #1a1a1a;
+  background: #f4f1ea;
+  font-family: "Hiragino Sans", "Noto Sans JP", sans-serif;
+  line-height: 1.5;
+}
+
+body {
+  margin: 0;
+}
+
+.page {
+  max-width: 52rem;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+h1 {
+  font-size: 1.5rem;
+  margin: 0 0 0.75rem;
+}
+
+.catalog-list {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0 1.5rem;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.catalog-item {
+  background: #fff;
+  border: 1px solid #d7d0c4;
+  border-radius: 0.5rem;
+  padding: 0.75rem 1rem;
+}
+
+.catalog-name {
+  margin: 0 0 0.35rem;
+  font-size: 1.05rem;
+}
+
+.catalog-description {
+  margin: 0;
+}
+
+.start-form {
+  display: grid;
+  gap: 1rem;
+}
+
+fieldset {
+  border: 1px solid #d7d0c4;
+  border-radius: 0.5rem;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.select-label,
+fieldset label {
+  display: grid;
+  gap: 0.25rem;
+}
+
+button,
+select {
+  font: inherit;
+}
+
+button {
+  width: fit-content;
+  padding: 0.4rem 0.9rem;
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+.error {
+  color: #a40000;
+}
+
+.result {
+  font-weight: 700;
+}
+
+.board-grid {
+  display: grid;
+  grid-template-columns: 1.5rem repeat(8, 2.75rem) 1.5rem;
+  grid-template-rows: 1.5rem repeat(8, 2.75rem) 1.5rem;
+  width: max-content;
+  margin: 1rem 0;
+  background: #0b5a36;
+  padding: 0.35rem;
+  gap: 2px;
+}
+
+.board-file,
+.board-rank,
+.board-corner {
+  display: grid;
+  place-items: center;
+  color: #eef8f1;
+  font-size: 0.85rem;
+}
+
+.square {
+  position: relative;
+  border: 0;
+  padding: 0;
+  background: #16804c;
+  display: grid;
+  place-items: center;
+}
+
+.square-last {
+  box-shadow: inset 0 0 0 3px #f4d35e;
+}
+
+.stone {
+  width: 78%;
+  height: 78%;
+  border-radius: 50%;
+  display: block;
+}
+
+.stone-black {
+  background: #111;
+}
+
+.stone-white {
+  background: #f4f4f4;
+  box-shadow: inset 0 0 0 1px #bbb;
+}
+
+.legal-mark {
+  width: 28%;
+  height: 28%;
+  border-radius: 50%;
+  background: #f4d35e;
+}
+
+.last-mark {
+  position: absolute;
+  inset: 4px;
+  border: 2px solid #f4d35e;
+  border-radius: 4px;
+  pointer-events: none;
+}
+
+.players,
+.turn,
+.score {
+  margin: 0.25rem 0;
+}
