@@ -172,8 +172,8 @@ def test_session_persists_finished_agent_game_only(tmp_path: Path) -> None:
     store = GameStore(rng=Random(0), db_path=path)
     opening = store.start(
         CreateGameRequest(
-            black=HumanPlayer(),
-            white=SpecimenPlayer(specimen_id=SPECIMEN_ID),
+            black=HumanPlayer(kind="human"),
+            white=SpecimenPlayer(kind="specimen", specimen_id=SPECIMEN_ID),
         )
     )
     assert opening.is_over is False
@@ -181,8 +181,8 @@ def test_session_persists_finished_agent_game_only(tmp_path: Path) -> None:
 
     finished = store.start(
         CreateGameRequest(
-            black=SpecimenPlayer(specimen_id=SPECIMEN_ID),
-            white=SpecimenPlayer(specimen_id=SPECIMEN_ID),
+            black=SpecimenPlayer(kind="specimen", specimen_id=SPECIMEN_ID),
+            white=SpecimenPlayer(kind="specimen", specimen_id=SPECIMEN_ID),
         )
     )
     assert finished.is_over is True
