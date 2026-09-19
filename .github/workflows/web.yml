@@ -1,0 +1,27 @@
+name: web
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  server:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: 依存を入れる
+        run: pnpm install --frozen-lockfile
+      - name: Hono の Origin と中継
+        run: pnpm exec vitest run --dir web/server
+      - name: 層の import
+        run: pnpm exec depcruise --config .dependency-cruiser.cjs web
+      - name: Biome
+        run: pnpm exec biome check web/server
