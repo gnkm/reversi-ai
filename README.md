@@ -105,7 +105,35 @@ podman-compose down
 | ニューラルネットワーク (棋譜) | 対局前に学習したネットワークで着手する |
 | 生成 AI (Jev) | OpenRouter 上の Jev が合法手から選ぶ |
 
-学習し直さなくても、これらの相手とは対局できます。
+学習し直さなくても、これらの相手とは対局できます。自分で学習し直す手順は次節です。
+
+## 学習し直す（任意）
+
+対局と同じ strategy の入れ物を、待ち受けせず一発起動します。専用 GPU は不要です。
+
+**機械学習 (棋譜)** と **ニューラルネットワーク (棋譜)** は、[WTHOR](https://www.ffothello.org/informatique/la-base-wthor) の 8×8 棋譜（`.wtb`）と、終局して残った自対局（`data/games.sqlite`）を使います。WTHOR の ZIP を手元で展開し、拡張子が `.wtb` のファイルを `data/wthor/` の直下に置いてください。ファイル名は問いません（例: `2024.wtb`、`2025.wtb`）。置いた `.wtb` をすべて読みます。このリポジトリから原本は配りません。再配布しないでください。
+
+**強化学習 (自己対局)** は自己対局だけで学びます。WTHOR は使いません。
+
+```bash
+mkdir -p data/wthor
+
+podman-compose run --rm strategy python -m reversi.train.ml \
+  --wthor /data/wthor --games /data/games.sqlite --out /models/ml.json
+
+podman-compose run --rm strategy python -m reversi.train.rl \
+  --out /models/rl.json
+
+podman-compose run --rm strategy python -m reversi.train.nn \
+  --wthor /data/wthor --games /data/games.sqlite --out /models/nn.onnx
+```
+
+書き出したファイルを、すでに動いている対局が読むなら、サービスを起動し直してください。
+
+```bash
+podman-compose down
+podman-compose up --build
+```
 
 ## 他の生成 AI を足す（任意）
 
