@@ -20,13 +20,14 @@ services:
       - ./data/certs:/app/data/certs:ro
     environment:
       STRATEGY_BASE_URL: http://127.0.0.1:8000
-    depends_on:
-      - strategy
 
   strategy:
     build:
       context: .
       dockerfile: strategy/Containerfile
+    network_mode: service:web
+    depends_on:
+      - web
     volumes:
       - ./data:/data
       - ./models:/models
