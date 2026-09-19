@@ -5,7 +5,7 @@
   },
   "scripts": {
     "test": "vitest run",
-    "lint": "biome check .",
+    "lint": "biome check web",
     "lint:deps": "depcruise --config .dependency-cruiser.cjs web",
     "dev:ui": "vite --config web/ui/vite.config.ts",
     "build:ui": "vite build --config web/ui/vite.config.ts"
