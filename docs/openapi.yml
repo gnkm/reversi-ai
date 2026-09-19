@@ -280,6 +280,7 @@ components:
         - machine_learning
         - reinforcement_learning
         - neural_network
+        - generative_ai
       description: 戦略個体のカテゴリ
     ErrorCode:
       type: string

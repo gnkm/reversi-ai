@@ -10,11 +10,14 @@ import pytest
 from fastapi.testclient import TestClient
 
 from reversi.agents.catalog import items as catalog_items
+from reversi.agents.jev import SPECIMEN_ID as JEV_ID
+from reversi.agents.jev import ExternalModelError
 from reversi.agents.random_uniform import SPECIMEN_ID
 from reversi.api import create_app
 from reversi.api.schemas import (
     Catalog,
     GameState,
+    GameUnplayable,
     IllegalMoveNotApplied,
     MoveApplied,
 )
@@ -272,3 +275,79 @@ def test_api_package_does_not_import_train() -> None:
     assert api_pkg.app is not None
     loaded = [name for name in sys.modules if name.startswith("reversi.train")]
     assert loaded == []
+
+
+_JEV = {"kind": "specimen", "specimen_id": JEV_ID}
+
+
+def test_catalog_includes_jev(client: TestClient) -> None:
+    response = client.get("/api/catalog")
+    body = Catalog.model_validate(response.json())
+    match = next(item for item in body.items if item.specimen_id == JEV_ID)
+    assert match.category == "generative_ai"
+    assert match.display_name == "生成 AI (Jev)"
+    assert "Jev" in match.description
+    assert "OpenRouter" in match.description
+
+
+def test_jev_failure_on_start_does_not_leave_partial_game(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    def boom(_position, _legal):
+        raise ExternalModelError("試験用の失敗")
+
+    monkeypatch.setattr("reversi.agents.jev._call_openrouter", boom)
+    client = TestClient(create_app(GameStore(db_path=tmp_path / "games.sqlite")))
+    response = client.post(
+        "/api/games",
+        json={"black": _JEV, "white": _HUMAN},
+    )
+    _problem(response, 422, "external_model_failed")
+    assert "sk-" not in response.text
+    listed = client.get("/api/catalog")
+    assert listed.status_code == 200
+
+
+def test_jev_failure_after_human_move_marks_unplayable_without_adopting_model_move(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    from reversi.engine.board import Square
+
+    def illegal(_position, _legal):
+        return Square.parse("a1")
+
+    monkeypatch.setattr("reversi.agents.jev._call_openrouter", illegal)
+    client = TestClient(create_app(GameStore(db_path=tmp_path / "games.sqlite")))
+    game = _create(client, _HUMAN, _JEV)
+    before_board = game.board
+    legal = game.legal_moves[0]
+    applied = client.post(
+        f"/api/games/{game.id}/moves",
+        json={"type": "place", "square": legal},
+    )
+    assert applied.status_code == 200
+    payload = MoveApplied.model_validate(applied.json())
+    assert payload.applied is True
+    assert payload.game.status == "unplayable"
+    assert payload.game.continuation_possible is False
+    assert payload.game.unplayable_reason == "external_model_failed"
+    assert payload.game.result is None
+    file_i = ord(legal[0]) - ord("a")
+    rank_i = int(legal[1]) - 1
+    assert payload.game.board[rank_i][file_i] == "black"
+    assert payload.game.board != before_board
+    assert payload.game.board[0][0] == "empty"
+
+    rejected = client.post(
+        f"/api/games/{game.id}/moves",
+        json={"type": "place", "square": "d3"},
+    )
+    assert rejected.status_code == 409
+    body = GameUnplayable.model_validate(rejected.json())
+    assert body.applied is False
+    assert body.code == "external_model_failed"
+    assert body.continuation_possible is False
+    assert body.game.status == "unplayable"
+    assert body.game.board == payload.game.board

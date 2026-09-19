@@ -11,8 +11,10 @@ from reversi.agents.catalog import CatalogItem as AgentItem
 from reversi.api.errors import (
     ApiProblem,
     MoveRejected,
+    UnplayableGame,
     api_problem_handler,
     move_rejected_handler,
+    unplayable_handler,
     validation_handler,
 )
 from reversi.api.schemas import (
@@ -47,6 +49,7 @@ def create_app(store: GameStore | None = None) -> FastAPI:
     app.add_exception_handler(ApiProblem, api_problem_handler)
     app.add_exception_handler(RequestValidationError, validation_handler)
     app.add_exception_handler(MoveRejected, move_rejected_handler)
+    app.add_exception_handler(UnplayableGame, unplayable_handler)
 
     @app.get("/api/catalog", response_model=Catalog)
     def list_catalog() -> Catalog:

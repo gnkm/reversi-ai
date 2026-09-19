@@ -19,6 +19,7 @@ Category = Literal[
     "machine_learning",
     "reinforcement_learning",
     "neural_network",
+    "generative_ai",
 ]
 ErrorCode = Literal[
     "validation_error",
@@ -126,4 +127,12 @@ class IllegalMoveNotApplied(_Strict):
     applied: Literal[False]
     code: Literal["illegal_move"]
     detail: str
+    game: GameState
+
+
+class GameUnplayable(_Strict):
+    applied: Literal[False]
+    code: Literal["external_model_failed"]
+    detail: str
+    continuation_possible: Literal[False]
     game: GameState

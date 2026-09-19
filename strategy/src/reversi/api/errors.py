@@ -6,7 +6,12 @@ from fastapi import Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from reversi.api.schemas import GameState, IllegalMoveNotApplied, Problem
+from reversi.api.schemas import (
+    GameState,
+    GameUnplayable,
+    IllegalMoveNotApplied,
+    Problem,
+)
 
 
 class ApiProblem(Exception):
@@ -31,6 +36,14 @@ class ApiProblem(Exception):
 
 class MoveRejected(Exception):
     """違法着手。盤は変えない。"""
+
+    def __init__(self, game: GameState, detail: str) -> None:
+        self.game = game
+        self.detail = detail
+
+
+class UnplayableGame(Exception):
+    """外部モデル失敗などで継続不能。着手は適用しない。"""
 
     def __init__(self, game: GameState, detail: str) -> None:
         self.game = game
@@ -73,6 +86,17 @@ async def move_rejected_handler(_request: Request, exc: MoveRejected) -> JSONRes
     return JSONResponse(status_code=409, content=body.model_dump(mode="json"))
 
 
+async def unplayable_handler(_request: Request, exc: UnplayableGame) -> JSONResponse:
+    body = GameUnplayable(
+        applied=False,
+        code="external_model_failed",
+        detail=exc.detail,
+        continuation_possible=False,
+        game=exc.game,
+    )
+    return JSONResponse(status_code=409, content=body.model_dump(mode="json"))
+
+
 def specimen_not_found() -> ApiProblem:
     return ApiProblem(
         status=404,
@@ -88,4 +112,13 @@ def game_not_found() -> ApiProblem:
         code="game_not_found",
         title="Not Found",
         detail="対局が無い",
+    )
+
+
+def external_model_failed() -> ApiProblem:
+    return ApiProblem(
+        status=422,
+        code="external_model_failed",
+        title="Unprocessable Entity",
+        detail="外部モデルの呼出しに失敗し、この対局は継続できない",
     )
