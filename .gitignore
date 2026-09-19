@@ -9,8 +9,8 @@ __pycache__/
 .import_linter_cache/
 *.egg-info/
 
-# mkcert の PEM。Hono へファイルとして渡す。
-/data/certs/
+# 運用者ローカル（終局棋譜・WTHOR 原本・証明書）。Git 管理外。
+data/
 
 # WTHOR 原本。試験フィクスチャ以外はリポジトリに入れない。
 /data/wthor/*.wtb
