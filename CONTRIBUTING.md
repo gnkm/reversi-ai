@@ -9,6 +9,18 @@
 - Issue のクローズは、`verifier` が検証コマンドを通したあとだけとする。
 - CI ワークフローを追加・変更したら、README に状況バッジを必ず出す。
 
+## ソフトウェア要求の変更
+
+開発中の要求の正本は [`docs/srs.md`](docs/srs.md) である。シードは [`docs/source-of-truth/`](docs/source-of-truth/) に残し、AI は編集しない。
+
+浮上した判断は次に分ける。
+
+- **設計**（shall を変えない）: Issue と実装 PR だけ。`docs/srs.md` は触らない。
+- **穴**（SRS が沈黙して実装が割れる）: Issue を起票し、`docs/srs.md` に TBD を足す PR を出す。決まるまで shall を発明しない。
+- **変更**（既存 shall の追加・緩和・撤回）: Issue に対象の要求 ID を書き、`docs/srs.md` の PR を出す。試験が必要なら同じ PR に含める。
+
+shall を変える PR は CODEOWNERS（`docs/srs.md`）のレビューを必須とする。草案の編集は作成者またはエージェントでよい。承認はオーナーが行う。要求 ID は再利用しない。シードの文言まで変える必要があれば、Issue で人間が `docs/source-of-truth/` を直す。
+
 ## Git ブランチ命名規則
 
 ブランチ名は **`<type>/<short-description>`** 形式で記述する。

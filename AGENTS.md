@@ -4,9 +4,24 @@ Cursor Cloud Agents 向けの作業ルール。アプリ固有のルールはプ
 
 ## 編集禁止（読み取り専用）
 
-- `docs/source-of-truth/` 配下はソース・オブ・トゥルース。AI は読んでよいが、編集・削除・リネーム・移動は禁止。
+- `docs/source-of-truth/` 配下はシードの正本。AI は読んでよいが、編集・削除・リネーム・移動は禁止。
 - フロントマターに `ai.editable: false`（または `ai_editable: false`）があるファイルも同様。
 - 内容変更が必要なら Issue で人間に依頼し、自分では触らない。
+
+## ソフトウェア要求（`docs/srs.md`）
+
+開発中のソフトウェア要求の正本は `docs/srs.md` である。シードは `docs/source-of-truth/` に残す。
+
+- 設計（言語、配置、層数など、shall を変えない判断）では `docs/srs.md` を編集しない。
+- shall の追加・変更・撤回、または新しい TBD は、対象 Issue を読んでから `docs/srs.md` を編集する。実装だけの PR に混ぜない。
+- 要求 ID は再利用しない。版を上げ、改訂履歴に 1 行足す。
+- シードに無い数値や義務を shall として発明しない。決まらなければ TBD にする。
+
+## 設計
+
+- 配置と層の正は `docs/ARCHITECTURE.md`。言語・ライブラリ・コンテナの選定は `docs/tech-stack.md`。
+- 対局と学習の起動は Podman。試験・lint・lefthook はホスト。コマンドの正は `docs/ARCHITECTURE.md` の「起動とコマンド」。
+- 設計判断（言語、配置、層数など、shall を変えない判断）では `docs/srs.md` を編集しない。
 
 ## タスク管理
 
