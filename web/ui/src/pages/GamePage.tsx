@@ -1,5 +1,10 @@
 import { useEffect, useState } from "react";
-import { MoveRejectedError, playMove, subscribeGameEvents } from "../api.ts";
+import {
+  type GameStreamFailure,
+  MoveRejectedError,
+  playMove,
+  subscribeGameEvents,
+} from "../api.ts";
 import { Board } from "../components/Board.tsx";
 import type { GameState, PlayerSpec } from "../types.ts";
 
@@ -65,6 +70,13 @@ export function illegalMoveMessage(code: string | undefined): string | null {
   return null;
 }
 
+export function streamFailureMessage(code: GameStreamFailure): string {
+  if (code === "game_not_found") {
+    return "対局がありません。";
+  }
+  return "対局の更新を取得できませんでした。";
+}
+
 export function GamePage({
   game,
   specimenNames,
@@ -73,6 +85,9 @@ export function GamePage({
 }: GamePageProps) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [streamError, setStreamError] = useState<GameStreamFailure | null>(
+    null,
+  );
   const humanTurn = isHumanTurn(game);
   const vsAgents =
     game.black.kind === "specimen" && game.white.kind === "specimen";
@@ -82,7 +97,9 @@ export function GamePage({
     if (!vsAgents || finished) {
       return;
     }
-    return subscribeGameEvents(game.id, onGame);
+    return subscribeGameEvents(game.id, onGame, (code) => {
+      setStreamError(code);
+    });
   }, [vsAgents, finished, game.id, onGame]);
 
   async function submitMove(move: Parameters<typeof playMove>[1]) {
@@ -109,6 +126,9 @@ export function GamePage({
   }
 
   const outcome = resultMessage(game);
+  const alert =
+    message ??
+    (streamError !== null ? streamFailureMessage(streamError) : null);
 
   return (
     <main className="page">
@@ -141,9 +161,9 @@ export function GamePage({
           パス
         </button>
       ) : null}
-      {message !== null ? <p className="error">{message}</p> : null}
+      {alert !== null ? <p className="error">{alert}</p> : null}
       {outcome !== null ? <p className="result">{outcome}</p> : null}
-      {finished ? (
+      {finished || streamError !== null ? (
         <button type="button" onClick={onBack}>
           カタログへ戻る
         </button>
