@@ -1,13 +1,13 @@
 ---
 title: アーキテクチャ
 product: Reversi Agents
-version: 0.1.0
+version: 0.1.1
 status: working
 date: 2026-09-19
 source: docs/srs.md
 srs_version: 0.1.22
 tech_stack: docs/tech-stack.md
-tech_stack_version: 0.2.7
+tech_stack_version: 0.2.8
 ---
 
 # アーキテクチャ
@@ -16,10 +16,10 @@ tech_stack_version: 0.2.7
 | --- | --- |
 | 文書識別 | reversi-ai-architecture |
 | 対象ソフトウェア | Reversi Agents |
-| 版 | 0.1.0 |
+| 版 | 0.1.1 |
 | 状態 | 現行（設計。要求ではない） |
 | 日付 | 2026-09-19 |
-| 入力 | [`docs/srs.md`](srs.md) 0.1.22、[`docs/tech-stack.md`](tech-stack.md) 0.2.7 |
+| 入力 | [`docs/srs.md`](srs.md) 0.1.22、[`docs/tech-stack.md`](tech-stack.md) 0.2.8 |
 
 本文書は**配置と層**の設計正本である。ソフトウェア要求の正本は [`docs/srs.md`](srs.md) であり、本文書は shall を追加・変更・撤回しない。言語・ライブラリ・コンテナの選定は [`docs/tech-stack.md`](tech-stack.md) を正とする。ディレクトリ名は tech-stack 2.3 と一致させ、ファイル単位の置き場と目的は本文書を正とする。
 
@@ -61,7 +61,7 @@ flowchart LR
 | --- | --- | --- |
 | `web` コンテナ（Hono） | ホスト `127.0.0.1` のみ HTTPS | UI 配信、Origin 照合、SSE、戦略プロセスへ中継 |
 | `strategy` コンテナ（FastAPI） | Pod 内のみ。ホストへ出さない | 規則、全エージェントの着手、進行中 1 局、終局の永続化、OpenRouter |
-| 学習（`uv run`） | 待ち受けしない | ML / RL / NN の学習と成果物の書き出し。対局サービスとは別起動 |
+| 学習（`podman compose run`） | 待ち受けしない | 対局と同じ strategy イメージ。ML / RL / NN の書き出し |
 
 同時対局は 1。進行中の局は戦略プロセスのメモリ上。終局だけ SQLite へ書く。
 
@@ -96,6 +96,7 @@ reversi-ai/
 ├── CONTRIBUTING.md                    # Issue / PR / ブランチ / コミット規約
 ├── LICENSE
 ├── compose.yaml                       # Podman Compose。同一 Pod に web と strategy
+├── compose.dev.yaml                   # 開発用オーバーレイ。bind mount と reload だけを足す
 ├── package.json                       # ウェブアプリ（UI + Hono）の依存とスクリプト
 ├── pnpm-lock.yaml
 ├── biome.json                         # TS/JSON/CSS の書式と認知的複雑度ゲート
@@ -349,9 +350,92 @@ tech-stack 第 5 節に加え、配置として次を置かない。
 - ブラウザから `strategy` への直接接続用ポート
 - アカウント表、セッション Cookie 用ストア
 - ルートの pnpm workspace（初版はルート `package.json` がウェブアプリ）
+- 対局・学習の正として、ホストの `pnpm dev` や `python -m reversi.api` を置くこと
+- ルートの Makefile / Justfile で起動を包むこと
 
-## 8 改訂履歴
+## 8 起動とコマンド
+
+動かすもの（対局・学習）は Podman。測るもの（pytest、Vitest、Biome、Ruff、lefthook）はホスト。根拠は [`docs/tech-stack.md`](tech-stack.md) 3.11 と 4.8。
+
+コンテナの `CMD` と `podman compose run` は、同じ `python -m` / `node` 入口を指す。コンソールスクリプトやルートの pnpm から Python を叩く入口は置かない。
+
+### 8.1 一度だけ
+
+```bash
+mkcert -install
+mkdir -p data/certs
+mkcert -cert-file data/certs/cert.pem -key-file data/certs/key.pem 127.0.0.1
+podman secret create openrouter-api-key -
+```
+
+生成 AI 以外の対局と試験に、secret は不要である。
+
+### 8.2 対局サービス
+
+運用者も開発者も同じ入口である。
+
+```bash
+podman compose up --build
+```
+
+ブラウザは `https://127.0.0.1:<compose が付けるポート>/`。停止は `podman compose down`。
+
+| サービス | 入口 | 待ち受け |
+| --- | --- | --- |
+| `web` | ビルド済み UI を出す Hono（`node`） | ホストへは `127.0.0.1` のみ |
+| `strategy` | `python -m reversi.api` | Pod 内のみ。ホストへ公開しない。コンテナ内は `8000` でよい |
+
+戦略コンテナが Pod 内で `0.0.0.0:8000` を聞くのはよい。禁止するのはホストへの `0.0.0.0` である。
+
+ホットリロードが要るときだけ、別スタックを増やさずオーバーレイを足す。
+
+```bash
+podman compose -f compose.yaml -f compose.dev.yaml up --build
+```
+
+`compose.dev.yaml` はソースの bind mount と reload だけを足す。secret・公開ポート・サービス名は `compose.yaml` のままにする。
+
+### 8.3 学習
+
+対局と同じ strategy イメージで、待ち受けせず一発起動する。ホストの `uv run` を正にしない。
+
+```bash
+podman compose run --rm strategy python -m reversi.train.ml \
+  --wthor /data/wthor --games /data/games.sqlite --out /models/ml.json
+
+podman compose run --rm strategy python -m reversi.train.rl \
+  --out /models/rl.json
+
+podman compose run --rm strategy python -m reversi.train.nn \
+  --wthor /data/wthor --games /data/games.sqlite --out /models/nn.onnx
+```
+
+書き出した成果物を既に動いている対局プロセスが読むなら、strategy の再起動が要る。再学習なしでも初版カタログは動く。
+
+### 8.4 試験と検査（ホスト）
+
+```bash
+uv run --directory strategy pytest
+uv run --directory strategy lint-imports
+uv run --directory strategy xenon --max-absolute C --max-modules B --max-average A src
+uv run --directory strategy ruff check src tests
+pnpm test
+pnpm exec biome check .
+pnpm exec depcruise --config .dependency-cruiser.cjs web
+```
+
+E2E はアプリを Podman で上げ、Playwright はホストの Google Chrome で `https://127.0.0.1` を叩く。
+
+```bash
+podman compose up --build --wait
+pnpm exec playwright test --project=chrome
+```
+
+Issue の検証欄と CI は、この節の生コマンドを使う。ラッパを増やさない。
+
+## 9 改訂履歴
 
 | 版 | 日付 | 内容 |
 | --- | --- | --- |
+| 0.1.1 | 2026-09-19 | 対局と学習の起動を Podman に揃え、試験はホストとするコマンドを書く |
 | 0.1.0 | 2026-09-19 | tech-stack 0.2.7 を入力に、ディレクトリとファイルの配置を初稿とする |

@@ -20,6 +20,7 @@ Cursor Cloud Agents 向けの作業ルール。アプリ固有のルールはプ
 ## 設計
 
 - 配置と層の正は `docs/ARCHITECTURE.md`。言語・ライブラリ・コンテナの選定は `docs/tech-stack.md`。
+- 対局と学習の起動は Podman。試験・lint・lefthook はホスト。コマンドの正は `docs/ARCHITECTURE.md` の「起動とコマンド」。
 - 設計判断（言語、配置、層数など、shall を変えない判断）では `docs/srs.md` を編集しない。
 
 ## タスク管理
