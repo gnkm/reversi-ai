@@ -9,6 +9,9 @@ __pycache__/
 .import_linter_cache/
 *.egg-info/
 
+# mkcert の PEM。Hono へファイルとして渡す。
+/data/certs/
+
 # WTHOR 原本。試験フィクスチャ以外はリポジトリに入れない。
 /data/wthor/*.wtb
 /data/wthor/*.WTB
