@@ -139,9 +139,46 @@ export const decideRequestSchema = z.strictObject({
   game: gameStateSchema,
 });
 
+export const snapshotEventSchema = z.strictObject({
+  type: z.literal("snapshot"),
+  game: gameStateSchema,
+});
+
+export const moveAppliedEventSchema = z.strictObject({
+  type: z.literal("move_applied"),
+  move: moveSchema,
+  game: gameStateSchema,
+});
+
+export const moveRejectedEventSchema = z.strictObject({
+  type: z.literal("move_rejected"),
+  move: moveSchema,
+  game: gameStateSchema,
+});
+
+export const gameOverEventSchema = z.strictObject({
+  type: z.literal("game_over"),
+  game: gameStateSchema,
+});
+
+export const unplayableEventSchema = z.strictObject({
+  type: z.literal("unplayable"),
+  reason: unplayableReasonSchema,
+  game: gameStateSchema,
+});
+
+export const gameEventSchema = z.discriminatedUnion("type", [
+  snapshotEventSchema,
+  moveAppliedEventSchema,
+  moveRejectedEventSchema,
+  gameOverEventSchema,
+  unplayableEventSchema,
+]);
+
 export type ErrorCode = z.infer<typeof errorCodeSchema>;
 export type Catalog = z.infer<typeof catalogSchema>;
 export type CreateGameRequest = z.infer<typeof createGameRequestSchema>;
 export type Move = z.infer<typeof moveSchema>;
 export type GameState = z.infer<typeof gameStateSchema>;
 export type IllegalMoveNotApplied = z.infer<typeof illegalMoveNotAppliedSchema>;
+export type GameEvent = z.infer<typeof gameEventSchema>;

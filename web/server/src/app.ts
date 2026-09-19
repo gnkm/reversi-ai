@@ -1,5 +1,6 @@
 import type { Context } from "hono";
 import { Hono } from "hono";
+import { streamSSE } from "hono/streaming";
 import { isStateChangingMethod, originMatches } from "./origin.ts";
 import {
   problemResponse,
@@ -8,17 +9,24 @@ import {
 } from "./problems.ts";
 import {
   createGameRequestSchema,
+  type GameState,
   gameStateSchema,
   moveSchema,
 } from "./schemas.ts";
 import { mountUi } from "./spa.ts";
-import { gameEventsResponse } from "./sse.ts";
+import {
+  DEFAULT_SSE_POLL_INTERVAL_MS,
+  gameEventsResponse,
+  streamLiveGameEvents,
+  terminalSseEvent,
+} from "./sse.ts";
 import type { StrategyGateway } from "./strategy.ts";
 
 export type CreateAppOptions = {
   publicOrigin: string;
   strategy: StrategyGateway;
   uiRoot?: string;
+  ssePollIntervalMs?: number;
 };
 
 export const PUBLIC_API_ROUTES = [
@@ -84,11 +92,10 @@ async function postMove(
   );
 }
 
-async function getGameEvents(
-  c: Context,
+async function readStrategyGame(
   strategy: StrategyGateway,
-): Promise<Response> {
-  const id = c.req.param("id");
+  id: string,
+): Promise<Response | GameState> {
   const res = await relay(strategy, `/api/games/${id}`);
   if (!res.ok) {
     return res;
@@ -102,12 +109,60 @@ async function getGameEvents(
       "戦略プロセスの応答が契約と違う",
     );
   }
-  return gameEventsResponse(parsed.data);
+  return parsed.data;
+}
+
+async function followStrategyGame(
+  strategy: StrategyGateway,
+  id: string,
+): Promise<GameState | undefined> {
+  const got = await readStrategyGame(strategy, id);
+  if (got instanceof Response) {
+    return undefined;
+  }
+  return got;
+}
+
+function liveGameEvents(
+  c: Context,
+  strategy: StrategyGateway,
+  id: string,
+  initial: GameState,
+  pollIntervalMs: number,
+): Response {
+  return streamSSE(c, async (stream) => {
+    await streamLiveGameEvents(
+      (event, data) => stream.writeSSE({ event, data: JSON.stringify(data) }),
+      (ms) => stream.sleep(ms),
+      () => stream.aborted,
+      initial,
+      () => followStrategyGame(strategy, id),
+      pollIntervalMs,
+    );
+  });
+}
+
+async function getGameEvents(
+  c: Context,
+  strategy: StrategyGateway,
+  pollIntervalMs: number,
+): Promise<Response> {
+  const id = c.req.param("id");
+  const got = await readStrategyGame(strategy, id);
+  if (got instanceof Response) {
+    return got;
+  }
+  if (terminalSseEvent(got) !== undefined) {
+    return gameEventsResponse(got);
+  }
+  return liveGameEvents(c, strategy, id, got, pollIntervalMs);
 }
 
 export function createApp(options: CreateAppOptions): Hono {
   const app = new Hono();
   const { publicOrigin, strategy, uiRoot } = options;
+  const pollIntervalMs =
+    options.ssePollIntervalMs ?? DEFAULT_SSE_POLL_INTERVAL_MS;
   app.use("*", async (c, next) => {
     if (
       isStateChangingMethod(c.req.method) &&
@@ -123,7 +178,9 @@ export function createApp(options: CreateAppOptions): Hono {
     relay(strategy, `/api/games/${c.req.param("id")}`),
   );
   app.post("/api/games/:id/moves", (c) => postMove(c, strategy));
-  app.get("/api/games/:id/events", (c) => getGameEvents(c, strategy));
+  app.get("/api/games/:id/events", (c) =>
+    getGameEvents(c, strategy, pollIntervalMs),
+  );
   if (uiRoot !== undefined && uiRoot !== "") {
     mountUi(app, uiRoot);
   }

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -208,17 +209,34 @@ def test_legal_move_updates_board_and_side_to_move(client: TestClient) -> None:
     assert payload.game.official_score.white == 1
 
 
+def _wait_until_over(client: TestClient, game_id: str) -> GameState:
+    deadline = time.monotonic() + 8.0
+    while time.monotonic() < deadline:
+        response = client.get(f"/api/games/{game_id}")
+        assert response.status_code == 200, response.text
+        game = _game_state(response.json())
+        if game.is_over or game.status != "in_progress":
+            return game
+        time.sleep(0.01)
+    raise AssertionError("人手の着手なしに終局まで進まなかった")
+
+
 def test_agent_vs_agent_completes_without_waiting_for_human(
     client: TestClient,
 ) -> None:
     game = _create(client, _SPECIMEN, _SPECIMEN)
-    assert game.is_over is True
-    assert game.status == "completed"
-    assert game.continuation_possible is False
-    assert game.result is not None
-    assert game.result.winner in {"black", "white", "draw"}
-    assert game.official_score.black + game.official_score.white == 64
-    assert game.last_move is not None
+    assert game.black.kind == "specimen"
+    assert game.white.kind == "specimen"
+    assert game.last_move is None
+    assert game.is_over is False
+    finished = _wait_until_over(client, game.id)
+    assert finished.is_over is True
+    assert finished.status == "completed"
+    assert finished.continuation_possible is False
+    assert finished.result is not None
+    assert finished.result.winner in {"black", "white", "draw"}
+    assert finished.official_score.black + finished.official_score.white == 64
+    assert finished.last_move is not None
     rejected = client.post(
         f"/api/games/{game.id}/moves",
         json={"type": "place", "square": "d3"},
@@ -243,7 +261,8 @@ def test_new_game_can_start_during_or_after(client: TestClient) -> None:
     assert got.id == second.id
 
     finished = _create(client, _SPECIMEN, _SPECIMEN)
-    assert finished.is_over is True
+    done = _wait_until_over(client, finished.id)
+    assert done.is_over is True
     again = _create(client, _HUMAN, _SPECIMEN)
     assert again.is_over is False
     assert again.last_move is None

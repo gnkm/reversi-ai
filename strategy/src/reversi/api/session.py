@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 from random import Random
-from threading import Lock
+from threading import Lock, Thread
 from uuid import uuid4
 
 from reversi.agents import catalog
@@ -236,6 +236,7 @@ class GameStore:
         self._db_path = db_path
         self._lock = Lock()
         self._game: Game | None = None
+        self._autoplay_thread: Thread | None = None
 
     def _persist_finished(self, game: Game) -> None:
         if self._db_path is None:
@@ -248,6 +249,40 @@ class GameStore:
             moves=tuple(_move_payload(move) for move in game.moves),
             db_path=self._db_path,
         )
+
+    def _autoplay_step(self, game_id: str) -> bool:
+        """標本の 1 手を進める。続けてよいとき True。"""
+        with self._lock:
+            game = self._game
+            if game is None or game.id != game_id:
+                return False
+            if is_over(game.position) or game.unplayable_reason is not None:
+                return False
+            try:
+                if not _apply_specimen_choice(game, self._rng):
+                    return False
+            except ExternalModelError:
+                game.unplayable_reason = "external_model_failed"
+                return False
+            if is_over(game.position):
+                try:
+                    self._persist_finished(game)
+                except Exception:
+                    self._game = None
+                return False
+            return game.unplayable_reason is None
+
+    def _run_autoplay(self, game_id: str) -> None:
+        while self._autoplay_step(game_id):
+            pass
+
+    def _start_autoplay(self, game_id: str) -> None:
+        self._autoplay_thread = Thread(
+            target=self._run_autoplay,
+            args=(game_id,),
+            daemon=True,
+        )
+        self._autoplay_thread.start()
 
     def catalog(self) -> list[catalog.CatalogItem]:
         return list(catalog.items())
@@ -268,6 +303,15 @@ class GameStore:
             black=request.black,
             white=request.white,
         )
+        both_specimens = _is_specimen(request.black) and _is_specimen(
+            request.white,
+        )
+        if both_specimens:
+            with self._lock:
+                self._game = game
+                opening = to_game_state(game)
+            self._start_autoplay(game.id)
+            return opening
         advance_specimens(game, self._rng)
         if game.unplayable_reason is not None:
             raise external_model_failed()

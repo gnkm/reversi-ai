@@ -87,6 +87,7 @@ export function subscribeGameEvents(
     }
   };
   source.addEventListener("snapshot", handle);
+  source.addEventListener("move_applied", handle);
   source.addEventListener("game_over", handle);
   source.addEventListener("unplayable", handle);
   return () => source.close();

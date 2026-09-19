@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import sqlite3
+import time
 from pathlib import Path
 from random import Random
 
 import pytest
 
 from reversi.agents.random_uniform import SPECIMEN_ID
+from reversi.api.errors import ApiProblem
 from reversi.api.persist import (
     DEFAULT_DB_PATH,
     MODE_AGENT_VS_AGENT,
@@ -42,6 +44,23 @@ _PII_COLUMNS = (
     "username",
     "full_name",
 )
+
+
+def _wait_store_over(store: GameStore, game_id: str) -> None:
+    deadline = time.monotonic() + 8.0
+    while time.monotonic() < deadline:
+        thread = store._autoplay_thread
+        if thread is not None and thread.is_alive():
+            thread.join(0.05)
+            continue
+        try:
+            state = store.snapshot(game_id)
+        except ApiProblem:
+            return
+        if state.is_over or state.status != "in_progress":
+            return
+        time.sleep(0.01)
+    raise AssertionError("エージェント対エージェントが終局まで進まなかった")
 
 
 def _terminal_white_win() -> Position:
@@ -186,13 +205,15 @@ def test_session_persists_finished_agent_game_only(tmp_path: Path) -> None:
     assert opening.is_over is False
     assert not path.exists()
 
-    finished = store.start(
+    started = store.start(
         CreateGameRequest(
             black=SpecimenPlayer(kind="specimen", specimen_id=SPECIMEN_ID),
             white=SpecimenPlayer(kind="specimen", specimen_id=SPECIMEN_ID),
         )
     )
-    assert finished.is_over is True
+    assert started.is_over is False
+    _wait_store_over(store, started.id)
+    finished = store.snapshot(started.id)
     games = load(path)
     assert len(games) == 1
     game = games[0]
@@ -227,13 +248,16 @@ def test_persist_failure_does_not_commit_finished_start(
         black=SpecimenPlayer(kind="specimen", specimen_id=SPECIMEN_ID),
         white=SpecimenPlayer(kind="specimen", specimen_id=SPECIMEN_ID),
     )
-    with pytest.raises(sqlite3.OperationalError):
-        store.start(request)
+    started = store.start(request)
+    assert started.is_over is False
+    _wait_store_over(store, started.id)
     assert store._game is None
     assert not path.exists()
 
     monkeypatch.undo()
-    finished = store.start(request)
+    started = store.start(request)
+    _wait_store_over(store, started.id)
+    finished = store.snapshot(started.id)
     assert finished.is_over is True
     assert len(load(path)) == 1
     got = store.snapshot(finished.id)
