@@ -7,7 +7,7 @@ x-podman:
   in_pod: true
   pod_args:
     - --infra=false
-    - --share=net
+    - --share=
 
 services:
   web:
