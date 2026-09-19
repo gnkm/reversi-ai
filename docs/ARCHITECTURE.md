@@ -2,7 +2,7 @@
 
 実装の置き方とプロセス分割。要求（shall）の正本は `docs/source-of-truth/` と GitHub Issue であり、本ファイルはそれらを変えない。
 
-対象: F001（対局エンジン）、F008（Issue #9、盤の入力符号化）、F009（WTHOR 棋譜）、F021（Issue #22）。後続の実装 Issue は本ファイルと `docs/openapi.yml` に従う。
+対象: F001（対局エンジン）、F002（ランダム個体）、F008（Issue #9、盤の入力符号化）、F009（WTHOR 棋譜）、F021（Issue #22）。後続の実装 Issue は本ファイルと `docs/openapi.yml` に従う。
 
 ## 1. 目的
 
@@ -56,19 +56,30 @@ TypeScript 側は Zod、Python 側は Pydantic で実行時の形を検証する
 
 公式スコアは石数が多い側の勝ちである。引き分けは 32–32。勝ちが決まったとき空マスは勝者に加算する。
 
-## 7. 盤の入力符号化
+## 7. 戦略個体
+
+選択単位は個体でありカテゴリではない。カタログと個体は `strategy/src/reversi/agents/` に置く。
+
+| ファイル | 責務 |
+| --- | --- |
+| `catalog.py` | 個体の識別・カテゴリ・表示名・説明文の一覧。選択は個体 ID |
+| `random_uniform.py` | 手番の合法手を等確率で 1 つ選ぶ。合法手が無ければ着手しない |
+
+カテゴリ `random` は「ランダム」である。表示名「ランダム (一様)」の個体は、対局中に WTHOR も学習済みモデルも参照しない。
+
+## 8. 盤の入力符号化
 
 ML / RL / NN が共有する盤の入力は `strategy/src/reversi/encode.py` に一つ置く。`engine` はこれを読まない。エージェント実装と学習が同じ関数を呼ぶ。
 
 符号化は黒・白・空の 3 平面 × 8×8 の 0/1 である。座標はエンジンと同じ（`[rank][file]`、a1 が `[0][0]`）。手番は盤の入力に含めない。数値目標は置かない。
 
-## 8. 学習棋譜（WTHOR）
+## 9. 学習棋譜（WTHOR）
 
 学習入力は `strategy/src/reversi/train/wthor.py` が読む。原本は `data/wthor/` の `.wtb` であり、HTTP の静的ファイルとしては出さない。リポジトリには入れない。
 
 ヘッダの盤サイズが 0 または 8 のファイルだけを 8×8 として扱う。それ以外と、8×8 規則で再生できないレコードは学習入力に含めない。再生は対局エンジンと同じ関数を呼ぶ。WTHOR はパスを符号に持たないので、合法手が無い側ではエンジンのパスを挿入する。
 
-## 9. リポジトリ構成
+## 10. リポジトリ構成
 
 ```
 docs/
@@ -83,11 +94,15 @@ strategy/
     board.py
     rules.py
     score.py
+  src/reversi/agents/
+    catalog.py
+    random_uniform.py
   src/reversi/encode.py
   src/reversi/train/
     wthor.py
   tests/
     test_engine.py
+    test_agents.py
     test_encode.py
     test_wthor.py
 ```
