@@ -1,8 +1,9 @@
-"""カタログと戦略個体（ランダム・最多取り・位置評価・ミニマックス・定石）。"""
+"""カタログと戦略個体（ランダム・最多取り・位置評価・ミニマックス・定石・強化学習）。"""
 
 from __future__ import annotations
 
 import ast
+import json
 import re
 from pathlib import Path
 from random import Random
@@ -20,6 +21,7 @@ from reversi.agents.random_uniform import (
     SPECIMEN_ID,
     choose_move,
 )
+from reversi.encode import VECTOR_SIZE
 from reversi.engine.board import Board, Color, Square, Stone, empty_board
 from reversi.engine.rules import (
     PassMove,
@@ -388,6 +390,189 @@ def test_most_flips_and_positional_source_does_not_call_models() -> None:
                 assert "ffothello.org" not in lowered
                 assert ".wtb" not in lowered
                 assert "openrouter.ai" not in lowered
+
+
+def _black_feature_index(square: Square) -> int:
+    return square.rank * 8 + square.file
+
+
+def _linear_policy(black_squares: dict[str, float], bias: float = 0.0):
+    from reversi.agents.rl import LinearPolicy
+
+    weights = [0.0] * VECTOR_SIZE
+    for algebraic, value in black_squares.items():
+        square = Square.parse(algebraic)
+        weights[_black_feature_index(square)] = value
+    return LinearPolicy(
+        weights=tuple(float(value) for value in weights),
+        bias=float(bias),
+    )
+
+
+def test_rl_policy_rejects_non_finite_values() -> None:
+    from reversi.agents.rl import LinearPolicy
+
+    with pytest.raises(ValueError, match="有限"):
+        LinearPolicy(tuple(0.0 for _ in range(VECTOR_SIZE)), float("nan"))
+    inf_weights = [0.0] * VECTOR_SIZE
+    inf_weights[0] = float("inf")
+    with pytest.raises(ValueError, match="有限"):
+        LinearPolicy(tuple(inf_weights), 0.0)
+
+
+def test_catalog_lists_rl_self_play() -> None:
+    from reversi.agents import rl
+
+    item = _item_by_display_name("強化学習 (自己対局)")
+    assert item.specimen_id == rl.SPECIMEN_ID == "rl"
+    assert item.category == rl.CATEGORY == "reinforcement_learning"
+    assert item.display_name == rl.DISPLAY_NAME
+    assert item.description == rl.DESCRIPTION
+    assert item.description.strip()
+    assert "自己対局" in item.description
+    assert "強化学習" in item.description
+    assert _JAPANESE.search(item.description)
+    assert get(rl.SPECIMEN_ID) == item
+    with pytest.raises(KeyError):
+        get("reinforcement_learning")
+
+
+def test_rl_greedy_maximizes_black_value() -> None:
+    from reversi.agents import rl
+
+    position = initial_position()
+    policy = _linear_policy({"c4": 4.0, "d3": 1.0})
+    move = rl.choose_move(position, policy=policy)
+    assert move == Place(Square.parse("c4"))
+    assert move.square in legal_places(position)
+    via_catalog = catalog_choose(rl.SPECIMEN_ID, position)
+    assert via_catalog is not None
+    assert via_catalog.square in legal_places(position)
+
+
+def test_rl_white_minimizes_black_value() -> None:
+    from reversi.agents import rl
+    from reversi.agents.rl import LinearPolicy
+
+    after_black = play(initial_position(), Place(Square.parse("d3")))
+    assert after_black.side_to_move is Color.WHITE
+    places = legal_places(after_black)
+    assert len(places) >= 2
+    policy = LinearPolicy(tuple(float(index) for index in range(VECTOR_SIZE)), 0.0)
+    move = rl.choose_move(after_black, policy=policy)
+    assert move is not None
+    scored = {
+        square: rl.value_of(
+            apply_place(after_black.board, square, Color.WHITE),
+            policy,
+        )
+        for square in places
+    }
+    best = min(scored.values())
+    expected = next(square for square in places if scored[square] == best)
+    assert move.square == expected
+    assert scored[move.square] == best
+
+
+def test_rl_tie_breaks_a1_to_h8_order() -> None:
+    from reversi.agents import rl
+
+    position = initial_position()
+    places = legal_places(position)
+    policy = _linear_policy({})
+    values = [
+        rl.value_of(apply_place(position.board, square, Color.BLACK), policy)
+        for square in places
+    ]
+    assert values and len(set(values)) == 1
+    move = rl.choose_move(position, Random(0), policy=policy)
+    assert move == Place(places[0])
+    assert move == Place(Square.parse("d3"))
+
+
+def test_rl_does_not_move_when_no_legal_places() -> None:
+    from reversi.agents import rl
+
+    policy = _linear_policy({"a1": 1.0})
+    assert rl.choose_move(_almost_full_white_with_black_on_b1(), policy=policy) is None
+    assert rl.choose_move(_both_sides_cannot_place(), policy=policy) is None
+
+
+def test_rl_default_policy_plays_only_legal_moves_to_the_end() -> None:
+    from reversi.agents import rl
+
+    assert rl.DEFAULT_MODEL_PATH.is_file()
+    policy = rl.load_policy(rl.DEFAULT_MODEL_PATH)
+    assert len(policy.weights) == VECTOR_SIZE
+    position = initial_position()
+    while not is_over(position):
+        if pass_is_legal(position):
+            position = play(position, PassMove())
+            continue
+        move = rl.choose_move(position, policy=policy)
+        assert move is not None
+        assert move.square in legal_places(position)
+        position = play(position, move)
+    assert is_over(position)
+
+
+def test_rl_source_does_not_import_nn_or_openrouter() -> None:
+    source = _module_source("rl.py")
+    roots = _imported_roots(source)
+    assert roots.isdisjoint(_FORBIDDEN_IMPORT_ROOTS)
+    assert "torch" not in roots
+    assert "onnxruntime" not in roots
+    assert "openrouter" not in roots
+    tree = ast.parse(source)
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            lowered = node.value.lower()
+            assert "ffothello.org" not in lowered
+            assert ".wtb" not in lowered
+            assert "openrouter.ai" not in lowered
+
+
+def test_rl_training_does_not_read_wthor(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from reversi.train import wthor
+    from reversi.train.rl import train_and_write
+
+    def boom(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("強化学習は WTHOR を読んではならない")
+
+    monkeypatch.setattr(wthor, "training_games", boom)
+    monkeypatch.setattr(wthor, "replay", boom)
+    out = tmp_path / "rl.json"
+    policy = train_and_write(out, games=2, seed=1, alpha=0.001, epsilon=0.5)
+    loaded = json.loads(out.read_text(encoding="utf-8"))
+    assert loaded["algorithm"] == "linear_td"
+    assert len(loaded["weights"]) == VECTOR_SIZE
+    assert len(policy.weights) == VECTOR_SIZE
+    from reversi.agents.rl import load_policy
+
+    assert load_policy(out).weights == policy.weights
+
+
+def test_rl_td_update_moves_weights_toward_terminal_reward() -> None:
+    import numpy as np
+
+    from reversi.train.rl import _features, _td_update
+
+    board = initial_position().board
+    phi = _features(board)
+    zeros = np.zeros(VECTOR_SIZE, dtype=np.float64)
+    alpha = 0.5
+    toward_win, bias_win = _td_update(zeros.copy(), 0.0, (board,), 1.0, alpha)
+    np.testing.assert_allclose(toward_win, alpha * phi)
+    assert bias_win == pytest.approx(alpha)
+
+    toward_loss, bias_loss = _td_update(zeros.copy(), 0.0, (board,), -1.0, alpha)
+    np.testing.assert_allclose(toward_loss, -alpha * phi)
+    assert bias_loss == pytest.approx(-alpha)
+
+    later = empty_board()
+    updated, _ = _td_update(zeros.copy(), 0.0, (board, later), 1.0, alpha)
+    # 先頭局面の TD 目標は次局面の価値 0 なので動かず、終端報酬は末局面だけに乗る。
+    np.testing.assert_allclose(updated, alpha * _features(later))
 
 
 def _spec_leaf_score(board: Board, root: Color) -> int:
