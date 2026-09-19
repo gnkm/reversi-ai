@@ -7,11 +7,12 @@ info:
   version: "0.1.0"
   summary: カタログ・対局・着手・SSE の HTTP 契約
   description: |
-    リソースは名詞の複数形。利用者向け Hono のプレフィックスは `/api/`。
-    戦略 FastAPI は同じ `components` の JSON を使う。パスに `/api` が無い場合は
-    下記 `servers` と `/api` なしの `paths` で区別する。
+    リソースは名詞の複数形。利用者向け Hono は `/api/*` を公開する（文書ルートの `servers`）。
+    戦略 FastAPI は `/decide` のみを公開し、パス項目の `servers` で Hono と混ぜない。
+    中継する JSON は同じ `components` である。
 
     JSON は snake_case。対局の公開識別子 `id` は UUID v4（小文字・ハイフン）。
+    スキーマ `GameId` の `pattern` がこの形を制約する。
 
     盤の代数表記は列 a–h が左から右、行 1–8 が上から下（a1 が左上）。
     `board[0][0]` が a1、`board[0][7]` が h1、`board[7][0]` が a8。
@@ -22,12 +23,7 @@ info:
     ブラウザへ OpenAPI を公開することは要求ではない。本ファイルが契約の正本である。
 servers:
   - url: http://127.0.0.1:3000
-    description: 利用者向け Hono。下記 paths の `/api/*` を公開する。
-  - url: http://127.0.0.1:8000
-    description: |
-      戦略 FastAPI。JSON は同じ components。
-      プレフィックス無しで公開する場合は、この URL をルートとし `/api` を除いたパス
-      （例: `/catalog`）と内部の `/decide` を使う。
+    description: 利用者向け Hono。`/api/*` のみ。`/decide` は公開しない。
 tags:
   - name: catalog
     description: 対局に出せる戦略個体の一覧
@@ -47,6 +43,9 @@ paths:
   /api/games/{id}/events:
     $ref: "#/components/pathItems/gameEvents"
   /decide:
+    servers:
+      - url: http://127.0.0.1:8000
+        description: 戦略 FastAPI。`/decide` のみ。`/api/*` は公開しない。
     post:
       operationId: decideMove
       tags: [strategy]
@@ -254,7 +253,8 @@ components:
     GameId:
       type: string
       format: uuid
-      description: 対局の公開識別子
+      pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+      description: 対局の公開識別子。UUID v4、小文字、ハイフン区切り。
     SpecimenId:
       type: string
       minLength: 1

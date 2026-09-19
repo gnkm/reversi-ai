@@ -14,10 +14,10 @@
 
 | 役割 | 実装 | 入口 |
 | --- | --- | --- |
-| 利用者向け | Hono | `/api/*` |
-| 戦略 | FastAPI | Hono が中継する JSON。パスに `/api` が無い場合は `docs/openapi.yml` の `servers` または別 `paths` で区別する |
+| 利用者向け | Hono | `/api/*`（文書ルートの `servers`） |
+| 戦略 | FastAPI | `/decide`（パス項目の `servers`）。Hono が中継する JSON は同じ `components` |
 
-Hono はブラウザからの対局 API を受け、必要な呼び出しを戦略 FastAPI へ中継する。戦略プロセス内部の JSON も `docs/openapi.yml` の `components` を使う。
+Hono はブラウザからの対局 API を受け、着手決定を戦略 FastAPI の `/decide` へ中継する。二つのサーバの経路は `docs/openapi.yml` で混ぜない。
 
 ## 3. HTTP 契約
 
