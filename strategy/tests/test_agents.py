@@ -1092,8 +1092,11 @@ def test_extra_genai_rejects_duplicate_display_name(
         [{"model_id": "vendor/other", "name": "Jev"}],
     )
     monkeypatch.setattr(extra_genai, "CONFIG_PATH", config)
-    with pytest.raises(extra_genai.ConfigError, match="一意"):
-        items()
+    listed = items()
+    names = [item.display_name for item in listed]
+    assert "生成 AI (Jev)" in names
+    assert all(not item.specimen_id.startswith("genai:") for item in listed)
+    assert get(jev.SPECIMEN_ID).display_name == "生成 AI (Jev)"
 
     dup = _write_extra_genai(
         tmp_path / "dup.json",
@@ -1105,6 +1108,24 @@ def test_extra_genai_rejects_duplicate_display_name(
     monkeypatch.setattr(extra_genai, "CONFIG_PATH", dup)
     with pytest.raises(extra_genai.ConfigError, match="一意"):
         extra_genai.load()
+    listed = items()
+    assert get(jev.SPECIMEN_ID).display_name == "生成 AI (Jev)"
+    assert all(not item.specimen_id.startswith("genai:") for item in listed)
+
+
+def test_extra_genai_invalid_config_keeps_builtin_catalog(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    broken = tmp_path / "genai.json"
+    broken.write_text("{", encoding="utf-8")
+    monkeypatch.setattr(extra_genai, "CONFIG_PATH", broken)
+    with pytest.raises(extra_genai.ConfigError):
+        extra_genai.load()
+    listed = items()
+    assert get(jev.SPECIMEN_ID) in listed
+    assert all(not item.specimen_id.startswith("genai:") for item in listed)
+    catalog_choose(SPECIMEN_ID, initial_position(), Random(0))
 
 
 def test_extra_genai_picks_legal_place_from_chat_double(

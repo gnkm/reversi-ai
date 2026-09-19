@@ -101,7 +101,7 @@ _BUILTIN: tuple[tuple[CatalogItem, Chooser], ...] = (
 )
 
 
-def _registry() -> tuple[tuple[CatalogItem, Chooser], ...]:
+def _extra_entries() -> tuple[tuple[CatalogItem, Chooser], ...]:
     extras: list[tuple[CatalogItem, Chooser]] = []
     names = {item.display_name for item, _ in _BUILTIN}
     ids = {item.specimen_id for item, _ in _BUILTIN}
@@ -127,7 +127,16 @@ def _registry() -> tuple[tuple[CatalogItem, Chooser], ...]:
                 extra.choose_move,
             )
         )
-    return _BUILTIN + tuple(extras)
+    return tuple(extras)
+
+
+def _registry() -> tuple[tuple[CatalogItem, Chooser], ...]:
+    """追加設定の失敗は組込み個体から切り離す。"""
+    try:
+        extras = _extra_entries()
+    except extra_genai.ConfigError:
+        return _BUILTIN
+    return _BUILTIN + extras
 
 
 def _by_id() -> dict[str, tuple[CatalogItem, Chooser]]:
