@@ -94,10 +94,20 @@ def test_openrouter_key_missing_or_empty_file_fails(
 
 def test_openrouter_key_default_path_is_podman_secret() -> None:
     assert openrouter_key.SECRET_PATH == Path("/run/secrets/openrouter-api-key")
-    assert jev.SECRET_PATH == openrouter_key.SECRET_PATH
+    assert jev.SECRET_PATH is openrouter_key.SECRET_PATH
     assert jev.DECISIONS_SERVER.startswith("https://")
     assert jev.DECISIONS_SERVER == "https://openrouter.ai"
     assert jev.MODEL_ID == "typesafe/jev-1.13"
+
+
+def test_openrouter_key_read_uses_jev_secret_reader(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    secret = tmp_path / "openrouter-api-key"
+    secret.write_text(f"  {_API_KEY}\n", encoding="utf-8")
+    monkeypatch.setattr(openrouter_key, "SECRET_PATH", secret)
+    assert openrouter_key.read_api_key() == jev.read_secret(secret)
 
 
 def test_openrouter_key_source_does_not_read_environment() -> None:
@@ -154,6 +164,8 @@ def test_jev_decisions_call_uses_https_and_model_id(
     create = fake.last_create
     assert isinstance(create, dict)
     assert create["model"] == "typesafe/jev-1.13"
+    retries = create["retries"]
+    assert getattr(retries, "strategy", None) == "none"
     questions = create["questions"]
     assert isinstance(questions, dict)
     criteria = questions["move"]["criteria"]

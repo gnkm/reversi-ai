@@ -8,6 +8,7 @@ from random import Random
 from typing import Any
 
 from openrouter import OpenRouter
+from openrouter.utils.retries import BackoffStrategy, RetryConfig
 
 from reversi.engine.board import BOARD_SIZE, Square
 from reversi.engine.rules import Place, Position, legal_places
@@ -23,6 +24,7 @@ DESCRIPTION = (
 DECISIONS_SERVER = "https://openrouter.ai"
 SECRET_PATH = Path("/run/secrets/openrouter-api-key")
 _QUESTION_ID = "move"
+_NO_RETRY = RetryConfig("none", BackoffStrategy(0, 0, 1.0, 0), False)
 
 __all__ = [
     "CATEGORY",
@@ -34,6 +36,7 @@ __all__ = [
     "SPECIMEN_ID",
     "ExternalModelError",
     "choose_move",
+    "read_secret",
 ]
 
 
@@ -41,9 +44,11 @@ class ExternalModelError(RuntimeError):
     """外部モデルの呼出し失敗。着手は採用しない。"""
 
 
-def _read_api_key() -> str:
+def read_secret(path: Path | None = None) -> str:
+    """`/run/secrets/openrouter-api-key` だけを読む。環境変数は見ない。"""
+    target = SECRET_PATH if path is None else path
     try:
-        raw = SECRET_PATH.read_text(encoding="utf-8")
+        raw = target.read_text(encoding="utf-8")
     except OSError as exc:
         raise ExternalModelError("OpenRouter の資格情報を読めません") from exc
     key = raw.strip()
@@ -108,13 +113,14 @@ def _legal_square(algebraic: str, places: Sequence[Square]) -> Square:
 
 
 def _call_openrouter(position: Position, places: Sequence[Square]) -> Square:
-    key = _read_api_key()
+    key = read_secret()
     try:
         with OpenRouter(api_key=key, server_url=DECISIONS_SERVER) as client:
             response = client.alpha.decisions.create(
                 model=MODEL_ID,
                 questions=_questions(places),
                 state=_board_state(position, places),
+                retries=_NO_RETRY,
             )
     except ExternalModelError:
         raise
