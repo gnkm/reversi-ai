@@ -18,6 +18,9 @@
 # ソース・オブ・トゥルース（人間のみ編集。AI は read-only）
 /docs/source-of-truth/  @gnkm
 
+# 開発中のソフトウェア要求の正本（shall の変更は CODEOWNERS レビュー）
+/docs/srs.md            @gnkm
+
 # 承認・検証の基準
 /.github/               @gnkm
 /.github/CODEOWNERS     @gnkm
