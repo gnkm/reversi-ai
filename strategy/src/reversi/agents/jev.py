@@ -23,12 +23,15 @@ DESCRIPTION = (
 )
 DECISIONS_SERVER = "https://openrouter.ai"
 SECRET_PATH = Path("/run/secrets/openrouter-api-key")
+# Hono の戦略中継は 60 秒。それより先に失敗させ、ロックを返す。
+DECISIONS_TIMEOUT_MS = 55_000
 _QUESTION_ID = "move"
 _NO_RETRY = RetryConfig("none", BackoffStrategy(0, 0, 1.0, 0), False)
 
 __all__ = [
     "CATEGORY",
     "DECISIONS_SERVER",
+    "DECISIONS_TIMEOUT_MS",
     "DESCRIPTION",
     "DISPLAY_NAME",
     "MODEL_ID",
@@ -115,12 +118,17 @@ def _legal_square(algebraic: str, places: Sequence[Square]) -> Square:
 def _call_openrouter(position: Position, places: Sequence[Square]) -> Square:
     key = read_secret()
     try:
-        with OpenRouter(api_key=key, server_url=DECISIONS_SERVER) as client:
+        with OpenRouter(
+            api_key=key,
+            server_url=DECISIONS_SERVER,
+            timeout_ms=DECISIONS_TIMEOUT_MS,
+        ) as client:
             response = client.alpha.decisions.create(
                 model=MODEL_ID,
                 questions=_questions(places),
                 state=_board_state(position, places),
                 retries=_NO_RETRY,
+                timeout_ms=DECISIONS_TIMEOUT_MS,
             )
     except ExternalModelError:
         raise

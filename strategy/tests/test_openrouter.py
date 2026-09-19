@@ -161,9 +161,12 @@ def test_jev_decisions_call_uses_https_and_model_id(
     assert isinstance(init, dict)
     assert init["api_key"] == _API_KEY
     assert init["server_url"] == "https://openrouter.ai"
+    assert init["timeout_ms"] == jev.DECISIONS_TIMEOUT_MS == 55_000
+    assert jev.DECISIONS_TIMEOUT_MS < 60_000
     create = fake.last_create
     assert isinstance(create, dict)
     assert create["model"] == "typesafe/jev-1.13"
+    assert create["timeout_ms"] == jev.DECISIONS_TIMEOUT_MS
     retries = create["retries"]
     assert getattr(retries, "strategy", None) == "none"
     questions = create["questions"]
