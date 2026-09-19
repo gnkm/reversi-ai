@@ -246,6 +246,14 @@ def test_new_game_can_start_during_or_after(client: TestClient) -> None:
     _problem(client.get(f"/api/games/{finished.id}"), 404, "game_not_found")
 
 
+def test_module_entrypoint_is_python_m_reversi_api() -> None:
+    from reversi.api.__main__ import HOST, PORT, main
+
+    assert HOST == "0.0.0.0"
+    assert PORT == 8000
+    assert callable(main)
+
+
 def test_api_package_does_not_import_train() -> None:
     for path in sorted(_API_DIR.glob("*.py")):
         tree = ast.parse(path.read_text(encoding="utf-8"))

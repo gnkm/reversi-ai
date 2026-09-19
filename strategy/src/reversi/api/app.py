@@ -24,7 +24,7 @@ from reversi.api.schemas import (
     Move,
     MoveApplied,
 )
-from reversi.api.session import GameStore, to_game_state
+from reversi.api.session import GameStore
 
 
 def _catalog_item(item: AgentItem) -> CatalogItem:
@@ -67,7 +67,7 @@ def create_app(store: GameStore | None = None) -> FastAPI:
     def get_game(
         game_id: Annotated[str, Path(pattern=GAME_ID_PATTERN)],
     ) -> GameState:
-        return to_game_state(app.state.store.current(game_id))
+        return app.state.store.snapshot(game_id)
 
     @app.post("/api/games/{game_id}/moves", response_model=MoveApplied)
     def play_move(

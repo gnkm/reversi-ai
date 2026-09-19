@@ -164,12 +164,12 @@ class GameStore:
     def catalog(self) -> list[catalog.CatalogItem]:
         return list(catalog.items())
 
-    def current(self, game_id: str) -> Game:
+    def snapshot(self, game_id: str) -> GameState:
         with self._lock:
             game = self._game
-        if game is None or game.id != game_id:
-            raise game_not_found()
-        return game
+            if game is None or game.id != game_id:
+                raise game_not_found()
+            return to_game_state(game)
 
     def start(self, request: CreateGameRequest) -> GameState:
         _ensure_known_specimens(request)
