@@ -155,15 +155,32 @@ def test_random_does_not_move_when_no_legal_places() -> None:
 
 
 def test_catalog_dispatches_random_uniform_by_specimen_id() -> None:
+    from reversi.agents import choose_move as package_choose
+
     position = initial_position()
     rng = Random(1)
     from_catalog = catalog_choose(SPECIMEN_ID, position, rng)
     rng = Random(1)
     from_module = choose_move(position, rng)
+    rng = Random(1)
+    from_package = package_choose(SPECIMEN_ID, position, rng)
     assert from_catalog == from_module
+    assert from_package == from_catalog
     assert from_catalog is not None
     with pytest.raises(KeyError):
         catalog_choose("random", position)
+    with pytest.raises(KeyError):
+        package_choose("random", position)
+
+
+def test_catalog_listed_specimens_match_choosers() -> None:
+    listed_ids = [item.specimen_id for item in items()]
+    assert listed_ids
+    assert len(listed_ids) == len(set(listed_ids))
+    position = initial_position()
+    for specimen_id in listed_ids:
+        get(specimen_id)
+        catalog_choose(specimen_id, position, Random(0))
 
 
 def test_random_uniform_source_does_not_reference_wthor_or_models() -> None:

@@ -44,21 +44,27 @@ RANDOM_UNIFORM = CatalogItem(
     description=DESCRIPTION,
 )
 
-_ITEMS: tuple[CatalogItem, ...] = (RANDOM_UNIFORM,)
-_CHOOSERS: dict[str, Chooser] = {SPECIMEN_ID: choose_random_uniform}
+# 一覧と着手関数は同じ登録から作る。
+_REGISTRY: tuple[tuple[CatalogItem, Chooser], ...] = (
+    (RANDOM_UNIFORM, choose_random_uniform),
+)
+_BY_ID: dict[str, tuple[CatalogItem, Chooser]] = {
+    item.specimen_id: (item, chooser) for item, chooser in _REGISTRY
+}
 
 
 def items() -> tuple[CatalogItem, ...]:
     """登録されている個体。"""
-    return _ITEMS
+    return tuple(item for item, _ in _REGISTRY)
 
 
 def get(specimen_id: str) -> CatalogItem:
     """個体 ID でカタログ項目を返す。"""
-    for item in _ITEMS:
-        if item.specimen_id == specimen_id:
-            return item
-    raise KeyError(specimen_id)
+    try:
+        item, _ = _BY_ID[specimen_id]
+    except KeyError:
+        raise KeyError(specimen_id) from None
+    return item
 
 
 def choose_move(
@@ -68,7 +74,7 @@ def choose_move(
 ) -> Place | None:
     """指定した個体に着手を選ばせる。未知の個体は KeyError。"""
     try:
-        chooser = _CHOOSERS[specimen_id]
+        _, chooser = _BY_ID[specimen_id]
     except KeyError:
         raise KeyError(specimen_id) from None
     return chooser(position, rng)
