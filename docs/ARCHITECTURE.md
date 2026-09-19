@@ -2,7 +2,7 @@
 
 実装の置き方とプロセス分割。要求（shall）の正本は `docs/source-of-truth/` と GitHub Issue であり、本ファイルはそれらを変えない。
 
-対象: F001（対局エンジン）、F002（ランダム個体）、F008（Issue #9、盤の入力符号化）、F009（WTHOR 棋譜）、F021（Issue #22）。後続の実装 Issue は本ファイルと `docs/openapi.yml` に従う。
+対象: F001（対局エンジン）、F002（ランダム個体）、F006（戦略 API）、F008（Issue #9、盤の入力符号化）、F009（WTHOR 棋譜）、F021（Issue #22）。後続の実装 Issue は本ファイルと `docs/openapi.yml` に従う。
 
 ## 1. 目的
 
@@ -18,6 +18,8 @@
 | 戦略 | FastAPI | `/decide`（パス項目の `servers`）。Hono が中継する JSON は同じ `components` |
 
 Hono はブラウザからの対局 API を受け、着手決定を戦略 FastAPI の `/decide` へ中継する。二つのサーバの経路は `docs/openapi.yml` で混ぜない。
+
+Hono がまだ無いあいだ、戦略 FastAPI（F006、`reversi.api`）が同じ `components` の JSON でカタログと 1 局の開始・着手を公開する。進行中の局はメモリ上で同時 1。盤の規則は engine、個体の着手は catalog に任せ、api はそれらを再実装しない。`reversi.api` は `reversi.train` を import しない。
 
 ## 3. HTTP 契約
 
@@ -79,7 +81,20 @@ ML / RL / NN が共有する盤の入力は `strategy/src/reversi/encode.py` に
 
 ヘッダの盤サイズが 0 または 8 のファイルだけを 8×8 として扱う。それ以外と、8×8 規則で再生できないレコードは学習入力に含めない。再生は対局エンジンと同じ関数を呼ぶ。WTHOR はパスを符号に持たないので、合法手が無い側ではエンジンのパスを挿入する。
 
-## 10. リポジトリ構成
+## 10. 戦略 API（FastAPI）
+
+1 局の HTTP は `strategy/src/reversi/api/` に置く。Pydantic の形は `docs/openapi.yml` の `components` と同じである。
+
+| ファイル | 責務 |
+| --- | --- |
+| `schemas.py` | カタログ・対局・着手・問題の JSON |
+| `errors.py` | RFC 9457 の Problem と違法着手の 409 |
+| `session.py` | メモリ上の同時 1 局。開始は既存を置き換える |
+| `app.py` | `GET /api/catalog`、`POST /api/games`、着手 |
+
+違法な着手は盤に適用しない。エージェント対エージェントは人手の着手を待たず終局まで進む。
+
+## 11. リポジトリ構成
 
 ```
 docs/
@@ -100,11 +115,17 @@ strategy/
   src/reversi/encode.py
   src/reversi/train/
     wthor.py
+  src/reversi/api/
+    app.py
+    errors.py
+    schemas.py
+    session.py
   tests/
     test_engine.py
     test_agents.py
     test_encode.py
     test_wthor.py
+    test_api.py
 ```
 
-アプリケーション本体（Hono / FastAPI のパッケージ）のディレクトリは、実装 Issue でこの tree に足す。
+利用者向け Hono のディレクトリは、実装 Issue でこの tree に足す。
