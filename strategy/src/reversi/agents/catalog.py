@@ -6,37 +6,17 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from random import Random
 
-from reversi.agents.most_flips import (
-    CATEGORY as MOST_FLIPS_CATEGORY,
-    DESCRIPTION as MOST_FLIPS_DESCRIPTION,
-    DISPLAY_NAME as MOST_FLIPS_DISPLAY_NAME,
-    SPECIMEN_ID as MOST_FLIPS_ID,
-    choose_move as choose_most_flips,
-)
-from reversi.agents.positional import (
-    CATEGORY as POSITIONAL_CATEGORY,
-    DESCRIPTION as POSITIONAL_DESCRIPTION,
-    DISPLAY_NAME as POSITIONAL_DISPLAY_NAME,
-    SPECIMEN_ID as POSITIONAL_ID,
-    choose_move as choose_positional,
-)
-from reversi.agents.random_uniform import (
-    CATEGORY,
-    DESCRIPTION,
-    DISPLAY_NAME,
-    SPECIMEN_ID,
-    choose_move as choose_random_uniform,
-)
+from reversi.agents import most_flips, positional, random_uniform
 from reversi.engine.rules import Place, Position
 
 Chooser = Callable[[Position, Random | None], Place | None]
 
 
 __all__ = [
-    "CatalogItem",
     "MOST_FLIPS",
     "POSITIONAL",
     "RANDOM_UNIFORM",
+    "CatalogItem",
     "choose_move",
     "get",
     "items",
@@ -54,29 +34,29 @@ class CatalogItem:
 
 
 RANDOM_UNIFORM = CatalogItem(
-    specimen_id=SPECIMEN_ID,
-    category=CATEGORY,
-    display_name=DISPLAY_NAME,
-    description=DESCRIPTION,
+    specimen_id=random_uniform.SPECIMEN_ID,
+    category=random_uniform.CATEGORY,
+    display_name=random_uniform.DISPLAY_NAME,
+    description=random_uniform.DESCRIPTION,
 )
 MOST_FLIPS = CatalogItem(
-    specimen_id=MOST_FLIPS_ID,
-    category=MOST_FLIPS_CATEGORY,
-    display_name=MOST_FLIPS_DISPLAY_NAME,
-    description=MOST_FLIPS_DESCRIPTION,
+    specimen_id=most_flips.SPECIMEN_ID,
+    category=most_flips.CATEGORY,
+    display_name=most_flips.DISPLAY_NAME,
+    description=most_flips.DESCRIPTION,
 )
 POSITIONAL = CatalogItem(
-    specimen_id=POSITIONAL_ID,
-    category=POSITIONAL_CATEGORY,
-    display_name=POSITIONAL_DISPLAY_NAME,
-    description=POSITIONAL_DESCRIPTION,
+    specimen_id=positional.SPECIMEN_ID,
+    category=positional.CATEGORY,
+    display_name=positional.DISPLAY_NAME,
+    description=positional.DESCRIPTION,
 )
 
 # 一覧と着手関数は同じ登録から作る。
 _REGISTRY: tuple[tuple[CatalogItem, Chooser], ...] = (
-    (RANDOM_UNIFORM, choose_random_uniform),
-    (MOST_FLIPS, choose_most_flips),
-    (POSITIONAL, choose_positional),
+    (RANDOM_UNIFORM, random_uniform.choose_move),
+    (MOST_FLIPS, most_flips.choose_move),
+    (POSITIONAL, positional.choose_move),
 )
 _BY_ID: dict[str, tuple[CatalogItem, Chooser]] = {
     item.specimen_id: (item, chooser) for item, chooser in _REGISTRY

@@ -9,24 +9,10 @@ from random import Random
 
 import pytest
 
-from reversi.agents.catalog import CatalogItem, choose_move as catalog_choose
-from reversi.agents.catalog import get, items
-from reversi.agents.most_flips import (
-    CATEGORY as MOST_FLIPS_CATEGORY,
-    DESCRIPTION as MOST_FLIPS_DESCRIPTION,
-    DISPLAY_NAME as MOST_FLIPS_DISPLAY_NAME,
-    SPECIMEN_ID as MOST_FLIPS_ID,
-    choose_move as choose_most_flips,
-)
+from reversi.agents import most_flips, positional
+from reversi.agents.catalog import CatalogItem, get, items
+from reversi.agents.catalog import choose_move as catalog_choose
 from reversi.agents.position_table import POSITION_SCORES, score_at
-from reversi.agents.positional import (
-    CATEGORY as POSITIONAL_CATEGORY,
-    DESCRIPTION as POSITIONAL_DESCRIPTION,
-    DISPLAY_NAME as POSITIONAL_DISPLAY_NAME,
-    SPECIMEN_ID as POSITIONAL_ID,
-    choose_move as choose_positional,
-    own_stone_score,
-)
 from reversi.agents.random_uniform import (
     CATEGORY,
     DESCRIPTION,
@@ -254,22 +240,22 @@ _CORNER_VS_TWO_FLIPS = (
 def test_catalog_lists_most_flips_and_positional() -> None:
     most = _item_by_display_name("ルールベース (最多取り)")
     pos = _item_by_display_name("ルールベース (位置評価)")
-    assert most.specimen_id == MOST_FLIPS_ID == "most_flips"
-    assert pos.specimen_id == POSITIONAL_ID == "positional"
+    assert most.specimen_id == most_flips.SPECIMEN_ID == "most_flips"
+    assert pos.specimen_id == positional.SPECIMEN_ID == "positional"
     assert most.category == pos.category == "rule_based"
-    assert most.category == MOST_FLIPS_CATEGORY
-    assert pos.category == POSITIONAL_CATEGORY
-    assert most.display_name == MOST_FLIPS_DISPLAY_NAME
-    assert pos.display_name == POSITIONAL_DISPLAY_NAME
+    assert most.category == most_flips.CATEGORY
+    assert pos.category == positional.CATEGORY
+    assert most.display_name == most_flips.DISPLAY_NAME
+    assert pos.display_name == positional.DISPLAY_NAME
     assert most.display_name != pos.display_name
-    assert most.description == MOST_FLIPS_DESCRIPTION
-    assert pos.description == POSITIONAL_DESCRIPTION
+    assert most.description == most_flips.DESCRIPTION
+    assert pos.description == positional.DESCRIPTION
     assert most.description.strip() and pos.description.strip()
     assert most.description != pos.description
     assert _JAPANESE.search(most.description)
     assert _JAPANESE.search(pos.description)
-    assert get(MOST_FLIPS_ID) == most
-    assert get(POSITIONAL_ID) == pos
+    assert get(most_flips.SPECIMEN_ID) == most
+    assert get(positional.SPECIMEN_ID) == pos
     with pytest.raises(KeyError):
         get("rule_based")
 
@@ -286,11 +272,11 @@ def test_most_flips_picks_max_opponent_flips_not_placed_stone() -> None:
     assert counts["a1"] == 1
     assert counts["d2"] == 2
     assert max(counts.values()) == counts["d2"]
-    move = choose_most_flips(position)
+    move = most_flips.choose_move(position)
     assert move == Place(Square.parse("d2"))
     # 置いた石を足すと全合法手に +1 されるだけなので、比較は裏返し数そのもの。
     assert counts[move.square.algebraic] == max(counts.values())
-    via_catalog = catalog_choose(MOST_FLIPS_ID, position)
+    via_catalog = catalog_choose(most_flips.SPECIMEN_ID, position)
     assert via_catalog == move
 
 
@@ -299,25 +285,25 @@ def test_most_flips_tie_breaks_a1_to_h8_order() -> None:
     places = legal_places(position)
     counts = [len(flips_for(position.board, square, Color.BLACK)) for square in places]
     assert counts and len(set(counts)) == 1
-    assert [square.algebraic for square in places][0] == "d3"
-    move = choose_most_flips(position)
+    assert places[0].algebraic == "d3"
+    move = most_flips.choose_move(position)
     assert move == Place(Square.parse("d3"))
-    assert choose_most_flips(position, Random(99)) == move
+    assert most_flips.choose_move(position, Random(99)) == move
 
 
 def test_most_flips_does_not_move_when_no_legal_places() -> None:
-    assert choose_most_flips(_almost_full_white_with_black_on_b1()) is None
-    assert choose_most_flips(_both_sides_cannot_place()) is None
+    assert most_flips.choose_move(_almost_full_white_with_black_on_b1()) is None
+    assert most_flips.choose_move(_both_sides_cannot_place()) is None
 
 
 def test_position_table_is_fixed_8x8_matching_engine_coordinates() -> None:
     expected = (
         (100, -20, 10, 5, 5, 10, -20, 100),
         (-20, -50, -2, -2, -2, -2, -50, -20),
-        (10, -2, -1, -1, -1, -1, -2, 10),
-        (5, -2, -1, -1, -1, -1, -2, 5),
-        (5, -2, -1, -1, -1, -1, -2, 5),
-        (10, -2, -1, -1, -1, -1, -2, 10),
+        (10, -2, 1, -1, -1, 1, -2, 10),
+        (5, -2, -1, 0, 0, -1, -2, 5),
+        (5, -2, -1, 0, 0, -1, -2, 5),
+        (10, -2, 1, -1, -1, 1, -2, 10),
         (-20, -50, -2, -2, -2, -2, -50, -20),
         (100, -20, 10, 5, 5, 10, -20, 100),
     )
@@ -329,12 +315,15 @@ def test_position_table_is_fixed_8x8_matching_engine_coordinates() -> None:
     assert score_at(Square.parse("a8")) == 100
     assert score_at(Square.parse("h8")) == 100
     assert score_at(Square.parse("b2")) == -50
+    assert score_at(Square.parse("c3")) == 1
+    assert score_at(Square.parse("d4")) == 0
+    assert score_at(Square.parse("c6")) == 1
     assert score_at(Square.parse("a1")) == POSITION_SCORES[0][0]
     assert score_at(Square.parse("h8")) == POSITION_SCORES[7][7]
     snapshot = tuple(tuple(row) for row in POSITION_SCORES)
     position = initial_position()
-    choose_positional(position)
-    choose_positional(_position_from_rank8_rows(_CORNER_VS_TWO_FLIPS, Color.BLACK))
+    positional.choose_move(position)
+    positional.choose_move(_position_from_rank8_rows(_CORNER_VS_TWO_FLIPS, Color.BLACK))
     assert POSITION_SCORES == snapshot == expected
 
 
@@ -342,19 +331,19 @@ def test_positional_maximizes_own_stone_score_after_place() -> None:
     position = _position_from_rank8_rows(_CORNER_VS_TWO_FLIPS, Color.BLACK)
     places = legal_places(position)
     scored = {
-        square.algebraic: own_stone_score(
+        square.algebraic: positional.own_stone_score(
             apply_place(position.board, square, Color.BLACK), Color.BLACK
         )
         for square in places
     }
     assert scored["a1"] > scored["d2"]
-    move = choose_positional(position)
+    move = positional.choose_move(position)
     assert move == Place(Square.parse("a1"))
     assert scored[move.square.algebraic] == max(scored.values())
-    most = choose_most_flips(position)
+    most = most_flips.choose_move(position)
     assert most == Place(Square.parse("d2"))
     assert most != move
-    via_catalog = catalog_choose(POSITIONAL_ID, position)
+    via_catalog = catalog_choose(positional.SPECIMEN_ID, position)
     assert via_catalog == move
 
 
@@ -362,19 +351,19 @@ def test_positional_tie_breaks_a1_to_h8_order() -> None:
     position = initial_position()
     places = legal_places(position)
     scores = [
-        own_stone_score(apply_place(position.board, square, Color.BLACK), Color.BLACK)
+        positional.own_stone_score(apply_place(position.board, square, Color.BLACK), Color.BLACK)
         for square in places
     ]
     assert scores and len(set(scores)) == 1
-    move = choose_positional(position)
+    move = positional.choose_move(position)
     assert move == Place(places[0])
     assert move == Place(Square.parse("d3"))
-    assert choose_positional(position, Random(0)) == move
+    assert positional.choose_move(position, Random(0)) == move
 
 
 def test_positional_does_not_move_when_no_legal_places() -> None:
-    assert choose_positional(_almost_full_white_with_black_on_b1()) is None
-    assert choose_positional(_both_sides_cannot_place()) is None
+    assert positional.choose_move(_almost_full_white_with_black_on_b1()) is None
+    assert positional.choose_move(_both_sides_cannot_place()) is None
 
 
 def test_most_flips_and_positional_source_does_not_call_models() -> None:
