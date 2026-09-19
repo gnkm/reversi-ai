@@ -116,9 +116,59 @@ def test_rl_training_script_does_not_read_wthor() -> None:
 
 
 
+def test_ml_play_path_does_not_import_nn_runtime_or_sklearn() -> None:
+    source = _read("agents", "ml.py")
+    roots = _imported_roots(source)
+    assert "torch" not in roots
+    assert "onnxruntime" not in roots
+    assert "sklearn" not in roots
+    assert "openrouter" not in roots
+    assert "numpy" not in roots
+    assert roots.isdisjoint(_NN_RUNTIME_ROOTS)
+    modules = _imported_modules(source)
+    assert "reversi.train" not in modules
+    assert all(not name.startswith("reversi.train") for name in modules)
+    for literal in _string_literals(source):
+        lowered = literal.lower()
+        assert "ffothello.org" not in lowered
+        assert ".wtb" not in lowered
+        assert "openrouter.ai" not in lowered
+
+
+def test_ml_training_script_uses_sklearn_and_wthor_and_games() -> None:
+    source = _read("train", "ml.py")
+    roots = _imported_roots(source)
+    modules = _imported_modules(source)
+    assert "sklearn" in roots
+    assert "torch" not in roots
+    assert "onnxruntime" not in roots
+    assert roots.isdisjoint(_NN_RUNTIME_ROOTS)
+    assert "reversi.train.wthor" in modules or any(
+        name.startswith("reversi.train.wthor") for name in modules
+    )
+    tree = ast.parse(source)
+    option_strings: list[str] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call):
+            func = node.func
+            attr = func.attr if isinstance(func, ast.Attribute) else ""
+            if attr == "add_argument":
+                for arg in node.args:
+                    if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+                        option_strings.append(arg.value)
+    assert "--wthor" in option_strings
+    assert "--games" in option_strings
+    for literal in _string_literals(source):
+        lowered = literal.lower()
+        assert "openrouter.ai" not in lowered
+
+
 def test_play_time_ml_and_rl_files_avoid_nn_runtimes() -> None:
     for name in _agent_files():
         source = _read("agents", name)
         roots = _imported_roots(source)
         assert roots.isdisjoint(_NN_RUNTIME_ROOTS), name
         assert "openrouter" not in roots
+        assert "sklearn" not in roots
+        assert "torch" not in roots
+        assert "onnxruntime" not in roots

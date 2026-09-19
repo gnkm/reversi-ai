@@ -1,4 +1,4 @@
-"""カタログと戦略個体（ランダム・最多取り・位置評価・ミニマックス・定石・強化学習・生成 AI）。"""
+"""カタログと戦略個体（ランダム・最多取り・位置評価・ミニマックス・定石・機械学習・強化学習・生成 AI）。"""
 
 from __future__ import annotations
 
@@ -677,6 +677,235 @@ def test_rl_td_update_moves_weights_toward_terminal_reward() -> None:
     updated, _ = _td_update(zeros.copy(), 0.0, (board, later), 1.0, alpha)
     # 先頭局面の TD 目標は次局面の価値 0 なので動かず、終端報酬は末局面だけに乗る。
     np.testing.assert_allclose(updated, alpha * _features(later))
+
+
+def _linear_ml_model(black_squares: dict[str, float], bias: float = 0.0):
+    from reversi.agents.ml import LinearModel
+
+    weights = [0.0] * VECTOR_SIZE
+    for algebraic, value in black_squares.items():
+        square = Square.parse(algebraic)
+        weights[_black_feature_index(square)] = value
+    return LinearModel(
+        weights=tuple(float(value) for value in weights),
+        bias=float(bias),
+    )
+
+
+def _write_wtb(path: Path, games: tuple[tuple[Square, ...], ...]) -> Path:
+    from reversi.train.wthor import RECORD_SIZE_8X8, encode_8x8_move
+
+    header = bytearray(16)
+    header[4:8] = len(games).to_bytes(4, "little")
+    header[12] = 8
+    payload = bytearray()
+    for squares in games:
+        rec = bytearray(RECORD_SIZE_8X8)
+        for index, square in enumerate(squares):
+            rec[8 + index] = encode_8x8_move(square)
+        payload.extend(rec)
+    path.write_bytes(bytes(header) + bytes(payload))
+    return path
+
+
+def _play_record(black, white) -> tuple[Position, tuple[dict[str, str], ...], tuple[Square, ...]]:
+    position = initial_position()
+    moves: list[dict[str, str]] = []
+    squares: list[Square] = []
+    while not is_over(position):
+        if pass_is_legal(position):
+            position = play(position, PassMove())
+            moves.append({"type": "pass"})
+            continue
+        chooser = black if position.side_to_move is Color.BLACK else white
+        move = chooser(position)
+        assert move is not None
+        position = play(position, move)
+        moves.append({"type": "place", "square": move.square.algebraic})
+        squares.append(move.square)
+    return position, tuple(moves), tuple(squares)
+
+
+def test_catalog_lists_ml_kifu() -> None:
+    from reversi.agents import ml
+
+    item = _item_by_display_name("機械学習 (棋譜)")
+    assert item.specimen_id == ml.SPECIMEN_ID == "ml"
+    assert item.category == ml.CATEGORY == "machine_learning"
+    assert item.display_name == ml.DISPLAY_NAME
+    assert item.description == ml.DESCRIPTION
+    assert item.description.strip()
+    assert "WTHOR" in item.description
+    assert "永続化" in item.description
+    assert "ニューラルネットワーク" in item.description
+    assert _JAPANESE.search(item.description)
+    assert get(ml.SPECIMEN_ID) == item
+    with pytest.raises(KeyError):
+        get("machine_learning")
+
+
+def test_ml_value_is_coefficient_dot_product() -> None:
+    from reversi.agents import ml
+    from reversi.encode import encode
+
+    model = _linear_ml_model({"d5": 2.5, "e4": -1.0}, bias=0.5)
+    board = initial_position().board
+    expected = 0.5
+    vector = encode(board).as_vector()
+    for weight, feature in zip(model.weights, vector, strict=True):
+        expected += weight * feature
+    assert ml.value_of(board, model) == pytest.approx(expected)
+
+
+def test_ml_greedy_maximizes_black_value() -> None:
+    from reversi.agents import ml
+
+    position = initial_position()
+    model = _linear_ml_model({"c4": 4.0, "d3": 1.0})
+    move = ml.choose_move(position, model=model)
+    assert move == Place(Square.parse("c4"))
+    assert move.square in legal_places(position)
+    via_catalog = catalog_choose(ml.SPECIMEN_ID, position)
+    assert via_catalog is not None
+    assert via_catalog.square in legal_places(position)
+
+
+def test_ml_white_minimizes_black_value() -> None:
+    from reversi.agents import ml
+    from reversi.agents.ml import LinearModel
+
+    after_black = play(initial_position(), Place(Square.parse("d3")))
+    assert after_black.side_to_move is Color.WHITE
+    places = legal_places(after_black)
+    assert len(places) >= 2
+    model = LinearModel(tuple(float(index) for index in range(VECTOR_SIZE)), 0.0)
+    move = ml.choose_move(after_black, model=model)
+    assert move is not None
+    scored = {
+        square: ml.value_of(
+            apply_place(after_black.board, square, Color.WHITE),
+            model,
+        )
+        for square in places
+    }
+    best = min(scored.values())
+    expected = next(square for square in places if scored[square] == best)
+    assert move.square == expected
+    assert scored[move.square] == best
+
+
+def test_ml_tie_breaks_a1_to_h8_order() -> None:
+    from reversi.agents import ml
+
+    position = initial_position()
+    places = legal_places(position)
+    model = _linear_ml_model({})
+    values = [
+        ml.value_of(apply_place(position.board, square, Color.BLACK), model)
+        for square in places
+    ]
+    assert values and len(set(values)) == 1
+    move = ml.choose_move(position, Random(0), model=model)
+    assert move == Place(places[0])
+    assert move == Place(Square.parse("d3"))
+
+
+def test_ml_does_not_move_when_no_legal_places() -> None:
+    from reversi.agents import ml
+
+    model = _linear_ml_model({"a1": 1.0})
+    assert ml.choose_move(_almost_full_white_with_black_on_b1(), model=model) is None
+    assert ml.choose_move(_both_sides_cannot_place(), model=model) is None
+
+
+def test_ml_default_model_plays_only_legal_moves_to_the_end() -> None:
+    from reversi.agents import ml
+
+    assert ml.DEFAULT_MODEL_PATH.is_file()
+    model = ml.load_model(ml.DEFAULT_MODEL_PATH)
+    assert len(model.weights) == VECTOR_SIZE
+    position = initial_position()
+    while not is_over(position):
+        if pass_is_legal(position):
+            position = play(position, PassMove())
+            continue
+        move = ml.choose_move(position, model=model)
+        assert move is not None
+        assert move.square in legal_places(position)
+        position = play(position, move)
+    assert is_over(position)
+
+
+def test_ml_source_does_not_import_nn_or_sklearn() -> None:
+    source = _module_source("ml.py")
+    roots = _imported_roots(source)
+    assert roots.isdisjoint(_FORBIDDEN_IMPORT_ROOTS)
+    assert "torch" not in roots
+    assert "onnxruntime" not in roots
+    assert "sklearn" not in roots
+    assert "openrouter" not in roots
+    tree = ast.parse(source)
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            lowered = node.value.lower()
+            assert "ffothello.org" not in lowered
+            assert ".wtb" not in lowered
+            assert "openrouter.ai" not in lowered
+
+
+def test_ml_model_rejects_non_finite_values() -> None:
+    from reversi.agents.ml import LinearModel
+
+    with pytest.raises(ValueError, match="有限"):
+        LinearModel(tuple(0.0 for _ in range(VECTOR_SIZE)), float("nan"))
+    inf_weights = [0.0] * VECTOR_SIZE
+    inf_weights[0] = float("inf")
+    with pytest.raises(ValueError, match="有限"):
+        LinearModel(tuple(inf_weights), 0.0)
+
+
+def test_ml_training_fits_sklearn_on_wthor_and_persisted_games(tmp_path: Path) -> None:
+    from reversi.agents import most_flips, positional
+    from reversi.agents.ml import ALGORITHM, load_model
+    from reversi.api.persist import MODE_AGENT_VS_AGENT, save_if_over
+    from reversi.train.ml import train_and_write
+
+    wthor_dir = tmp_path / "wthor"
+    wthor_dir.mkdir()
+    db_path = tmp_path / "games.sqlite"
+    out = tmp_path / "ml.json"
+
+    _write_wtb(wthor_dir / "sample.wtb", ((Square.parse("f5"),),))
+
+    finished, moves, squares = _play_record(
+        most_flips.choose_move,
+        positional.choose_move,
+    )
+    assert squares
+    written = save_if_over(
+        finished,
+        mode=MODE_AGENT_VS_AGENT,
+        black={"kind": "specimen", "specimen_id": most_flips.SPECIMEN_ID},
+        white={"kind": "specimen", "specimen_id": positional.SPECIMEN_ID},
+        moves=moves,
+        db_path=db_path,
+    )
+    assert written is True
+    _write_wtb(wthor_dir / "played.wtb", (squares[:8],))
+
+    model = train_and_write(out, wthor=wthor_dir, games=db_path)
+    loaded = json.loads(out.read_text(encoding="utf-8"))
+    assert loaded["algorithm"] == ALGORITHM == "sklearn_ridge"
+    assert len(loaded["weights"]) == VECTOR_SIZE
+    assert len(model.weights) == VECTOR_SIZE
+    assert load_model(out).weights == model.weights
+
+
+def test_ml_training_requires_wthor_or_persisted_games(tmp_path: Path) -> None:
+    from reversi.train.ml import train
+
+    with pytest.raises(ValueError, match="学習例"):
+        train(wthor=tmp_path / "missing-wthor", games=tmp_path / "missing.sqlite")
 
 
 def _spec_leaf_score(board: Board, root: Color) -> int:
