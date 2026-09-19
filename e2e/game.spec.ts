@@ -2,7 +2,8 @@ import { expect, test } from "@playwright/test";
 
 const OPENING_LEGAL = ["c4", "d3", "e6", "f5"] as const;
 
-test("手番表示と合法手の印が観測できる", async ({ page }) => {
+test("手番表示と合法手の印が観測できる", async ({ page }, testInfo) => {
+  expect(testInfo.project.use.channel).toBe("chrome");
   await page.goto("/");
   const start = page.getByRole("button", { name: "対局を開始" });
   await expect(start).toBeEnabled();

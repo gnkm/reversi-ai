@@ -12,7 +12,9 @@ const CATALOG_NAMES = [
   "生成 AI (Jev)",
 ] as const;
 
-test("カタログ一覧（日本語）から盤面へ移れる", async ({ page }) => {
+test("カタログ一覧（日本語）から盤面へ移れる", async ({ page }, testInfo) => {
+  expect(testInfo.project.name).toBe("chrome");
+  expect(testInfo.project.use.channel).toBe("chrome");
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "カタログ" })).toBeVisible();
   await expect(page.getByText("利用者対エージェント")).toBeVisible();
