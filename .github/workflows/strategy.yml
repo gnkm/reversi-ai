@@ -14,7 +14,7 @@ jobs:
       - name: 合法手・裏返し・パス・終局・公式スコア
         run: uv run --directory strategy pytest tests/test_engine.py -q
       - name: カタログとランダム個体
-        run: uv run --directory strategy pytest tests/test_agents.py -q -k 'catalog or random'
+        run: uv run --directory strategy pytest tests/test_agents.py -q
       - name: import lint
         run: uv run --directory strategy lint-imports
       - name: complexity
