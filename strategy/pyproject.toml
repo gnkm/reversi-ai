@@ -27,9 +27,10 @@ pythonpath = ["src"]
 root_packages = ["reversi"]
 
 [[tool.importlinter.contracts]]
-name = "engine は board の上に rules と score を置く"
+name = "agents は engine の上に置き、engine は board の上に rules と score を置く"
 type = "layers"
 layers = [
+    "reversi.agents",
     "reversi.engine.score | reversi.engine.rules",
     "reversi.engine.board",
 ]
