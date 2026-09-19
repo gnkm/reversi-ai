@@ -10,6 +10,7 @@ requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115",
     "numpy>=2.0",
+    "onnxruntime>=1.19",
     "openrouter>=1.2.1",
     "scikit-learn>=1.5",
     "uvicorn>=0.32",
@@ -23,6 +24,9 @@ dev = [
     "radon>=6.0.1",
     "ruff>=0.13",
     "xenon>=0.9.3",
+]
+train = [
+    "torch>=2.4",
 ]
 
 [tool.hatch.build.targets.wheel]
