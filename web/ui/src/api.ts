@@ -7,6 +7,50 @@ import type {
 
 export type GameStreamFailure = "game_not_found" | "internal_error";
 
+export const SSE_RECONNECT_DELAY_MS = 250;
+export const SSE_MAX_RECONNECTS = 5;
+export const SSE_RECONNECT_DELAY_CAP_MS = 2000;
+
+export type SubscribeGameEventsOptions = {
+  reconnectDelayMs?: number;
+  maxReconnects?: number;
+  sleep?: (ms: number) => Promise<void>;
+};
+
+async function defaultSleep(ms: number): Promise<void> {
+  if (ms <= 0) {
+    return;
+  }
+  await new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+function reconnectWaitMs(attempt: number, base: number, cap: number): number {
+  return Math.min(cap, base * 2 ** (attempt - 1));
+}
+
+async function lookupLiveGame(
+  id: string,
+): Promise<GameState | GameStreamFailure> {
+  try {
+    const res = await fetch(`/api/games/${id}`);
+    if (res.ok) {
+      return (await res.json()) as GameState;
+    }
+    const code = problemCode(await res.json());
+    return code === "game_not_found" ? "game_not_found" : "internal_error";
+  } catch {
+    return "internal_error";
+  }
+}
+
+function isStreamFailure(
+  got: GameState | GameStreamFailure,
+): got is GameStreamFailure {
+  return got === "game_not_found" || got === "internal_error";
+}
+
 async function readJson(res: Response): Promise<unknown> {
   return await res.json();
 }
@@ -85,17 +129,24 @@ export function subscribeGameEvents(
   id: string,
   onGame: (game: GameState) => void,
   onFailure?: (code: GameStreamFailure) => void,
+  options: SubscribeGameEventsOptions = {},
 ): () => void {
   const url = `/api/games/${id}/events`;
+  const delayMs = options.reconnectDelayMs ?? SSE_RECONNECT_DELAY_MS;
+  const maxReconnects = options.maxReconnects ?? SSE_MAX_RECONNECTS;
+  const sleep = options.sleep ?? defaultSleep;
   let source: EventSource | null = null;
   let closed = false;
   let terminal = false;
+  let failures = 0;
+  let classifying = false;
   const handle = (event: MessageEvent<string>) => {
     try {
       const payload = JSON.parse(event.data) as { game?: GameState };
       if (payload.game === undefined) {
         return;
       }
+      failures = 0;
       if (payload.game.status !== "in_progress") {
         terminal = true;
       }
@@ -124,27 +175,44 @@ export function subscribeGameEvents(
     source?.close();
     onFailure?.(code);
   };
-  const classify = async () => {
+  const reconnectIfAllowed = async () => {
+    if (failures >= maxReconnects) {
+      fail("internal_error");
+      return;
+    }
+    failures += 1;
+    await sleep(reconnectWaitMs(failures, delayMs, SSE_RECONNECT_DELAY_CAP_MS));
     if (closed || terminal) {
       return;
     }
+    connect();
+  };
+  const recoverFromDisconnect = async () => {
+    const got = await lookupLiveGame(id);
+    if (closed || terminal) {
+      return;
+    }
+    if (isStreamFailure(got)) {
+      fail(got);
+      return;
+    }
+    if (got.status !== "in_progress") {
+      terminal = true;
+      onGame(got);
+      return;
+    }
+    onGame(got);
+    await reconnectIfAllowed();
+  };
+  const classify = async () => {
+    if (closed || terminal || classifying) {
+      return;
+    }
+    classifying = true;
     try {
-      const res = await fetch(`/api/games/${id}`);
-      if (res.ok) {
-        const game = (await res.json()) as GameState;
-        if (game.status !== "in_progress") {
-          terminal = true;
-          onGame(game);
-          return;
-        }
-        onGame(game);
-        connect();
-        return;
-      }
-      const code = problemCode(await res.json());
-      fail(code === "game_not_found" ? "game_not_found" : "internal_error");
-    } catch {
-      fail("internal_error");
+      await recoverFromDisconnect();
+    } finally {
+      classifying = false;
     }
   };
   connect();
