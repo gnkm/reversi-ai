@@ -1,0 +1,38 @@
+# Podman Compose。web と strategy を同一 Pod で起動する。
+# 公開はホストのループバックだけ。secret の中身は書かない。
+
+name: reversi-ai
+
+x-podman:
+  in_pod: true
+  pod_args:
+    - --infra=false
+    - --share=net
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: web/Containerfile
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - ./data/certs:/app/data/certs:ro
+    environment:
+      STRATEGY_BASE_URL: http://127.0.0.1:8000
+    depends_on:
+      - strategy
+
+  strategy:
+    build:
+      context: .
+      dockerfile: strategy/Containerfile
+    volumes:
+      - ./data:/data
+      - ./models:/models
+    secrets:
+      - openrouter-api-key
+
+secrets:
+  openrouter-api-key:
+    external: true
