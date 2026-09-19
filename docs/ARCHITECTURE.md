@@ -2,7 +2,7 @@
 
 実装の置き方とプロセス分割。要求（shall）の正本は `docs/source-of-truth/` と GitHub Issue であり、本ファイルはそれらを変えない。
 
-対象: F001（対局エンジン）と F021（Issue #22）。後続の実装 Issue は本ファイルと `docs/openapi.yml` に従う。
+対象: F001（対局エンジン）、F008（Issue #9、盤の入力符号化）と F021（Issue #22）。後続の実装 Issue は本ファイルと `docs/openapi.yml` に従う。
 
 ## 1. 目的
 
@@ -56,7 +56,13 @@ TypeScript 側は Zod、Python 側は Pydantic で実行時の形を検証する
 
 公式スコアは石数が多い側の勝ちである。引き分けは 32–32。勝ちが決まったとき空マスは勝者に加算する。
 
-## 7. リポジトリ構成
+## 7. 盤の入力符号化
+
+ML / RL / NN が共有する盤の入力は `strategy/src/reversi/encode.py` に一つ置く。`engine` はこれを読まない。エージェント実装と学習が同じ関数を呼ぶ。
+
+符号化は黒・白・空の 3 平面 × 8×8 の 0/1 である。座標はエンジンと同じ（`[rank][file]`、a1 が `[0][0]`）。手番は盤の入力に含めない。数値目標は置かない。
+
+## 8. リポジトリ構成
 
 ```
 docs/
@@ -69,8 +75,10 @@ strategy/
     board.py
     rules.py
     score.py
+  src/reversi/encode.py
   tests/
     test_engine.py
+    test_encode.py
 ```
 
 アプリケーション本体（Hono / FastAPI のパッケージ）のディレクトリは、実装 Issue でこの tree に足す。
