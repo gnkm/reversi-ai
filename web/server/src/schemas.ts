@@ -12,6 +12,7 @@ export const categorySchema = z.enum([
   "machine_learning",
   "reinforcement_learning",
   "neural_network",
+  "generative_ai",
 ]);
 export const errorCodeSchema = z.enum([
   "validation_error",

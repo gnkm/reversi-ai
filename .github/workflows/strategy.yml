@@ -25,6 +25,8 @@ jobs:
         run: uv run --directory strategy pytest tests/test_persist.py -q
       - name: OpenRouter の鍵と Jev 境界
         run: uv run --directory strategy pytest tests/test_openrouter.py -q
+      - name: ML/RL が NN ランタイムを import しない
+        run: uv run --directory strategy pytest tests/test_layers.py -q
       - name: import lint
         run: uv run --directory strategy lint-imports
       - name: complexity

@@ -9,6 +9,7 @@ description = "対局と学習が共有する 8×8 リバーシ規則"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115",
+    "numpy>=2.0",
     "openrouter>=1.2.1",
     "uvicorn>=0.32",
 ]
@@ -47,7 +48,8 @@ root_packages = ["reversi"]
 name = "agents と train は engine の上、engine は board の上に rules と score を置く"
 type = "layers"
 layers = [
-    "reversi.agents | reversi.train",
+    "reversi.train",
+    "reversi.agents",
     "reversi.engine.score | reversi.engine.rules",
     "reversi.engine.board",
 ]
