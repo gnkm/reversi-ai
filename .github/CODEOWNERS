@@ -26,7 +26,9 @@
 /.github/CODEOWNERS     @gnkm
 
 # 検査の閾値。緩める変更を必ずレビューに通すため
-/strategy/pyproject.toml @gnkm
+/biome.json                 @gnkm
+/.dependency-cruiser.cjs    @gnkm
+/strategy/pyproject.toml    @gnkm
 
 # git hooks（無効化・緩和をレビューに通す）
 /lefthook.yml           @gnkm
