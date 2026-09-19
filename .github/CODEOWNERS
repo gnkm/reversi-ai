@@ -23,10 +23,7 @@
 /.github/CODEOWNERS     @gnkm
 
 # 検査の閾値。緩める変更を必ずレビューに通すため
-# プロジェクトで実際に使っている設定ファイルに置き換えること。
-# 例: pyproject.toml / .importlinter / eslint.config.js / .dependency-cruiser.js
-#     .golangci.yml / .rubocop.yml / deptrac.yaml / clippy.toml
-# {{LINT_CONFIG_FILES}}   @gnkm
+/strategy/pyproject.toml @gnkm
 
 # git hooks（無効化・緩和をレビューに通す）
 /lefthook.yml           @gnkm

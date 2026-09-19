@@ -1,0 +1,19 @@
+name: strategy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  engine:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v10.1.0
+      - name: 合法手・裏返し・パス・終局・公式スコア
+        run: uv run --directory strategy pytest tests/test_engine.py -q
+      - name: import lint
+        run: uv run --directory strategy lint-imports
+      - name: complexity
+        run: uv run --directory strategy xenon --max-absolute C --max-modules B --max-average A src

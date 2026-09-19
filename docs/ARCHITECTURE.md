@@ -2,7 +2,7 @@
 
 実装の置き方とプロセス分割。要求（shall）の正本は `docs/source-of-truth/` と GitHub Issue であり、本ファイルはそれらを変えない。
 
-対象: F021（Issue #22）。後続の実装 Issue は本ファイルと `docs/openapi.yml` に従う。
+対象: F001（対局エンジン）と F021（Issue #22）。後続の実装 Issue は本ファイルと `docs/openapi.yml` に従う。
 
 ## 1. 目的
 
@@ -40,7 +40,23 @@ TypeScript 側は Zod、Python 側は Pydantic で実行時の形を検証する
 
 初版では TypeScript と Python のあいだで型やスキーマを共有するパッケージを置かない。契約の単一の置き場所は `docs/openapi.yml` であり、各言語のモデルはそこから手で揃える。共有パッケージが必要になったら、その時点の Issue で足す。
 
-## 6. リポジトリ構成
+## 6. 対局エンジン
+
+8×8 リバーシの規則は `strategy/src/reversi/engine/` に置く。対局と学習が同じ関数を呼ぶ。ビットボードは使わない。
+
+| ファイル | 責務 |
+| --- | --- |
+| `board.py` | 盤・マス・初期配置・代数表記 |
+| `rules.py` | 合法手・裏返し・パス・終局 |
+| `score.py` | 石数と公式スコア |
+
+代数表記の a1 は黒から見て左下である。列 a–h は左から右、行 1–8 は黒側から白側。内部配列は `board[rank-1][file-a]`（`[0][0]` が a1）。
+
+合法手は相手石を 1 個以上挟む空マスだけである。挟んだ石をすべて裏返し、連鎖的な追加の裏返しは起きない。合法手が無い側にだけパスが適用される。双方が着手不能なら、64 マスが埋まっていなくても終局する。
+
+公式スコアは石数が多い側の勝ちである。引き分けは 32–32。勝ちが決まったとき空マスは勝者に加算する。
+
+## 7. リポジトリ構成
 
 ```
 docs/
@@ -48,6 +64,13 @@ docs/
   openapi.yml          # 対局 API の契約（OpenAPI 3.1）
   source-of-truth/     # 要求の正本（人間のみ編集）
     01-seed.md
+strategy/
+  src/reversi/engine/
+    board.py
+    rules.py
+    score.py
+  tests/
+    test_engine.py
 ```
 
 アプリケーション本体（Hono / FastAPI のパッケージ）のディレクトリは、実装 Issue でこの tree に足す。
