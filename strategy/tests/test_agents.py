@@ -10,7 +10,15 @@ from random import Random
 
 import pytest
 
-from reversi.agents import jev, minimax, most_flips, opening, positional
+from reversi.agents import (
+    chat_completions,
+    extra_genai,
+    jev,
+    minimax,
+    most_flips,
+    opening,
+    positional,
+)
 from reversi.agents.catalog import CatalogItem, get, items
 from reversi.agents.catalog import choose_move as catalog_choose
 from reversi.agents.position_table import POSITION_SCORES, score_at
@@ -196,7 +204,7 @@ def test_catalog_listed_specimens_match_choosers() -> None:
     position = initial_position()
     for specimen_id in listed_ids:
         get(specimen_id)
-        if specimen_id == jev.SPECIMEN_ID:
+        if specimen_id == jev.SPECIMEN_ID or specimen_id.startswith("genai:"):
             continue
         catalog_choose(specimen_id, position, Random(0))
 
@@ -982,4 +990,214 @@ def test_opening_source_does_not_call_models_or_wthor() -> None:
                 assert ".wtb" not in lowered
                 assert "openrouter.ai" not in lowered
                 assert "wthor" not in lowered
+
+
+def _write_extra_genai(path: Path, entries: list[dict[str, str]]) -> Path:
+    path.write_text(json.dumps(entries), encoding="utf-8")
+    return path
+
+
+def test_extra_genai_missing_config_does_not_add_specimens(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(extra_genai, "CONFIG_PATH", tmp_path / "missing.json")
+    listed = items()
+    names = [item.display_name for item in listed]
+    assert names.count("生成 AI (Jev)") == 1
+    generative = [item for item in listed if item.category == "generative_ai"]
+    assert [item.display_name for item in generative] == ["生成 AI (Jev)"]
+    assert all(not item.specimen_id.startswith("genai:") for item in listed)
+    assert extra_genai.load() == ()
+
+
+def test_extra_genai_does_not_preplace_opus_or_astra(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(extra_genai, "CONFIG_PATH", tmp_path / "missing.json")
+    names = [item.display_name for item in items()]
+    lowered = " ".join(names).lower()
+    assert "opus" not in lowered
+    assert "astra" not in lowered
+    assert "生成 AI (Opus)" not in names
+    assert "生成 AI (Astra)" not in names
+
+
+def test_extra_genai_config_adds_display_name_and_calls_model_id(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    model_id = "openai/gpt-test-not-a-catalog-default"
+    config = _write_extra_genai(
+        tmp_path / "genai.json",
+        [{"model_id": model_id, "name": "GPT"}],
+    )
+    monkeypatch.setattr(extra_genai, "CONFIG_PATH", config)
+    item = _item_by_display_name("生成 AI (GPT)")
+    assert item.specimen_id == "genai:GPT"
+    assert item.category == extra_genai.CATEGORY == "generative_ai"
+    assert item.display_name == "生成 AI (GPT)"
+    assert item.description.strip()
+    assert _JAPANESE.search(item.description)
+    assert model_id in item.description
+    assert "Chat Completions" in item.description
+    assert "WTHOR" in item.description
+    assert get(item.specimen_id) == item
+
+    seen: dict[str, str] = {}
+
+    def pick(_position, places, called_model_id: str):
+        seen["model_id"] = called_model_id
+        return places[0]
+
+    monkeypatch.setattr(chat_completions, "_call_openrouter", pick)
+    position = initial_position()
+    move = catalog_choose(item.specimen_id, position)
+    assert seen["model_id"] == model_id
+    assert move is not None
+    assert move.square in legal_places(position)
+
+
+def test_extra_genai_display_names_are_unique_in_catalog(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config = _write_extra_genai(
+        tmp_path / "genai.json",
+        [
+            {"model_id": "vendor/one", "name": "One"},
+            {"model_id": "vendor/two", "name": "Two"},
+        ],
+    )
+    monkeypatch.setattr(extra_genai, "CONFIG_PATH", config)
+    names = [item.display_name for item in items()]
+    assert len(names) == len(set(names))
+    assert names.count("生成 AI (One)") == 1
+    assert names.count("生成 AI (Two)") == 1
+    assert names.count("生成 AI (Jev)") == 1
+    one = get("genai:One")
+    two = get("genai:Two")
+    assert one.display_name != two.display_name
+    assert extra_genai.load()[0].model_id == "vendor/one"
+    assert extra_genai.load()[1].model_id == "vendor/two"
+
+
+def test_extra_genai_rejects_duplicate_display_name(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config = _write_extra_genai(
+        tmp_path / "genai.json",
+        [{"model_id": "vendor/other", "name": "Jev"}],
+    )
+    monkeypatch.setattr(extra_genai, "CONFIG_PATH", config)
+    with pytest.raises(extra_genai.ConfigError, match="一意"):
+        items()
+
+    dup = _write_extra_genai(
+        tmp_path / "dup.json",
+        [
+            {"model_id": "vendor/a", "name": "Same"},
+            {"model_id": "vendor/b", "name": "Same"},
+        ],
+    )
+    monkeypatch.setattr(extra_genai, "CONFIG_PATH", dup)
+    with pytest.raises(extra_genai.ConfigError, match="一意"):
+        extra_genai.load()
+
+
+def test_extra_genai_picks_legal_place_from_chat_double(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config = _write_extra_genai(
+        tmp_path / "genai.json",
+        [{"model_id": "vendor/chat", "name": "Chat"}],
+    )
+    monkeypatch.setattr(extra_genai, "CONFIG_PATH", config)
+    position = initial_position()
+    places = legal_places(position)
+
+    def pick_second(_position, legal, _model_id: str):
+        return legal[1]
+
+    monkeypatch.setattr(chat_completions, "_call_openrouter", pick_second)
+    move = catalog_choose("genai:Chat", position)
+    assert move == Place(places[1])
+    assert extra_genai.load()[0].choose_move(position) == move
+
+
+def test_extra_genai_does_not_adopt_place_outside_legal_set(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config = _write_extra_genai(
+        tmp_path / "genai.json",
+        [{"model_id": "vendor/chat", "name": "Chat"}],
+    )
+    monkeypatch.setattr(extra_genai, "CONFIG_PATH", config)
+    position = initial_position()
+    illegal = Square.parse("a1")
+    assert illegal not in legal_places(position)
+
+    def pick_illegal(_position, _legal, _model_id: str):
+        return illegal
+
+    monkeypatch.setattr(chat_completions, "_call_openrouter", pick_illegal)
+    with pytest.raises(jev.ExternalModelError, match="合法手"):
+        catalog_choose("genai:Chat", position)
+
+
+def test_extra_genai_does_not_move_when_no_legal_places(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    called = {"n": 0}
+
+    def should_not_run(_position, _legal, _model_id: str):
+        called["n"] += 1
+        raise AssertionError("合法手が無い局面で OpenRouter を呼んではいけない")
+
+    monkeypatch.setattr(chat_completions, "_call_openrouter", should_not_run)
+    extra = extra_genai.ExtraSpecimen(
+        specimen_id="genai:Chat",
+        model_id="vendor/chat",
+        display_name="生成 AI (Chat)",
+        description="試験",
+    )
+    assert extra.choose_move(_almost_full_white_with_black_on_b1()) is None
+    assert extra.choose_move(_both_sides_cannot_place()) is None
+    assert called["n"] == 0
+
+
+def test_extra_genai_source_has_no_player_wizard() -> None:
+    extra_source = _module_source("extra_genai.py")
+    chat_source = _module_source("chat_completions.py")
+    catalog_source = _module_source("catalog.py")
+    assert "data/genai.json" in extra_source
+    assert "ウィザード" in extra_source
+    combined = extra_source + chat_source + catalog_source
+    assert "wizard" not in combined.lower()
+    roots = _imported_roots(extra_source)
+    assert roots.isdisjoint(_FORBIDDEN_IMPORT_ROOTS)
+    chat_roots = _imported_roots(chat_source)
+    assert "openrouter" in chat_roots
+    assert "wthor" not in chat_roots
+    assert "https://openrouter.ai" in chat_source
+    assert "chat.send" in chat_source or "chat" in chat_source
+    assert "typesafe/jev-1.13" not in chat_source
+    tree = ast.parse(chat_source)
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr in {"getenv", "putenv"}
+        ):
+            raise AssertionError("chat_completions.py は環境変数から鍵を読んではいけない")
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            lowered = node.value.lower()
+            assert "ffothello.org" not in lowered
+            assert ".wtb" not in lowered
+            assert "openrouter_api_key" not in lowered
 

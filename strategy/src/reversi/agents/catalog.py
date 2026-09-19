@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from random import Random
 
 from reversi.agents import (
+    extra_genai,
     jev,
     minimax,
     most_flips,
@@ -88,8 +89,8 @@ JEV = CatalogItem(
     description=jev.DESCRIPTION,
 )
 
-# 一覧と着手関数は同じ登録から作る。
-_REGISTRY: tuple[tuple[CatalogItem, Chooser], ...] = (
+# 一覧と着手関数は同じ登録から作る。追加の生成 AI は data/genai.json から足す。
+_BUILTIN: tuple[tuple[CatalogItem, Chooser], ...] = (
     (RANDOM_UNIFORM, random_uniform.choose_move),
     (MOST_FLIPS, most_flips.choose_move),
     (POSITIONAL, positional.choose_move),
@@ -98,20 +99,50 @@ _REGISTRY: tuple[tuple[CatalogItem, Chooser], ...] = (
     (RL, rl.choose_move),
     (JEV, jev.choose_move),
 )
-_BY_ID: dict[str, tuple[CatalogItem, Chooser]] = {
-    item.specimen_id: (item, chooser) for item, chooser in _REGISTRY
-}
+
+
+def _registry() -> tuple[tuple[CatalogItem, Chooser], ...]:
+    extras: list[tuple[CatalogItem, Chooser]] = []
+    names = {item.display_name for item, _ in _BUILTIN}
+    ids = {item.specimen_id for item, _ in _BUILTIN}
+    for extra in extra_genai.load():
+        if extra.display_name in names:
+            raise extra_genai.ConfigError(
+                "表示名はカタログ内で一意でなければなりません"
+            )
+        if extra.specimen_id in ids:
+            raise extra_genai.ConfigError(
+                "個体 ID はカタログ内で一意でなければなりません"
+            )
+        names.add(extra.display_name)
+        ids.add(extra.specimen_id)
+        extras.append(
+            (
+                CatalogItem(
+                    specimen_id=extra.specimen_id,
+                    category=extra_genai.CATEGORY,
+                    display_name=extra.display_name,
+                    description=extra.description,
+                ),
+                extra.choose_move,
+            )
+        )
+    return _BUILTIN + tuple(extras)
+
+
+def _by_id() -> dict[str, tuple[CatalogItem, Chooser]]:
+    return {item.specimen_id: (item, chooser) for item, chooser in _registry()}
 
 
 def items() -> tuple[CatalogItem, ...]:
     """登録されている個体。"""
-    return tuple(item for item, _ in _REGISTRY)
+    return tuple(item for item, _ in _registry())
 
 
 def get(specimen_id: str) -> CatalogItem:
     """個体 ID でカタログ項目を返す。"""
     try:
-        item, _ = _BY_ID[specimen_id]
+        item, _ = _by_id()[specimen_id]
     except KeyError:
         raise KeyError(specimen_id) from None
     return item
@@ -124,7 +155,7 @@ def choose_move(
 ) -> Place | None:
     """指定した個体に着手を選ばせる。未知の個体は KeyError。"""
     try:
-        _, chooser = _BY_ID[specimen_id]
+        _, chooser = _by_id()[specimen_id]
     except KeyError:
         raise KeyError(specimen_id) from None
     return chooser(position, rng)
