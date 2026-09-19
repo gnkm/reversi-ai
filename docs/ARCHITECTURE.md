@@ -1,7 +1,7 @@
 ---
 title: アーキテクチャ
 product: Reversi Agents
-version: 0.1.1
+version: 0.1.2
 status: working
 date: 2026-09-19
 source: docs/srs.md
@@ -16,7 +16,7 @@ tech_stack_version: 0.2.8
 | --- | --- |
 | 文書識別 | reversi-ai-architecture |
 | 対象ソフトウェア | Reversi Agents |
-| 版 | 0.1.1 |
+| 版 | 0.1.2 |
 | 状態 | 現行（設計。要求ではない） |
 | 日付 | 2026-09-19 |
 | 入力 | [`docs/srs.md`](srs.md) 0.1.22、[`docs/tech-stack.md`](tech-stack.md) 0.2.8 |
@@ -425,7 +425,7 @@ uv run --directory strategy lint-imports
 uv run --directory strategy xenon --max-absolute C --max-modules B --max-average A src
 uv run --directory strategy ruff check src tests
 pnpm test
-pnpm exec biome check .
+pnpm exec biome check web
 pnpm exec depcruise --config .dependency-cruiser.cjs web
 ```
 
@@ -442,5 +442,6 @@ Issue の検証欄と CI は、この節の生コマンドを使う。ラッパ�
 
 | 版 | 日付 | 内容 |
 | --- | --- | --- |
+| 0.1.2 | 2026-09-19 | Biome の検査対象を CI と同じ `web` にする |
 | 0.1.1 | 2026-09-19 | 対局と学習の起動を Podman に揃え、試験はホストとするコマンドを書く |
 | 0.1.0 | 2026-09-19 | tech-stack 0.2.7 を入力に、ディレクトリとファイルの配置を初稿とする |

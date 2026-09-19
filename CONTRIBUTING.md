@@ -59,7 +59,7 @@ uv run --directory strategy lint-imports
 uv run --directory strategy xenon --max-absolute C --max-modules B --max-average A src
 uv run --directory strategy ruff check src tests
 pnpm test
-pnpm exec biome check .
+pnpm exec biome check web
 pnpm exec depcruise --config .dependency-cruiser.cjs web
 ```
 
