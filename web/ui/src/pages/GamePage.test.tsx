@@ -1,7 +1,17 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Cell, GameState } from "../types.ts";
-import { GamePage, illegalMoveMessage } from "./GamePage.tsx";
+import {
+  GamePage,
+  illegalMoveMessage,
+  streamFailureMessage,
+} from "./GamePage.tsx";
 
 function emptyBoard(): Cell[][] {
   return Array.from({ length: 8 }, () =>
@@ -29,12 +39,29 @@ function game(overrides: Partial<GameState> = {}): GameState {
   };
 }
 
+function problemResponse(status: number, code: string): Response {
+  return new Response(
+    JSON.stringify({
+      type: `urn:reversi-ai:error:${code}`,
+      title: "Error",
+      status,
+      detail: "x",
+      code,
+    }),
+    {
+      status,
+      headers: { "content-type": "application/problem+json" },
+    },
+  );
+}
+
 const names = new Map([["random_uniform", "ランダム (一様)"]]);
 
 class FakeEventSource {
   static instances: FakeEventSource[] = [];
   readonly listeners = new Map<string, Array<(event: MessageEvent) => void>>();
   closed = false;
+  onerror: ((event: Event) => void) | null = null;
 
   constructor(readonly url: string) {
     FakeEventSource.instances.push(this);
@@ -55,6 +82,28 @@ class FakeEventSource {
       handler({ data: JSON.stringify(data) } as MessageEvent);
     }
   }
+
+  error() {
+    this.onerror?.(new Event("error"));
+  }
+}
+
+function renderAgents() {
+  const opening = game({
+    black: { kind: "specimen", specimen_id: "random_uniform" },
+    white: { kind: "specimen", specimen_id: "random_uniform" },
+    legal_moves: ["c4", "d3", "e6", "f5"],
+  });
+  const seen: GameState[] = [];
+  render(
+    <GamePage
+      game={opening}
+      specimenNames={names}
+      onGame={(next) => seen.push(next)}
+      onBack={() => undefined}
+    />,
+  );
+  return { opening, seen };
 }
 
 afterEach(() => {
@@ -110,22 +159,16 @@ describe("GamePage", () => {
     expect(illegalMoveMessage(undefined)).toBeNull();
   });
 
+  it("SSE 切断の案内は game_not_found と内部障害を分ける", () => {
+    expect(streamFailureMessage("game_not_found")).toBe("対局がありません。");
+    expect(streamFailureMessage("internal_error")).toBe(
+      "対局の更新を取得できませんでした。",
+    );
+  });
+
   it("エージェント対エージェントは人手の着手なしに SSE で盤面を進める", () => {
     vi.stubGlobal("EventSource", FakeEventSource);
-    const seen: GameState[] = [];
-    const opening = game({
-      black: { kind: "specimen", specimen_id: "random_uniform" },
-      white: { kind: "specimen", specimen_id: "random_uniform" },
-      legal_moves: ["c4", "d3", "e6", "f5"],
-    });
-    render(
-      <GamePage
-        game={opening}
-        specimenNames={names}
-        onGame={(next) => seen.push(next)}
-        onBack={() => undefined}
-      />,
-    );
+    const { opening, seen } = renderAgents();
     expect(FakeEventSource.instances).toHaveLength(1);
     expect(FakeEventSource.instances[0]?.url).toBe(
       `/api/games/${opening.id}/events`,
@@ -154,5 +197,77 @@ describe("GamePage", () => {
     });
     expect(seen).toEqual([moved, finished]);
     expect(screen.queryByRole("button", { name: "パス" })).toBeNull();
+  });
+
+  it("SSE 切断後の 404 は対局なしと案内し外部モデル失敗にしない", async () => {
+    vi.stubGlobal("EventSource", FakeEventSource);
+    const fetchMock = vi.fn(async () => problemResponse(404, "game_not_found"));
+    vi.stubGlobal("fetch", fetchMock);
+    const { opening } = renderAgents();
+    FakeEventSource.instances[0]?.error();
+    await waitFor(() => {
+      expect(screen.getByText("対局がありません。")).toBeTruthy();
+    });
+    expect(screen.queryByText(/外部モデル/)).toBeNull();
+    expect(fetchMock).toHaveBeenCalledWith(`/api/games/${opening.id}`);
+  });
+
+  it("SSE 切断後の 500 は内部障害と案内し外部モデル失敗にしない", async () => {
+    vi.stubGlobal("EventSource", FakeEventSource);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => problemResponse(500, "internal_error")),
+    );
+    renderAgents();
+    FakeEventSource.instances[0]?.error();
+    await waitFor(() => {
+      expect(
+        screen.getByText("対局の更新を取得できませんでした。"),
+      ).toBeTruthy();
+    });
+    expect(screen.queryByText(/外部モデル/)).toBeNull();
+  });
+
+  it("unplayable は外部モデル失敗として案内する", () => {
+    render(
+      <GamePage
+        game={game({
+          status: "unplayable",
+          continuation_possible: false,
+          unplayable_reason: "external_model_failed",
+        })}
+        specimenNames={names}
+        onGame={() => undefined}
+        onBack={() => undefined}
+      />,
+    );
+    expect(
+      screen.getByText("外部モデルの失敗により、この対局は続けられません。"),
+    ).toBeTruthy();
+  });
+
+  it("終局イベントのあとの SSE 切断では GET しない", async () => {
+    vi.stubGlobal("EventSource", FakeEventSource);
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const { opening, seen } = renderAgents();
+    const finished = game({
+      ...opening,
+      is_over: true,
+      status: "completed",
+      continuation_possible: false,
+      legal_moves: [],
+      result: { winner: "black", black: "win", white: "loss" },
+    });
+    FakeEventSource.instances[0]?.emit("game_over", {
+      type: "game_over",
+      game: finished,
+    });
+    FakeEventSource.instances[0]?.error();
+    await Promise.resolve();
+    expect(seen).toEqual([finished]);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(screen.queryByText("対局がありません。")).toBeNull();
+    expect(screen.queryByText("対局の更新を取得できませんでした。")).toBeNull();
   });
 });

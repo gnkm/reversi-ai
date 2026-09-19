@@ -16,6 +16,7 @@ import {
 import { mountUi } from "./spa.ts";
 import {
   DEFAULT_SSE_POLL_INTERVAL_MS,
+  type GameFollowUpResult,
   gameEventsResponse,
   streamLiveGameEvents,
   terminalSseEvent,
@@ -115,10 +116,13 @@ async function readStrategyGame(
 async function followStrategyGame(
   strategy: StrategyGateway,
   id: string,
-): Promise<GameState | null> {
+): Promise<GameFollowUpResult> {
   const got = await readStrategyGame(strategy, id);
   if (got instanceof Response) {
-    return null;
+    if (got.status === 404) {
+      return "gone";
+    }
+    return "unavailable";
   }
   return got;
 }

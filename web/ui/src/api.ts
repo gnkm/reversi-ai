@@ -5,8 +5,18 @@ import type {
   Move,
 } from "./types.ts";
 
+export type GameStreamFailure = "game_not_found" | "internal_error";
+
 async function readJson(res: Response): Promise<unknown> {
   return await res.json();
+}
+
+function problemCode(body: unknown): string | undefined {
+  if (typeof body !== "object" || body === null || !("code" in body)) {
+    return undefined;
+  }
+  const code = body.code;
+  return typeof code === "string" ? code : undefined;
 }
 
 export async function fetchCatalog(): Promise<CatalogItem[]> {
@@ -74,21 +84,60 @@ export async function playMove(id: string, move: Move): Promise<GameState> {
 export function subscribeGameEvents(
   id: string,
   onGame: (game: GameState) => void,
+  onFailure?: (code: GameStreamFailure) => void,
 ): () => void {
   const source = new EventSource(`/api/games/${id}/events`);
+  let closed = false;
+  let terminal = false;
   const handle = (event: MessageEvent<string>) => {
     try {
       const payload = JSON.parse(event.data) as { game?: GameState };
-      if (payload.game !== undefined) {
-        onGame(payload.game);
+      if (payload.game === undefined) {
+        return;
       }
+      if (payload.game.status !== "in_progress") {
+        terminal = true;
+      }
+      onGame(payload.game);
     } catch {
       return;
+    }
+  };
+  const classify = async () => {
+    if (closed || terminal) {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/games/${id}`);
+      if (res.ok) {
+        const game = (await res.json()) as GameState;
+        if (game.status !== "in_progress") {
+          terminal = true;
+        }
+        onGame(game);
+        if (game.status === "in_progress") {
+          onFailure?.("internal_error");
+        }
+        return;
+      }
+      const code = problemCode(await res.json());
+      onFailure?.(
+        code === "game_not_found" ? "game_not_found" : "internal_error",
+      );
+    } catch {
+      onFailure?.("internal_error");
     }
   };
   source.addEventListener("snapshot", handle);
   source.addEventListener("move_applied", handle);
   source.addEventListener("game_over", handle);
   source.addEventListener("unplayable", handle);
-  return () => source.close();
+  source.onerror = () => {
+    source.close();
+    void classify();
+  };
+  return () => {
+    closed = true;
+    source.close();
+  };
 }

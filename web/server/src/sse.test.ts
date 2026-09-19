@@ -220,7 +220,7 @@ describe("sse", () => {
     );
   });
 
-  it("進行中の戦略取得失敗は unplayable を流して終える", async () => {
+  it("進行中の戦略 500 は snapshot のあと SSE を終え unplayable にしない", async () => {
     const opening = gameState();
     let calls = 0;
     const app = appWith(async () => {
@@ -233,14 +233,25 @@ describe("sse", () => {
     const res = await app.request(EVENTS);
     expect(res.status).toBe(200);
     const events = parseSse(await res.text());
-    expect(events.map((event) => event.type)).toEqual([
-      "snapshot",
-      "unplayable",
-    ]);
-    const failed = unplayableEventSchema.parse(events[1]);
-    expect(failed.reason).toBe("external_model_failed");
-    expect(failed.game.status).toBe("unplayable");
-    expect(failed.game.continuation_possible).toBe(false);
+    expect(events.map((event) => event.type)).toEqual(["snapshot"]);
+    expect(events.some((event) => event.type === "unplayable")).toBe(false);
+  });
+
+  it("進行中の戦略 404 は snapshot のあと SSE を終え unplayable にしない", async () => {
+    const opening = gameState();
+    let calls = 0;
+    const app = appWith(async () => {
+      calls += 1;
+      if (calls === 1) {
+        return jsonResponse(200, opening);
+      }
+      return problemResponse(404, "game_not_found");
+    });
+    const res = await app.request(EVENTS);
+    expect(res.status).toBe(200);
+    const events = parseSse(await res.text());
+    expect(events.map((event) => event.type)).toEqual(["snapshot"]);
+    expect(events.some((event) => event.type === "unplayable")).toBe(false);
   });
 
   it("対局が無ければ戦略の 404 を中継し SSE にしない", async () => {
@@ -282,27 +293,23 @@ describe("sse", () => {
     ]);
   });
 
-  it("streamLiveGameEvents は後続取得失敗を unplayable にする", async () => {
-    const written: GameEvent[] = [];
-    await streamLiveGameEvents(
-      async (event, data) => {
-        const parsed = gameEventSchema.parse(data);
-        expect(parsed.type).toBe(event);
-        written.push(parsed);
-      },
-      async () => {},
-      () => false,
-      gameState(),
-      async () => null,
-      0,
-    );
-    expect(written.map((event) => event.type)).toEqual([
-      "snapshot",
-      "unplayable",
-    ]);
-    expect(unplayableEventSchema.parse(written[1]).game.status).toBe(
-      "unplayable",
-    );
+  it("streamLiveGameEvents は後続の gone でも unavailable でも unplayable を出さない", async () => {
+    for (const result of ["gone", "unavailable"] as const) {
+      const written: GameEvent[] = [];
+      await streamLiveGameEvents(
+        async (event, data) => {
+          const parsed = gameEventSchema.parse(data);
+          expect(parsed.type).toBe(event);
+          written.push(parsed);
+        },
+        async () => {},
+        () => false,
+        gameState(),
+        async () => result,
+        0,
+      );
+      expect(written.map((event) => event.type)).toEqual(["snapshot"]);
+    }
   });
 
   it("Hono の SSE は WebSocket を使わず戦略 GET が更新の源である", () => {

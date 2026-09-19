@@ -4,6 +4,8 @@ export const DEFAULT_SSE_POLL_INTERVAL_MS = 50;
 
 export type SseWrite = (event: string, data: unknown) => Promise<void>;
 
+export type GameFollowUpResult = GameState | "gone" | "unavailable";
+
 function sseBlock(event: string, data: unknown): string {
   return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
 }
@@ -92,7 +94,7 @@ export async function streamLiveGameEvents(
   sleep: (ms: number) => Promise<void>,
   aborted: () => boolean,
   initial: GameState,
-  followUp: () => Promise<GameState | null>,
+  followUp: () => Promise<GameFollowUpResult>,
   pollIntervalMs: number,
 ): Promise<void> {
   await write("snapshot", snapshotEvent(initial));
@@ -102,9 +104,13 @@ export async function streamLiveGameEvents(
     if (aborted()) {
       return;
     }
-    const next = await followUp();
-    if (next === null) {
-      await write("unplayable", unplayableEvent(previous));
+    let next: GameFollowUpResult;
+    try {
+      next = await followUp();
+    } catch {
+      return;
+    }
+    if (next === "gone" || next === "unavailable") {
       return;
     }
     await emitMoveApplied(write, previous, next);
