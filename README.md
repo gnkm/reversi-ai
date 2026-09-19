@@ -89,6 +89,51 @@ podman-compose down
 
 「生成 AI (Jev)」は、有効な OpenRouter の API キーが無いと対局を続けられません。その場合は画面にその旨が出ます。
 
+## API だけで対局する
+
+画面を使わず、起動済みのサービスへ HTTPS で問い合わせても対局できます。入口は `https://127.0.0.1:3000` です。戦略プロセスのポートへはつながません。証明書は mkcert なので、curl では `-k` を付けます。
+
+対局の作成と着手は POST です。ヘッダ `Origin: https://127.0.0.1:3000` が無いと 403 になります。カタログと盤面の GET には Origin は不要です。同時に進行できる対局は 1 局で、新しく始めると進行中の局は置き換わります。
+
+カタログ（個体 ID は `specimen_id`）:
+
+```bash
+curl -sk https://127.0.0.1:3000/api/catalog
+```
+
+利用者対エージェント（自分が黒、相手はランダム）:
+
+```bash
+curl -sk https://127.0.0.1:3000/api/games \
+  -H 'Origin: https://127.0.0.1:3000' \
+  -H 'Content-Type: application/json' \
+  -d '{"black":{"kind":"human"},"white":{"kind":"specimen","specimen_id":"random_uniform"}}'
+```
+
+応答の `id` が対局 ID です。着手と盤面の確認:
+
+```bash
+curl -sk https://127.0.0.1:3000/api/games/<対局ID>
+
+curl -sk https://127.0.0.1:3000/api/games/<対局ID>/moves \
+  -H 'Origin: https://127.0.0.1:3000' \
+  -H 'Content-Type: application/json' \
+  -d '{"type":"place","square":"f5"}'
+```
+
+パスするときは `{"type":"pass"}` を送ります。違法な手は盤に載らず、409 でその旨が返ります。
+
+エージェント対エージェント（開始後は終局まで自動で進みます。盤面は GET で確認します）:
+
+```bash
+curl -sk https://127.0.0.1:3000/api/games \
+  -H 'Origin: https://127.0.0.1:3000' \
+  -H 'Content-Type: application/json' \
+  -d '{"black":{"kind":"specimen","specimen_id":"minimax"},"white":{"kind":"specimen","specimen_id":"rl"}}'
+```
+
+自分が白のときは `black` に個体、`white` に `{"kind":"human"}` を置きます。
+
 ## カタログのエージェント
 
 初版で選べる相手は次のとおりです。方針の詳細は、カタログ画面の説明文を見てください。
