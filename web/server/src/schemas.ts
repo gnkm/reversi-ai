@@ -100,7 +100,7 @@ export const gameStateSchema = z.strictObject({
   id: z.string().regex(GAME_ID_PATTERN),
   board: z.array(boardRowSchema).length(8),
   side_to_move: colorSchema,
-  legal_moves: z.array(z.string()),
+  legal_moves: z.array(z.string().regex(SQUARE_PATTERN)),
   pass_is_legal: z.boolean(),
   last_move: moveSchema.nullable(),
   is_over: z.boolean(),

@@ -9,6 +9,7 @@ import {
   listenPort,
   publicOrigin,
   strategyBaseUrl,
+  strategyTimeoutMs,
 } from "./listen.ts";
 import { createStrategyGateway } from "./strategy.ts";
 
@@ -19,7 +20,11 @@ export function startServer(
   const paths = certPaths(env);
   const app = createApp({
     publicOrigin: publicOrigin(env, port),
-    strategy: createStrategyGateway(strategyBaseUrl(env)),
+    strategy: createStrategyGateway(
+      strategyBaseUrl(env),
+      fetch,
+      strategyTimeoutMs(env),
+    ),
   });
   return serve({
     fetch: app.fetch,

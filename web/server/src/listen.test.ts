@@ -4,9 +4,11 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_CERT_FILE,
   DEFAULT_KEY_FILE,
+  DEFAULT_STRATEGY_TIMEOUT_MS,
   LISTEN_HOST,
   listenPort,
   publicOrigin,
+  strategyTimeoutMs,
 } from "./listen.ts";
 
 describe("listen", () => {
@@ -17,6 +19,8 @@ describe("listen", () => {
     expect(publicOrigin({})).toBe("https://127.0.0.1:3000");
     expect(DEFAULT_CERT_FILE).toBe("data/certs/cert.pem");
     expect(DEFAULT_KEY_FILE).toBe("data/certs/key.pem");
+    expect(strategyTimeoutMs({})).toBe(DEFAULT_STRATEGY_TIMEOUT_MS);
+    expect(DEFAULT_STRATEGY_TIMEOUT_MS).toBe(60_000);
   });
 
   it("入口は node:https の createServer に PEM を渡す", () => {

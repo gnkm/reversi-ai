@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { createApp, PUBLIC_API_ROUTES } from "./app.ts";
-import type { GameState } from "./schemas.ts";
+import { type GameState, gameStateSchema } from "./schemas.ts";
 import { createStrategyGateway, type StrategyGateway } from "./strategy.ts";
 
 const PUBLIC_ORIGIN = "https://127.0.0.1:3000";
@@ -221,6 +221,31 @@ describe("strategy relay", () => {
     expect(JSON.stringify(body)).not.toContain("traceback");
   });
 
+  it("戦略が応答しないときは継続不能を返す", async () => {
+    const hung: typeof fetch = (_url, init) =>
+      new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => {
+          reject(init.signal?.reason ?? new Error("aborted"));
+        });
+      });
+    const app = createApp({
+      publicOrigin: PUBLIC_ORIGIN,
+      strategy: createStrategyGateway("http://strategy.test", hung, 20),
+    });
+    const res = await app.request("https://127.0.0.1:3000/api/games", {
+      method: "POST",
+      headers: originHeaders(),
+      body: JSON.stringify({
+        black: { kind: "human" },
+        white: { kind: "human" },
+      }),
+    });
+    expect(res.status).toBe(422);
+    const body = await res.json();
+    expect(body.code).toBe("external_model_failed");
+    expect(body.applied).toBeUndefined();
+  });
+
   it("形が契約と違う POST は 400 で戦略を呼ばない", async () => {
     let calls = 0;
     const app = appWith(async () => {
@@ -287,5 +312,12 @@ describe("public /api paths", () => {
     expect(body).toContain("event: snapshot");
     expect(body).toContain("event: game_over");
     expect(body).toContain(`"id":"${GAME_ID}"`);
+  });
+
+  it("legal_moves は Square パターンだけを受理する", () => {
+    expect(gameStateSchema.safeParse(gameState()).success).toBe(true);
+    expect(
+      gameStateSchema.safeParse(gameState({ legal_moves: ["z9"] })).success,
+    ).toBe(false);
   });
 });

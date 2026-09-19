@@ -3,6 +3,7 @@
 export const LISTEN_HOST = "127.0.0.1";
 export const DEFAULT_PORT = 3000;
 export const DEFAULT_STRATEGY_BASE_URL = "http://127.0.0.1:8000";
+export const DEFAULT_STRATEGY_TIMEOUT_MS = 60_000;
 export const DEFAULT_CERT_FILE = "data/certs/cert.pem";
 export const DEFAULT_KEY_FILE = "data/certs/key.pem";
 
@@ -27,6 +28,20 @@ export function publicOrigin(
 
 export function strategyBaseUrl(env: NodeJS.ProcessEnv = process.env): string {
   return env.STRATEGY_BASE_URL ?? DEFAULT_STRATEGY_BASE_URL;
+}
+
+export function strategyTimeoutMs(
+  env: NodeJS.ProcessEnv = process.env,
+): number {
+  const raw = env.STRATEGY_TIMEOUT_MS;
+  if (raw === undefined || raw === "") {
+    return DEFAULT_STRATEGY_TIMEOUT_MS;
+  }
+  const ms = Number(raw);
+  if (!Number.isInteger(ms) || ms <= 0) {
+    return DEFAULT_STRATEGY_TIMEOUT_MS;
+  }
+  return ms;
 }
 
 export function certPaths(env: NodeJS.ProcessEnv = process.env): {

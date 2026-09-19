@@ -34,12 +34,17 @@ function strategyUrl(baseUrl: string, path: string): string {
 export function createStrategyGateway(
   baseUrl: string,
   fetchImpl: typeof fetch = fetch,
+  timeoutMs = 60_000,
 ): StrategyGateway {
   return {
     async request(path, init = {}) {
       const method = init.method ?? "GET";
+      const signal = AbortSignal.timeout(timeoutMs);
       try {
-        const res = await fetchImpl(strategyUrl(baseUrl, path), init);
+        const res = await fetchImpl(strategyUrl(baseUrl, path), {
+          ...init,
+          signal,
+        });
         if (res.status >= 500) {
           return strategyUnreachable(method);
         }
