@@ -1,5 +1,6 @@
 .firecrawl/
 node_modules/
+web/ui/dist
 .env
 .cursor-audit.jsonl
 __pycache__/

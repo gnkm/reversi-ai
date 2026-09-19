@@ -9,6 +9,7 @@ import {
   listenPort,
   publicOrigin,
   strategyTimeoutMs,
+  uiRoot,
 } from "./listen.ts";
 
 describe("listen", () => {
@@ -21,6 +22,9 @@ describe("listen", () => {
     expect(DEFAULT_KEY_FILE).toBe("data/certs/key.pem");
     expect(strategyTimeoutMs({})).toBe(DEFAULT_STRATEGY_TIMEOUT_MS);
     expect(DEFAULT_STRATEGY_TIMEOUT_MS).toBe(60_000);
+    expect(uiRoot({})).toBe("web/ui/dist");
+    expect(uiRoot({ UI_ROOT: "" })).toBe("web/ui/dist");
+    expect(uiRoot({ UI_ROOT: "/app/web/ui/dist" })).toBe("/app/web/ui/dist");
   });
 
   it("入口は node:https の createServer に PEM を渡す", () => {

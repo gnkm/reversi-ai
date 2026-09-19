@@ -11,6 +11,7 @@ describe("no legal-move engine in Hono", () => {
       "web/server/src/schemas.ts",
       "web/server/src/index.ts",
       "web/server/src/listen.ts",
+      "web/server/src/spa.ts",
     ];
     const joined = files.map((path) => readFileSync(path, "utf8")).join("\n");
     expect(joined).not.toMatch(/from ["']web\/ui/);
