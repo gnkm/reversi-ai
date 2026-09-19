@@ -125,7 +125,7 @@ def _squares_from_codes(codes: Iterable[int]) -> tuple[Square, ...] | None:
     squares: list[Square] = []
     for code in codes:
         if code == 0:
-            continue
+            break
         square = decode_8x8_move(code)
         if square is None:
             return None

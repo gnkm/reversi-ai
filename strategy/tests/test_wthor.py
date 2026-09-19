@@ -121,6 +121,18 @@ def test_unplayable_8x8_record_is_excluded(tmp_path: Path) -> None:
     assert games[0].squares == (Square.parse("f5"),)
 
 
+def test_first_zero_ends_the_move_list(tmp_path: Path) -> None:
+    rec = bytearray(RECORD_SIZE_8X8)
+    rec[8] = encode_8x8_move(Square.parse("f5"))
+    rec[9] = 0
+    rec[10] = encode_8x8_move(Square.parse("d6"))
+    path = tmp_path / "padded.wtb"
+    path.write_bytes(_header(1, 8) + bytes(rec))
+    games = training_games(path)
+    assert len(games) == 1
+    assert games[0].squares == (Square.parse("f5"),)
+
+
 def test_replay_inserts_pass_when_wthor_omits_it() -> None:
     squares, expected_passes = _greedy_until_pass()
     game = TrainingGame(squares=tuple(squares), black_discs=0)
