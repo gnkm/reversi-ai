@@ -116,6 +116,17 @@ def _record_move(game: Game, move: Move, engine_move: Place | EnginePass) -> Non
     game.moves.append(move)
 
 
+def _copy_game(game: Game) -> Game:
+    return Game(
+        id=game.id,
+        position=game.position,
+        last_move=game.last_move,
+        black=game.black,
+        white=game.white,
+        moves=list(game.moves),
+    )
+
+
 def _board_cells(position: Position) -> list[list[Cell]]:
     return [[stone.value for stone in row] for row in position.board.cells]
 
@@ -231,8 +242,8 @@ class GameStore:
         )
         advance_specimens(game, self._rng)
         with self._lock:
-            self._game = game
             self._persist_finished(game)
+            self._game = game
         return to_game_state(game)
 
     def play_move(self, game_id: str, move: Move) -> GameState:
@@ -241,13 +252,15 @@ class GameStore:
             if game is None or game.id != game_id:
                 raise game_not_found()
             snapshot = to_game_state(game)
+            updated = _copy_game(game)
             try:
-                _record_move(game, move, _to_engine_move(move))
+                _record_move(updated, move, _to_engine_move(move))
             except IllegalMoveError as exc:
                 raise MoveRejected(
                     snapshot,
                     "違法な着手は盤に適用しない",
                 ) from exc
-            advance_specimens(game, self._rng)
-            self._persist_finished(game)
-            return to_game_state(game)
+            advance_specimens(updated, self._rng)
+            self._persist_finished(updated)
+            self._game = updated
+            return to_game_state(updated)

@@ -6,6 +6,8 @@ import sqlite3
 from pathlib import Path
 from random import Random
 
+import pytest
+
 from reversi.agents.random_uniform import SPECIMEN_ID
 from reversi.api.persist import (
     DEFAULT_DB_PATH,
@@ -15,7 +17,12 @@ from reversi.api.persist import (
     load,
     save_if_over,
 )
-from reversi.api.schemas import CreateGameRequest, HumanPlayer, SpecimenPlayer
+from reversi.api.schemas import (
+    CreateGameRequest,
+    HumanPlayer,
+    PlaceMove,
+    SpecimenPlayer,
+)
 from reversi.api.session import GameStore
 from reversi.engine.board import Color, Square, Stone, empty_board
 from reversi.engine.rules import Position, initial_position, is_over
@@ -202,3 +209,58 @@ def test_session_persists_finished_agent_game_only(tmp_path: Path) -> None:
     assert game.winner == finished.result.winner
     assert game.score_black == finished.official_score.black
     assert game.score_white == finished.official_score.white
+
+
+def test_persist_failure_does_not_commit_finished_start(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = tmp_path / "games.sqlite"
+    store = GameStore(rng=Random(0), db_path=path)
+
+    def fail_if_over(position, **kwargs):
+        if is_over(position):
+            raise sqlite3.OperationalError("database is locked")
+        return False
+
+    monkeypatch.setattr("reversi.api.session.save_if_over", fail_if_over)
+    request = CreateGameRequest(
+        black=SpecimenPlayer(kind="specimen", specimen_id=SPECIMEN_ID),
+        white=SpecimenPlayer(kind="specimen", specimen_id=SPECIMEN_ID),
+    )
+    with pytest.raises(sqlite3.OperationalError):
+        store.start(request)
+    assert store._game is None
+    assert not path.exists()
+
+    monkeypatch.undo()
+    finished = store.start(request)
+    assert finished.is_over is True
+    assert len(load(path)) == 1
+    got = store.snapshot(finished.id)
+    assert got.id == finished.id
+
+
+def test_persist_failure_does_not_apply_move(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = tmp_path / "games.sqlite"
+    store = GameStore(db_path=path)
+    game = store.start(
+        CreateGameRequest(
+            black=HumanPlayer(kind="human"),
+            white=HumanPlayer(kind="human"),
+        )
+    )
+    square = game.legal_moves[0]
+
+    def boom(*_args, **_kwargs):
+        raise sqlite3.OperationalError("disk I/O error")
+
+    monkeypatch.setattr(GameStore, "_persist_finished", boom)
+    with pytest.raises(sqlite3.OperationalError):
+        store.play_move(game.id, PlaceMove(type="place", square=square))
+    after = store.snapshot(game.id)
+    assert after.board == game.board
+    assert after.side_to_move == game.side_to_move
+    assert after.last_move is None
+    assert not path.exists()
