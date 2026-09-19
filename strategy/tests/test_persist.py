@@ -264,6 +264,26 @@ def test_persist_failure_does_not_commit_finished_start(
     assert got.id == finished.id
 
 
+def test_persist_oserror_does_not_leave_finished_game(tmp_path: Path) -> None:
+    blocker = tmp_path / "not_a_dir"
+    blocker.write_text("x")
+    path = blocker / "games.sqlite"
+    store = GameStore(rng=Random(0), db_path=path)
+    started = store.start(
+        CreateGameRequest(
+            black=SpecimenPlayer(kind="specimen", specimen_id=SPECIMEN_ID),
+            white=SpecimenPlayer(kind="specimen", specimen_id=SPECIMEN_ID),
+        )
+    )
+    assert started.is_over is False
+    _wait_store_over(store, started.id)
+    assert store._game is None
+    with pytest.raises(ApiProblem) as excinfo:
+        store.snapshot(started.id)
+    assert excinfo.value.code == "game_not_found"
+    assert not path.exists()
+
+
 def test_persist_failure_does_not_apply_move(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

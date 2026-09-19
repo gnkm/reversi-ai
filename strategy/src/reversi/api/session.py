@@ -318,7 +318,7 @@ class GameStore:
             if is_over(game.position):
                 try:
                     self._persist_finished(game)
-                except sqlite3.Error:
+                except (OSError, sqlite3.Error):
                     self._game = None
                 return False
             return True
