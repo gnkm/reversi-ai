@@ -1,4 +1,4 @@
-"""OpenRouter の Jev で合法手を選ぶ個体。優先の答えと着手後評価を合成する。"""
+"""OpenRouter の Jev で合法手を選ぶ個体。言葉の事実の Choice と着手後評価を合成する。"""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from math import isfinite
 from pathlib import Path
 from random import Random
+from string import Formatter
 from typing import Any
 
 from openrouter import OpenRouter
@@ -14,16 +15,16 @@ from openrouter.utils.retries import BackoffStrategy, RetryConfig
 
 from reversi.agents.position_table import score_at
 from reversi.agents.prompt import PROMPTS_DIR, PromptFileError, load_json
-from reversi.engine.board import BOARD_SIZE, Board, Color, Square, all_squares
-from reversi.engine.rules import Place, Position, apply_place, legal_places
+from reversi.engine.board import Board, Color, Square, Stone, all_squares
+from reversi.engine.rules import Place, Position, apply_place, flips_for, legal_places
 
 MODEL_ID = "typesafe/jev-1.13"
 SPECIMEN_ID = "jev"
 CATEGORY = "generative_ai"
 DISPLAY_NAME = "生成 AI (Jev)"
 DESCRIPTION = (
-    "OpenRouter 上の Jev を Decisions API で呼び、どの目標を優先するかを"
-    "原子質問で答えさせ、着手後の盤の点数はコードが付けて合成する。"
+    "OpenRouter 上の Jev を Decisions API で呼び、コードが言葉にした合法手を"
+    "Choice で比べさせ、着手後の盤の点数と合成する。"
     "対局中に WTHOR は参照しない。"
 )
 DECISIONS_SERVER = "https://openrouter.ai"
@@ -32,20 +33,14 @@ PROMPT_PATH = PROMPTS_DIR / "jev.json"
 # Hono の戦略中継は 60 秒。それより先に失敗させ、ロックを返す。
 DECISIONS_TIMEOUT_MS = 55_000
 _NO_RETRY = RetryConfig("none", BackoffStrategy(0, 0, 1.0, 0), False)
-_NOUL_IDS = ("corner_priority", "mobility_priority", "position_priority")
-_SCORE_ID = "material_importance"
-_STAGE_ID = "stage"
-_STAGE_KEYS = ("opening", "midgame", "endgame")
 _METRIC_KEYS = ("position", "mobility", "material", "corners")
-_METRIC_ANSWERS = {
-    "position": "position_priority",
-    "mobility": "mobility_priority",
-    "material": _SCORE_ID,
-    "corners": "corner_priority",
-}
-_CORNERS = frozenset(
-    {Square.parse(name) for name in ("a1", "h1", "a8", "h8")}
-)
+_STAGE_KEYS = ("opening", "midgame", "endgame")
+_KIND_KEYS = ("corner", "x", "c", "edge", "interior")
+_AMOUNT_KEYS = ("few", "some", "many")
+_YES_NO_KEYS = ("true", "false")
+_SIDE_KEYS = ("black", "white")
+_PLACE_FIELDS = ("kind", "takes_corner", "gives_corner", "opponent_places", "flips")
+_BOARD_CORNERS = frozenset({"a1", "h1", "a8", "h8"})
 
 __all__ = [
     "CATEGORY",
@@ -70,19 +65,30 @@ class ExternalModelError(RuntimeError):
 @dataclass(frozen=True, slots=True)
 class _Spec:
     objective: str
-    origin: str
-    questions: dict[str, Any]
-    answer_weights: dict[str, float]
+    question_id: str
+    instructions: str
+    place_line: str
+    kinds: dict[str, frozenset[str]]
+    kind_words: dict[str, str]
+    yes_no: dict[str, str]
+    amounts: dict[str, str]
+    stages: dict[str, str]
+    sides: dict[str, str]
+    empty_buckets: dict[str, tuple[int, int]]
+    opponent_buckets: dict[str, tuple[int, int]]
+    flip_buckets: dict[str, tuple[int, int]]
+    w_jev: float
+    w_code: float
+    w_confidence: float
     metric_weights: dict[str, float]
+    scales: dict[str, float]
     stage_weights: dict[str, dict[str, float]]
-    score_span: float
 
 
 @dataclass(frozen=True, slots=True)
 class _Parsed:
-    noul: dict[str, float]
-    material: float
-    stage: dict[str, float]
+    probabilities: dict[str, float]
+    confidence: float
 
 
 @dataclass(frozen=True, slots=True)
@@ -142,36 +148,127 @@ def _float_map(raw: Mapping[str, Any], keys: Sequence[str]) -> dict[str, float]:
     return {key: _finite_float(raw[key]) for key in keys}
 
 
-def _question_payload(raw: object, expected: str) -> dict[str, Any]:
-    if not isinstance(raw, dict):
+def _word_map(raw: Mapping[str, Any], keys: Sequence[str]) -> dict[str, str]:
+    if set(raw) != set(keys):
         raise _fail_spec()
-    if raw.get("type") != expected:
+    return {key: _text_field(raw, key) for key in keys}
+
+
+def _int_pair(raw: object) -> tuple[int, int]:
+    if not isinstance(raw, list) or len(raw) != 2:
         raise _fail_spec()
-    instructions = raw.get("instructions")
-    if not isinstance(instructions, str) or not instructions.strip():
+    lo, hi = raw
+    if isinstance(lo, bool) or isinstance(hi, bool):
         raise _fail_spec()
-    payload: dict[str, Any] = {
-        "type": expected,
-        "instructions": instructions.strip(),
+    if not isinstance(lo, int) or not isinstance(hi, int):
+        raise _fail_spec()
+    if lo > hi:
+        raise _fail_spec()
+    return lo, hi
+
+
+def _bucket_map(raw: Mapping[str, Any], keys: Sequence[str]) -> dict[str, tuple[int, int]]:
+    if set(raw) != set(keys):
+        raise _fail_spec()
+    return {key: _int_pair(raw[key]) for key in keys}
+
+
+def _require_cover(buckets: Mapping[str, tuple[int, int]], low: int, high: int) -> None:
+    for value in range(low, high + 1):
+        hits = [name for name, (lo, hi) in buckets.items() if lo <= value <= hi]
+        if len(hits) != 1:
+            raise _fail_spec()
+
+
+def _algebraic_set(raw: object) -> frozenset[str]:
+    if not isinstance(raw, list) or not raw:
+        raise _fail_spec()
+    names: list[str] = []
+    for item in raw:
+        if not isinstance(item, str):
+            raise _fail_spec()
+        try:
+            parsed = Square.parse(item)
+        except ValueError as exc:
+            raise _fail_spec(exc) from exc
+        names.append(parsed.algebraic)
+    if len(names) != len(set(names)):
+        raise _fail_spec()
+    return frozenset(names)
+
+
+def _load_kinds(raw: Mapping[str, Any]) -> dict[str, frozenset[str]]:
+    if set(raw) != set(_KIND_KEYS):
+        raise _fail_spec()
+    kinds = {name: _algebraic_set(raw[name]) for name in _KIND_KEYS}
+    seen: set[str] = set()
+    for group in kinds.values():
+        if seen & group:
+            raise _fail_spec()
+        seen.update(group)
+    expected = {square.algebraic for square in all_squares()}
+    if seen != expected:
+        raise _fail_spec()
+    if kinds["corner"] != _BOARD_CORNERS:
+        raise _fail_spec()
+    return kinds
+
+
+def _load_question(raw: Mapping[str, Any]) -> tuple[str, str]:
+    if len(raw) != 1:
+        raise _fail_spec()
+    question_id, payload = next(iter(raw.items()))
+    if not isinstance(question_id, str) or not question_id.strip():
+        raise _fail_spec()
+    if not isinstance(payload, dict):
+        raise _fail_spec()
+    if payload.get("type") != "choice":
+        raise _fail_spec()
+    return question_id.strip(), _text_field(payload, "instructions")
+
+
+def _load_weights(raw: Mapping[str, Any]) -> tuple[
+    float,
+    float,
+    float,
+    dict[str, float],
+    dict[str, float],
+    dict[str, dict[str, float]],
+]:
+    w_jev = _finite_float(raw.get("jev"))
+    w_code = _finite_float(raw.get("code"))
+    w_confidence = _finite_float(raw.get("confidence"))
+    if w_jev < 0.0 or w_code < 0.0 or w_confidence < 0.0:
+        raise _fail_spec()
+    metrics = _float_map(_mapping_field(raw, "metrics"), _METRIC_KEYS)
+    scales = _float_map(_mapping_field(raw, "scales"), _METRIC_KEYS)
+    if any(scales[key] <= 0.0 for key in _METRIC_KEYS):
+        raise _fail_spec()
+    stage_raw = _mapping_field(raw, "stage")
+    if set(stage_raw) != set(_STAGE_KEYS):
+        raise _fail_spec()
+    stage = {
+        name: _float_map(_mapping_field(stage_raw, name), _METRIC_KEYS)
+        for name in _STAGE_KEYS
     }
-    criteria = raw.get("criteria")
-    if expected == "noul":
-        if criteria is not None:
-            if not isinstance(criteria, dict) or set(criteria) != {"true", "false"}:
-                raise _fail_spec()
-            payload["criteria"] = criteria
-        return payload
-    if expected == "score":
-        if not isinstance(criteria, list) or len(criteria) < 2:
+    return w_jev, w_code, w_confidence, metrics, scales, stage
+
+
+def _place_line_fields(template: str) -> set[str]:
+    names: set[str] = set()
+    for _, name, _, _ in Formatter().parse(template):
+        if name is None:
+            continue
+        if not name or name.isdigit() or "." in name or "[" in name:
             raise _fail_spec()
-        if any(not isinstance(item, str) or not item.strip() for item in criteria):
-            raise _fail_spec()
-        payload["criteria"] = criteria
-        return payload
-    if not isinstance(criteria, dict) or set(criteria) != set(_STAGE_KEYS):
+        names.add(name)
+    return names
+
+
+def _require_place_line(template: str) -> str:
+    if _place_line_fields(template) != set(_PLACE_FIELDS):
         raise _fail_spec()
-    payload["criteria"] = criteria
-    return payload
+    return template
 
 
 def _load_spec(path: Path | None = None) -> _Spec:
@@ -182,57 +279,129 @@ def _load_spec(path: Path | None = None) -> _Spec:
         raise ExternalModelError(str(exc)) from exc
     if not isinstance(loaded, dict):
         raise _fail_spec()
-    questions_raw = _mapping_field(loaded, "questions")
-    if len(questions_raw) < 2:
-        raise _fail_spec()
-    expected = {
-        "corner_priority": "noul",
-        "mobility_priority": "noul",
-        "position_priority": "noul",
-        _SCORE_ID: "score",
-        _STAGE_ID: "choice",
-    }
-    if set(questions_raw) != set(expected):
-        raise _fail_spec()
-    questions = {
-        qid: _question_payload(questions_raw[qid], qtype)
-        for qid, qtype in expected.items()
-    }
+    question_id, instructions = _load_question(_mapping_field(loaded, "questions"))
+    vocab = _mapping_field(loaded, "vocabulary")
+    buckets = _mapping_field(loaded, "buckets")
+    empty_buckets = _bucket_map(_mapping_field(buckets, "empty"), _STAGE_KEYS)
+    opponent_buckets = _bucket_map(
+        _mapping_field(buckets, "opponent_places"), _AMOUNT_KEYS
+    )
+    flip_buckets = _bucket_map(_mapping_field(buckets, "flips"), _AMOUNT_KEYS)
+    _require_cover(empty_buckets, 0, 64)
+    _require_cover(opponent_buckets, 0, 32)
+    _require_cover(flip_buckets, 1, 20)
     weights = _mapping_field(loaded, "weights")
-    answers = _float_map(_mapping_field(weights, "answers"), _NOUL_IDS + (_SCORE_ID,))
-    metrics = _float_map(_mapping_field(weights, "metrics"), _METRIC_KEYS)
-    stage_raw = _mapping_field(weights, "stage")
-    if set(stage_raw) != set(_STAGE_KEYS):
-        raise _fail_spec()
-    stage = {
-        name: _float_map(_mapping_field(stage_raw, name), _METRIC_KEYS)
-        for name in _STAGE_KEYS
-    }
-    criteria = questions[_SCORE_ID]["criteria"]
+    w_jev, w_code, w_confidence, metrics, scales, stage = _load_weights(weights)
     return _Spec(
         objective=_text_field(loaded, "objective"),
-        origin=_text_field(loaded, "origin"),
-        questions=questions,
-        answer_weights=answers,
+        question_id=question_id,
+        instructions=instructions,
+        place_line=_require_place_line(_text_field(loaded, "place_line")),
+        kinds=_load_kinds(_mapping_field(loaded, "kinds")),
+        kind_words=_word_map(_mapping_field(vocab, "kind"), _KIND_KEYS),
+        yes_no=_word_map(_mapping_field(vocab, "yes_no"), _YES_NO_KEYS),
+        amounts=_word_map(_mapping_field(vocab, "amount"), _AMOUNT_KEYS),
+        stages=_word_map(_mapping_field(vocab, "stage"), _STAGE_KEYS),
+        sides=_word_map(_mapping_field(vocab, "side"), _SIDE_KEYS),
+        empty_buckets=empty_buckets,
+        opponent_buckets=opponent_buckets,
+        flip_buckets=flip_buckets,
+        w_jev=w_jev,
+        w_code=w_code,
+        w_confidence=w_confidence,
         metric_weights=metrics,
+        scales=scales,
         stage_weights=stage,
-        score_span=float(len(criteria) - 1),
     )
 
 
-def _board_state(
+def _empty_count(board: Board) -> int:
+    return sum(1 for square in all_squares() if board.stone_at(square) is Stone.EMPTY)
+
+
+def _bucket_label(value: int, buckets: Mapping[str, tuple[int, int]]) -> str:
+    for name, (lo, hi) in buckets.items():
+        if lo <= value <= hi:
+            return name
+    raise ExternalModelError("合成できません")
+
+
+def _stage_of(board: Board, spec: _Spec) -> str:
+    return _bucket_label(_empty_count(board), spec.empty_buckets)
+
+
+def _kind_of(square: Square, spec: _Spec) -> str:
+    name = square.algebraic
+    for kind in _KIND_KEYS:
+        if name in spec.kinds[kind]:
+            return kind
+    raise ExternalModelError("合成できません")
+
+
+def _yes_no(flag: bool, spec: _Spec) -> str:
+    return spec.yes_no["true"] if flag else spec.yes_no["false"]
+
+
+def _amount_word(value: int, buckets: Mapping[str, tuple[int, int]], spec: _Spec) -> str:
+    return spec.amounts[_bucket_label(value, buckets)]
+
+
+def _gives_corner(position: Position, square: Square, spec: _Spec) -> bool:
+    after = apply_place(position.board, square, position.side_to_move)
+    replies = legal_places(Position(after, position.side_to_move.opponent))
+    return any(place.algebraic in spec.kinds["corner"] for place in replies)
+
+
+def _place_line(position: Position, square: Square, spec: _Spec) -> str:
+    kind = _kind_of(square, spec)
+    flipped = flips_for(position.board, square, position.side_to_move)
+    mapping = {
+        "kind": spec.kind_words[kind],
+        "takes_corner": _yes_no(kind == "corner", spec),
+        "gives_corner": _yes_no(_gives_corner(position, square, spec), spec),
+        "opponent_places": _amount_word(
+            len(legal_places(Position(
+                apply_place(position.board, square, position.side_to_move),
+                position.side_to_move.opponent,
+            ))),
+            spec.opponent_buckets,
+            spec,
+        ),
+        "flips": _amount_word(len(flipped), spec.flip_buckets, spec),
+    }
+    if set(mapping) != set(_PLACE_FIELDS):
+        raise _fail_spec()
+    try:
+        return spec.place_line.format(**mapping)
+    except (KeyError, IndexError, ValueError) as exc:
+        raise _fail_spec(exc) from exc
+
+
+def _place_lines(
     position: Position, places: Sequence[Square], spec: _Spec
+) -> dict[str, str]:
+    return {square.algebraic: _place_line(position, square, spec) for square in places}
+
+
+def _decision_state(
+    position: Position, spec: _Spec, lines: Mapping[str, str]
 ) -> dict[str, Any]:
-    board = [
-        [position.board.cells[rank][file].value for file in range(BOARD_SIZE)]
-        for rank in range(BOARD_SIZE)
-    ]
+    stage = _stage_of(position.board, spec)
     return {
         "objective": spec.objective,
-        "origin": spec.origin,
-        "side_to_move": position.side_to_move.value,
-        "board": board,
-        "legal_places": [square.algebraic for square in places],
+        "side_to_move": spec.sides[position.side_to_move.value],
+        "stage": spec.stages[stage],
+        "places": dict(lines),
+    }
+
+
+def _decision_questions(spec: _Spec, lines: Mapping[str, str]) -> dict[str, Any]:
+    return {
+        spec.question_id: {
+            "type": "choice",
+            "instructions": spec.instructions,
+            "criteria": dict(lines),
+        }
     }
 
 
@@ -251,82 +420,65 @@ def _finite_answer(value: object) -> float:
     return number
 
 
-def _clamp_unit(value: float) -> float:
-    if value < 0.0:
-        return 0.0
-    if value > 1.0:
-        return 1.0
-    return value
+def _unit_answer(value: object) -> float:
+    number = _finite_answer(value)
+    if number < 0.0 or number > 1.0:
+        raise ExternalModelError("合成できません")
+    return number
 
 
-def _parse_noul(answers: Mapping[str, Any]) -> dict[str, float]:
+def _parse_probabilities(
+    raw: object, places: Sequence[Square]
+) -> dict[str, float] | None:
+    if not isinstance(raw, Mapping):
+        return None
     parsed: dict[str, float] = {}
-    for qid in _NOUL_IDS:
-        answer = answers.get(qid)
-        if answer is None:
+    for square in places:
+        key = square.algebraic
+        if key not in raw:
             raise ExternalModelError("合成できません")
-        parsed[qid] = _clamp_unit(_finite_answer(_attr(answer, "noul")))
+        parsed[key] = _unit_answer(raw[key])
+    if not any(value > 0.0 for value in parsed.values()):
+        raise ExternalModelError("合成できません")
     return parsed
 
 
-def _parse_material(answers: Mapping[str, Any], span: float) -> float:
-    answer = answers.get(_SCORE_ID)
-    if answer is None or span <= 0.0:
-        raise ExternalModelError("合成できません")
-    return _clamp_unit(_finite_answer(_attr(answer, "score")) / span)
-
-
-def _normalized_stage_probs(probs: Mapping[object, object]) -> dict[str, float] | None:
-    values = {key: _finite_answer(probs.get(key, 0.0)) for key in _STAGE_KEYS}
-    if any(value < 0.0 or value > 1.0 for value in values.values()):
-        raise ExternalModelError("合成できません")
-    total = sum(values.values())
-    if total <= 0.0:
-        return None
-    return {key: value / total for key, value in values.items()}
-
-
-def _parse_stage(answers: Mapping[str, Any]) -> dict[str, float]:
-    answer = answers.get(_STAGE_ID)
+def _parse_choice(
+    answers: Mapping[str, Any], spec: _Spec, places: Sequence[Square]
+) -> _Parsed:
+    answer = answers.get(spec.question_id)
     if answer is None:
         raise ExternalModelError("合成できません")
-    probs = _attr(answer, "probabilities")
-    if isinstance(probs, Mapping):
-        mixed = _normalized_stage_probs(probs)
-        if mixed is not None:
-            return mixed
+    keys = {square.algebraic for square in places}
     choice = _attr(answer, "choice")
-    if not isinstance(choice, str) or choice not in _STAGE_KEYS:
-        raise ExternalModelError("合成できません")
-    return {key: 1.0 if key == choice else 0.0 for key in _STAGE_KEYS}
+    if isinstance(choice, str) and choice not in keys:
+        raise ExternalModelError("合法手の外です")
+    probabilities = _parse_probabilities(_attr(answer, "probabilities"), places)
+    if probabilities is None:
+        if not isinstance(choice, str):
+            raise ExternalModelError("合成できません")
+        probabilities = {key: 1.0 if key == choice else 0.0 for key in keys}
+    confidence_raw = _attr(answer, "confidence")
+    confidence = 1.0 if confidence_raw is None else _unit_answer(confidence_raw)
+    return _Parsed(probabilities=probabilities, confidence=confidence)
 
 
-def _answers_from_response(response: object, spec: _Spec) -> _Parsed:
+def _answers_from_response(
+    response: object, spec: _Spec, places: Sequence[Square]
+) -> _Parsed:
     answers = _attr(response, "answers")
     if not isinstance(answers, Mapping):
         raise ExternalModelError("OpenRouter の応答に着手がありません")
-    return _Parsed(
-        noul=_parse_noul(answers),
-        material=_parse_material(answers, spec.score_span),
-        stage=_parse_stage(answers),
-    )
+    return _parse_choice(answers, spec, places)
 
 
-def _normalize(raw: Mapping[Square, float]) -> dict[Square, float]:
-    values = tuple(raw.values())
-    lo = min(values)
-    span = max(values) - lo
-    if span == 0.0:
-        return dict.fromkeys(raw, 0.0)
-    return {square: (value - lo) / span for square, value in raw.items()}
-
-
-def _board_totals(board: Board, color: Color) -> tuple[float, float, float]:
+def _board_totals(board: Board, color: Color, spec: _Spec) -> tuple[float, float, float]:
     own = color.stone
     opponent = color.opponent.stone
+    corners = spec.kinds["corner"]
     position = 0.0
     material = 0.0
-    corners = 0.0
+    corner_score = 0.0
     for square in all_squares():
         stone = board.stone_at(square)
         if stone is own:
@@ -337,71 +489,52 @@ def _board_totals(board: Board, color: Color) -> tuple[float, float, float]:
             continue
         position += sign * float(score_at(square))
         material += sign
-        if square in _CORNERS:
-            corners += sign
-    return position, material, corners
+        if square.algebraic in corners:
+            corner_score += sign
+    return position, material, corner_score
 
 
-def _after_metrics(position: Position, places: Sequence[Square]) -> dict[Square, _Metrics]:
+def _after_metrics(
+    position: Position, places: Sequence[Square], spec: _Spec
+) -> dict[Square, _Metrics]:
     color = position.side_to_move
-    position_raw: dict[Square, float] = {}
-    mobility_raw: dict[Square, float] = {}
-    material_raw: dict[Square, float] = {}
-    corners_raw: dict[Square, float] = {}
+    scored: dict[Square, _Metrics] = {}
     for square in places:
         after = apply_place(position.board, square, color)
         own_places = legal_places(Position(after, color))
         opp_places = legal_places(Position(after, color.opponent))
-        pos, material, corners = _board_totals(after, color)
-        position_raw[square] = pos
-        mobility_raw[square] = float(len(own_places) - len(opp_places))
-        material_raw[square] = material
-        corners_raw[square] = corners
-    position_n = _normalize(position_raw)
-    mobility_n = _normalize(mobility_raw)
-    material_n = _normalize(material_raw)
-    corners_n = _normalize(corners_raw)
-    return {
-        square: _Metrics(
-            position=position_n[square],
-            mobility=mobility_n[square],
-            material=material_n[square],
-            corners=corners_n[square],
+        pos, material, corners = _board_totals(after, color, spec)
+        scored[square] = _Metrics(
+            position=pos,
+            mobility=float(len(own_places) - len(opp_places)),
+            material=material,
+            corners=corners,
         )
-        for square in places
-    }
+    return scored
 
 
-def _stage_mix(parsed: _Parsed, spec: _Spec) -> dict[str, float]:
-    mixed = dict.fromkeys(_METRIC_KEYS, 0.0)
-    for name, share in parsed.stage.items():
-        row = spec.stage_weights[name]
-        for key in _METRIC_KEYS:
-            mixed[key] += share * row[key]
-    return mixed
-
-
-def _answer_factor(parsed: _Parsed, spec: _Spec, metric: str) -> float:
-    qid = _METRIC_ANSWERS[metric]
-    if qid == _SCORE_ID:
-        value = parsed.material
-    else:
-        value = parsed.noul[qid]
-    return 1.0 + spec.answer_weights[qid] * value
-
-
-def _score_metrics(
-    metrics: _Metrics, parsed: _Parsed, spec: _Spec, stage: Mapping[str, float]
-) -> float:
+def _code_score(metrics: _Metrics, spec: _Spec, stage: str) -> float:
+    mix = spec.stage_weights[stage]
     total = 0.0
     for key in _METRIC_KEYS:
         total += (
             spec.metric_weights[key]
-            * getattr(metrics, key)
-            * stage[key]
-            * _answer_factor(parsed, spec, key)
+            * mix[key]
+            * (getattr(metrics, key) / spec.scales[key])
         )
     return total
+
+
+def _combined_score(
+    square: Square,
+    metrics: _Metrics,
+    parsed: _Parsed,
+    spec: _Spec,
+    stage: str,
+) -> float:
+    code = _code_score(metrics, spec, stage)
+    jev = parsed.probabilities.get(square.algebraic, 0.0) * parsed.confidence
+    return spec.w_code * code + spec.w_jev * spec.w_confidence * jev
 
 
 def _select_square(
@@ -410,12 +543,12 @@ def _select_square(
     parsed: _Parsed,
     spec: _Spec,
 ) -> Square:
-    metrics = _after_metrics(position, places)
-    stage = _stage_mix(parsed, spec)
+    stage = _stage_of(position.board, spec)
+    metrics = _after_metrics(position, places, spec)
     best_square = places[0]
-    best_score = _score_metrics(metrics[best_square], parsed, spec, stage)
+    best_score = _combined_score(best_square, metrics[best_square], parsed, spec, stage)
     for square in places[1:]:
-        score = _score_metrics(metrics[square], parsed, spec, stage)
+        score = _combined_score(square, metrics[square], parsed, spec, stage)
         if score > best_score:
             best_score = score
             best_square = square
@@ -431,7 +564,9 @@ def _legal_square(square: Square, places: Sequence[Square]) -> Square:
 def _call_openrouter(position: Position, places: Sequence[Square]) -> Square:
     spec = _load_spec()
     key = read_secret()
-    state = _board_state(position, places, spec)
+    lines = _place_lines(position, places, spec)
+    state = _decision_state(position, spec, lines)
+    questions = _decision_questions(spec, lines)
     try:
         with OpenRouter(
             api_key=key,
@@ -440,7 +575,7 @@ def _call_openrouter(position: Position, places: Sequence[Square]) -> Square:
         ) as client:
             response = client.alpha.decisions.create(
                 model=MODEL_ID,
-                questions=spec.questions,
+                questions=questions,
                 state=state,
                 retries=_NO_RETRY,
                 timeout_ms=DECISIONS_TIMEOUT_MS,
@@ -449,7 +584,7 @@ def _call_openrouter(position: Position, places: Sequence[Square]) -> Square:
         raise
     except Exception:  # noqa: BLE001 - SDK の 4xx/5xx/timeout を継続不能に畳む
         raise ExternalModelError("OpenRouter の呼出しに失敗しました") from None
-    parsed = _answers_from_response(response, spec)
+    parsed = _answers_from_response(response, spec, places)
     return _legal_square(_select_square(position, places, parsed, spec), places)
 
 
@@ -459,6 +594,8 @@ def choose_move(position: Position, rng: Random | None = None) -> Place | None:
     places = legal_places(position)
     if not places:
         return None
+    if len(places) == 1:
+        return Place(places[0])
     square = _call_openrouter(position, places)
     if square not in places:
         raise ExternalModelError("合法手の外です")

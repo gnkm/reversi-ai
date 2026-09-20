@@ -19,7 +19,7 @@ Cursor Cloud Agents 向けの作業ルール。アプリ固有のルールはプ
 
 ## 設計
 
-- 配置と層の正は `docs/ARCHITECTURE.md`。言語・ライブラリ・コンテナの選定は `docs/tech-stack.md`。
+- 配置と層の正は `docs/ARCHITECTURE.md`。言語・ライブラリ・コンテナの選定は `docs/tech-stack.md`。生成 AI (Jev) の Decisions Choice の形は `docs/jev-decisions.md`。
 - 対局と学習の起動は Podman。試験・lint・lefthook はホスト。運用コマンドの正は `README.md`。試験・lint・E2E の正は `CONTRIBUTING.md`。配置と層（待ち受け、`CMD`、`train` を `up` に載せないこと）は `docs/ARCHITECTURE.md`。
 - 設計判断（言語、配置、層数など、shall を変えない判断）では `docs/srs.md` を編集しない。
 

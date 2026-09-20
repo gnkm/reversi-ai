@@ -1,62 +1,128 @@
 {
   "objective": "Win by having more discs than the opponent at the end of the game.",
-  "origin": "board[0][0] is a1 (Black's lower left). Rows are ranks 1-8 toward White, columns are files a-h.",
   "questions": {
-    "corner_priority": {
-      "type": "noul",
-      "instructions": "Should the side to move prioritize occupying corners as a goal this turn?",
-      "criteria": {
-        "true": "Corners are the right strategic priority now.",
-        "false": "Corners are not the right priority this turn."
-      }
+    "place": {
+      "type": "choice",
+      "instructions": "Compare the legal places. Each place is written with the same facts. Choose the place that best helps you win."
+    }
+  },
+  "place_line": "{kind}. Occupies a corner: {takes_corner}. Gives a corner next: {gives_corner}. Opponent replies: {opponent_places}. Discs turned: {flips}.",
+  "vocabulary": {
+    "kind": {
+      "corner": "corner square",
+      "x": "X-square",
+      "c": "C-square",
+      "edge": "edge square",
+      "interior": "interior square"
     },
-    "mobility_priority": {
-      "type": "noul",
-      "instructions": "Should the side to move prioritize keeping more options than the opponent, rather than grabbing discs?",
-      "criteria": {
-        "true": "Keeping options open matters more than grabbing discs this turn.",
-        "false": "Occupying strong squares or taking discs matters more than options this turn."
-      }
+    "yes_no": {
+      "true": "yes",
+      "false": "no"
     },
-    "position_priority": {
-      "type": "noul",
-      "instructions": "Should the side to move prioritize valuable square control this turn?",
-      "criteria": {
-        "true": "Occupying valuable squares is the right priority now.",
-        "false": "Square control is not the main priority this turn."
-      }
-    },
-    "material_importance": {
-      "type": "score",
-      "instructions": "How important is taking discs this turn for the side to move?",
-      "criteria": [
-        "Taking discs this turn barely matters.",
-        "Taking some discs is useful but not decisive.",
-        "Taking discs this turn is important."
-      ]
+    "amount": {
+      "few": "few",
+      "some": "some",
+      "many": "many"
     },
     "stage": {
-      "type": "choice",
-      "instructions": "Which phase best describes this position for the side to move?",
-      "criteria": {
-        "opening": "The opening fight for the center is still going.",
-        "midgame": "The fight is about edges, corners, and options.",
-        "endgame": "The game is close to finishing and remaining empty squares will soon be filled."
-      }
+      "opening": "opening",
+      "midgame": "midgame",
+      "endgame": "endgame"
+    },
+    "side": {
+      "black": "Black",
+      "white": "White"
+    }
+  },
+  "kinds": {
+    "corner": ["a1", "h1", "a8", "h8"],
+    "x": ["b2", "g2", "b7", "g7"],
+    "c": ["a2", "b1", "g1", "h2", "a7", "b8", "g8", "h7"],
+    "edge": [
+      "a3",
+      "a4",
+      "a5",
+      "a6",
+      "h3",
+      "h4",
+      "h5",
+      "h6",
+      "c1",
+      "d1",
+      "e1",
+      "f1",
+      "c8",
+      "d8",
+      "e8",
+      "f8"
+    ],
+    "interior": [
+      "c2",
+      "d2",
+      "e2",
+      "f2",
+      "b3",
+      "c3",
+      "d3",
+      "e3",
+      "f3",
+      "g3",
+      "b4",
+      "c4",
+      "d4",
+      "e4",
+      "f4",
+      "g4",
+      "b5",
+      "c5",
+      "d5",
+      "e5",
+      "f5",
+      "g5",
+      "b6",
+      "c6",
+      "d6",
+      "e6",
+      "f6",
+      "g6",
+      "c7",
+      "d7",
+      "e7",
+      "f7"
+    ]
+  },
+  "buckets": {
+    "empty": {
+      "opening": [45, 64],
+      "midgame": [16, 44],
+      "endgame": [0, 15]
+    },
+    "opponent_places": {
+      "few": [0, 3],
+      "some": [4, 8],
+      "many": [9, 32]
+    },
+    "flips": {
+      "few": [1, 2],
+      "some": [3, 5],
+      "many": [6, 20]
     }
   },
   "weights": {
-    "answers": {
-      "corner_priority": 2.0,
-      "mobility_priority": 1.5,
-      "position_priority": 1.5,
-      "material_importance": 1.2
-    },
+    "jev": 4.0,
+    "code": 1.0,
+    "confidence": 1.0,
     "metrics": {
       "position": 2.0,
       "mobility": 1.5,
       "material": 1.0,
       "corners": 2.5
+    },
+    "scales": {
+      "position": 100.0,
+      "mobility": 8.0,
+      "material": 8.0,
+      "corners": 1.0
     },
     "stage": {
       "opening": {

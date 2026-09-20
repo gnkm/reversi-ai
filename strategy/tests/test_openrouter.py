@@ -5,7 +5,8 @@ from __future__ import annotations
 import ast
 import json
 import os
-from collections.abc import Callable, Mapping
+import re
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -50,26 +51,38 @@ def _source(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
-def _complete_answers(**overrides: object) -> dict[str, SimpleNamespace]:
-    answers = {
-        "corner_priority": SimpleNamespace(type="noul", noul=0.2),
-        "mobility_priority": SimpleNamespace(type="noul", noul=0.4),
-        "position_priority": SimpleNamespace(type="noul", noul=0.1),
-        "material_importance": SimpleNamespace(type="score", score=1.0),
-        "stage": SimpleNamespace(
+def _choice_answers(
+    places: Sequence[Square],
+    *,
+    focused: str | None = None,
+    confidence: float = 1.0,
+    probabilities: Mapping[str, float] | None = None,
+) -> dict[str, SimpleNamespace]:
+    spec = load_json(jev.PROMPT_PATH)
+    assert isinstance(spec, dict)
+    questions = spec["questions"]
+    assert isinstance(questions, dict)
+    question_id = next(iter(questions))
+    keys = [square.algebraic for square in places]
+    if probabilities is None:
+        if focused is None:
+            each = 1.0 / float(len(keys))
+            probs = dict.fromkeys(keys, each)
+            choice = keys[0]
+        else:
+            probs = {key: 1.0 if key == focused else 0.0 for key in keys}
+            choice = focused
+    else:
+        probs = {key: float(probabilities.get(key, 0.0)) for key in keys}
+        choice = max(keys, key=lambda key: probs[key])
+    return {
+        question_id: SimpleNamespace(
             type="choice",
-            choice="opening",
-            probabilities={"opening": 0.8, "midgame": 0.15, "endgame": 0.05},
-        ),
+            choice=choice,
+            confidence=confidence,
+            probabilities=probs,
+        )
     }
-    answers.update(
-        {
-            key: value
-            for key, value in overrides.items()
-            if isinstance(value, SimpleNamespace)
-        }
-    )
-    return answers
 
 
 def _respond_with(answers: Mapping[str, SimpleNamespace]):
@@ -188,7 +201,7 @@ def test_jev_decisions_call_uses_https_and_model_id(
     position = initial_position()
     places = legal_places(position)
 
-    fake = _fake_openrouter(_respond_with(_complete_answers()))
+    fake = _fake_openrouter(_respond_with(_choice_answers(places)))
     monkeypatch.setattr(jev, "OpenRouter", fake)
     move = jev.choose_move(position)
     assert move is not None
@@ -207,31 +220,32 @@ def test_jev_decisions_call_uses_https_and_model_id(
     assert getattr(retries, "strategy", None) == "none"
     questions = create["questions"]
     assert isinstance(questions, dict)
-    assert len(questions) >= 2
-    assert set(questions) == {
-        "corner_priority",
-        "mobility_priority",
-        "position_priority",
-        "material_importance",
-        "stage",
-    }
-    assert set(questions).isdisjoint({square.algebraic for square in places})
+    assert len(questions) == 1
+    spec = load_json(jev.PROMPT_PATH)
+    assert isinstance(spec, dict)
+    question_id = next(iter(spec["questions"]))
+    assert set(questions) == {question_id}
+    assert question_id not in {square.algebraic for square in places}
     spec_text = jev.PROMPT_PATH.read_text(encoding="utf-8")
-    for question in questions.values():
-        assert question["type"] in {"noul", "score", "choice"}
-        assert question["instructions"]
-        assert question["instructions"] in spec_text
-        lowered = question["instructions"].lower()
-        assert "how many" not in lowered
-        assert "count" not in lowered
-        assert "which square" not in lowered
-        assert "best move" not in lowered
-        assert "legal_places" not in lowered
+    payload = questions[question_id]
+    assert payload["type"] == "choice"
+    assert payload["instructions"]
+    assert payload["instructions"] in spec_text
+    lowered = payload["instructions"].lower()
+    assert "how many" not in lowered
+    assert "count the" not in lowered
+    assert "legal_places" not in lowered
+    assert set(payload["criteria"]) == {square.algebraic for square in places}
     state = create["state"]
     assert isinstance(state, dict)
-    assert "board[0][0] is a1" in str(state["origin"])
+    assert "board" not in state
+    assert "origin" not in state
+    assert isinstance(state["places"], dict)
+    assert set(state["places"]) == {square.algebraic for square in places}
+    assert state["places"] == payload["criteria"]
     assert "more discs" in str(state["objective"]).lower()
-    assert "a1" not in questions["stage"]["instructions"]
+    for text in state["places"].values():
+        assert not re.search(r"\d", text)
     assert "Place a stone on" not in spec_text
 
 
@@ -251,7 +265,7 @@ def _corner_vs_two_flips() -> Position:
     return Position(Board(cells), Color.BLACK)
 
 
-def test_jev_fake_priority_answers_pick_legal_post_move_square(
+def test_jev_fake_choice_probability_on_corner_picks_that_square(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -267,48 +281,27 @@ def test_jev_fake_priority_answers_pick_legal_post_move_square(
     assert after_a1.stone_at(Square.parse("a1")) is Stone.BLACK
     assert after_d2.stone_at(Square.parse("a1")) is Stone.EMPTY
 
-    fake = _fake_openrouter(
-        _respond_with(
-            _complete_answers(
-                corner_priority=SimpleNamespace(type="noul", noul=1.0),
-                mobility_priority=SimpleNamespace(type="noul", noul=0.0),
-                position_priority=SimpleNamespace(type="noul", noul=0.0),
-                material_importance=SimpleNamespace(type="score", score=0.0),
-                stage=SimpleNamespace(
-                    type="choice",
-                    choice="midgame",
-                    probabilities={"opening": 0.0, "midgame": 1.0, "endgame": 0.0},
-                ),
-            )
-        )
-    )
+    fake = _fake_openrouter(_respond_with(_choice_answers(places, focused="a1")))
     monkeypatch.setattr(jev, "OpenRouter", fake)
     corner_move = jev.choose_move(position)
     assert corner_move is not None
     assert corner_move.square == Square.parse("a1")
     assert corner_move.square in places
+    create = fake.last_create
+    assert isinstance(create, dict)
+    questions = create["questions"]
+    assert isinstance(questions, dict)
+    payload = next(iter(questions.values()))
+    assert payload["type"] == "choice"
+    assert set(payload["criteria"]) == {square.algebraic for square in places}
 
-    fake_material = _fake_openrouter(
-        _respond_with(
-            _complete_answers(
-                corner_priority=SimpleNamespace(type="noul", noul=0.0),
-                mobility_priority=SimpleNamespace(type="noul", noul=0.0),
-                position_priority=SimpleNamespace(type="noul", noul=0.0),
-                material_importance=SimpleNamespace(type="score", score=2.0),
-                stage=SimpleNamespace(
-                    type="choice",
-                    choice="endgame",
-                    probabilities={"opening": 0.0, "midgame": 0.0, "endgame": 1.0},
-                ),
-            )
-        )
-    )
-    monkeypatch.setattr(jev, "OpenRouter", fake_material)
-    material_move = jev.choose_move(position)
-    assert material_move is not None
-    assert material_move.square == Square.parse("d2")
-    assert material_move.square in places
-    assert material_move.square != corner_move.square
+    fake_other = _fake_openrouter(_respond_with(_choice_answers(places, focused="d2")))
+    monkeypatch.setattr(jev, "OpenRouter", fake_other)
+    other_move = jev.choose_move(position)
+    assert other_move is not None
+    assert other_move.square == Square.parse("d2")
+    assert other_move.square in places
+    assert other_move.square != corner_move.square
 
 
 def test_jev_http_error_from_sdk_is_unplayable(
@@ -368,10 +361,11 @@ def test_jev_prompt_states_win_by_more_discs() -> None:
     assert "more discs" in lowered
     questions = spec["questions"]
     assert isinstance(questions, dict)
-    assert len(questions) >= 2
-    origin = spec["origin"]
-    assert isinstance(origin, str)
-    assert "board[0][0] is a1" in origin
+    assert len(questions) == 1
+    payload = next(iter(questions.values()))
+    assert payload["type"] == "choice"
+    assert "board[0][0]" not in json.dumps(spec)
+    assert "origin" not in spec
 
 
 def test_jev_questions_do_not_ask_to_count() -> None:
@@ -444,14 +438,53 @@ def test_jev_empty_or_incomplete_prompt_is_unplayable(
     with pytest.raises(jev.ExternalModelError, match="不正"):
         jev.choose_move(initial_position())
 
-    one_question = _repo_spec()
-    questions = one_question["questions"]
+    wrong_type = _repo_spec()
+    questions = wrong_type["questions"]
     assert isinstance(questions, dict)
     first_id = next(iter(questions))
-    one_question["questions"] = {first_id: questions[first_id]}
-    single = tmp_path / "one.json"
-    _write_spec(single, one_question)
-    monkeypatch.setattr(jev, "PROMPT_PATH", single)
+    payload = questions[first_id]
+    assert isinstance(payload, dict)
+    payload["type"] = "noul"
+    noul = tmp_path / "noul.json"
+    _write_spec(noul, wrong_type)
+    monkeypatch.setattr(jev, "PROMPT_PATH", noul)
+    with pytest.raises(jev.ExternalModelError, match="不正"):
+        jev.choose_move(initial_position())
+
+
+def test_jev_place_line_must_include_all_fact_fields(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    secret = tmp_path / "openrouter-api-key"
+    secret.write_text(_API_KEY, encoding="utf-8")
+    monkeypatch.setattr(jev, "SECRET_PATH", secret)
+    spec = _repo_spec()
+    spec["place_line"] = "{kind}. Occupies a corner: {takes_corner}."
+    path = tmp_path / "missing-fields.json"
+    _write_spec(path, spec)
+    monkeypatch.setattr(jev, "PROMPT_PATH", path)
+    with pytest.raises(jev.ExternalModelError, match="不正"):
+        jev.choose_move(initial_position())
+
+
+def test_jev_kinds_corner_must_match_board(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    secret = tmp_path / "openrouter-api-key"
+    secret.write_text(_API_KEY, encoding="utf-8")
+    monkeypatch.setattr(jev, "SECRET_PATH", secret)
+    spec = _repo_spec()
+    kinds = spec["kinds"]
+    assert isinstance(kinds, dict)
+    kinds["corner"] = ["a1", "h1", "a8", "d4"]
+    interior = kinds["interior"]
+    assert isinstance(interior, list)
+    kinds["interior"] = [name for name in interior if name != "d4"] + ["h8"]
+    path = tmp_path / "wrong-corners.json"
+    _write_spec(path, spec)
+    monkeypatch.setattr(jev, "PROMPT_PATH", path)
     with pytest.raises(jev.ExternalModelError, match="不正"):
         jev.choose_move(initial_position())
 
@@ -486,26 +519,28 @@ def test_jev_uses_updated_json_on_next_call(
     spec = _repo_spec()
     questions = spec["questions"]
     assert isinstance(questions, dict)
-    first_q = questions["stage"]
+    question_id = next(iter(questions))
+    first_q = questions[question_id]
     assert isinstance(first_q, dict)
-    first_q["instructions"] = "First stage instruction."
+    first_q["instructions"] = "First place instruction."
     prompt = _write_spec(tmp_path / "jev.json", spec)
     monkeypatch.setattr(jev, "PROMPT_PATH", prompt)
     position = initial_position()
+    places = legal_places(position)
 
-    fake = _fake_openrouter(_respond_with(_complete_answers()))
+    fake = _fake_openrouter(_respond_with(_choice_answers(places)))
     monkeypatch.setattr(jev, "OpenRouter", fake)
     assert jev.choose_move(position) is not None
     first = fake.last_create
     assert isinstance(first, dict)
-    assert first["questions"]["stage"]["instructions"] == "First stage instruction."
+    assert first["questions"][question_id]["instructions"] == "First place instruction."
 
-    first_q["instructions"] = "Second stage instruction."
+    first_q["instructions"] = "Second place instruction."
     _write_spec(prompt, spec)
     assert jev.choose_move(position) is not None
     second = fake.last_create
     assert isinstance(second, dict)
-    assert second["questions"]["stage"]["instructions"] == "Second stage instruction."
+    assert second["questions"][question_id]["instructions"] == "Second place instruction."
 
 
 def _fake_chat_openrouter(
