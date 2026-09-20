@@ -100,12 +100,12 @@
     "opponent_places": {
       "few": [0, 3],
       "some": [4, 8],
-      "many": [9, 32]
+      "many": [9, 64]
     },
     "flips": {
       "few": [1, 2],
       "some": [3, 5],
-      "many": [6, 20]
+      "many": [6, 64]
     }
   },
   "weights": {

@@ -304,6 +304,92 @@ def test_jev_fake_choice_probability_on_corner_picks_that_square(
     assert other_move.square != corner_move.square
 
 
+def test_jev_prompt_many_buckets_cover_to_sixty_four() -> None:
+    spec = _repo_spec()
+    buckets = spec["buckets"]
+    assert isinstance(buckets, dict)
+    for key in ("opponent_places", "flips"):
+        group = buckets[key]
+        assert isinstance(group, dict)
+        many = group["many"]
+        assert isinstance(many, list)
+        assert many[1] == 64
+
+
+def test_jev_narrow_place_or_flip_buckets_are_invalid(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    secret = tmp_path / "openrouter-api-key"
+    secret.write_text(_API_KEY, encoding="utf-8")
+    monkeypatch.setattr(jev, "SECRET_PATH", secret)
+
+    spec = _repo_spec()
+    buckets = spec["buckets"]
+    assert isinstance(buckets, dict)
+    opponent = buckets["opponent_places"]
+    assert isinstance(opponent, dict)
+    opponent["many"] = [9, 32]
+    path = tmp_path / "narrow-places.json"
+    _write_spec(path, spec)
+    monkeypatch.setattr(jev, "PROMPT_PATH", path)
+    with pytest.raises(jev.ExternalModelError, match="不正"):
+        jev.choose_move(initial_position())
+
+    spec = _repo_spec()
+    buckets = spec["buckets"]
+    assert isinstance(buckets, dict)
+    flips = buckets["flips"]
+    assert isinstance(flips, dict)
+    flips["many"] = [6, 20]
+    path = tmp_path / "narrow-flips.json"
+    _write_spec(path, spec)
+    monkeypatch.setattr(jev, "PROMPT_PATH", path)
+    with pytest.raises(jev.ExternalModelError, match="不正"):
+        jev.choose_move(initial_position())
+
+
+def test_jev_same_position_and_fake_decisions_repeat_the_square(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    secret = tmp_path / "openrouter-api-key"
+    secret.write_text(_API_KEY, encoding="utf-8")
+    monkeypatch.setattr(jev, "SECRET_PATH", secret)
+    position = initial_position()
+    places = legal_places(position)
+    focused = places[1].algebraic
+    creates: list[dict[str, object]] = []
+
+    def respond(kwargs: dict[str, object]) -> SimpleNamespace:
+        creates.append(dict(kwargs))
+        return SimpleNamespace(
+            answers=_choice_answers(places, focused=focused),
+            api_key=_API_KEY,
+        )
+
+    monkeypatch.setattr(jev, "OpenRouter", _fake_openrouter(respond))
+    first = jev.choose_move(position)
+    second = jev.choose_move(position)
+    assert first is not None and second is not None
+    assert first.square == second.square == Square.parse(focused)
+    assert len(creates) == 2
+    assert creates[0]["questions"] == creates[1]["questions"]
+    assert creates[0]["state"] == creates[1]["state"]
+    err = capsys.readouterr().err
+    lines = [line for line in err.splitlines() if line.startswith("jev candidate ")]
+    assert len(lines) == 2 * len(places)
+    selected = [line for line in lines if "selected=true" in line]
+    assert len(selected) == 2
+    assert all(f"square={focused}" in line for line in selected)
+    for line in lines:
+        assert "code=" in line
+        assert "probability=" in line
+        assert "confidence=" in line
+        assert "position=" in line
+
+
 def test_jev_http_error_from_sdk_is_unplayable(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
