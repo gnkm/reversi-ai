@@ -34,13 +34,24 @@ def markdown_sections(text: str) -> dict[str, str]:
     """`##` 見出しを小文字の節名として本文を取る。"""
     sections: dict[str, list[str]] = {}
     current: str | None = None
+    in_fence = False
     for line in text.splitlines():
-        if line.startswith("## "):
-            current = line[3:].strip().lower()
+        if line.lstrip().startswith("```"):
+            in_fence = not in_fence
+            if current is not None:
+                sections[current].append(line)
+            continue
+        if not in_fence and line.startswith("## "):
+            name = line[3:].strip().lower()
+            if name in sections:
+                raise PromptFileError(f"着手指示の {name} が重複しています")
+            current = name
             sections[current] = []
             continue
         if current is not None:
             sections[current].append(line)
+    if in_fence:
+        raise PromptFileError("着手指示のコードフェンスが閉じていません")
     return {name: "\n".join(body).strip() for name, body in sections.items()}
 
 

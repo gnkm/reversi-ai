@@ -11,6 +11,7 @@ from types import SimpleNamespace
 import pytest
 
 from reversi.agents import chat_completions, extra_genai, jev
+from reversi.agents.prompt import PromptFileError, markdown_sections
 from reversi.api import openrouter_key
 from reversi.engine.board import Square
 from reversi.engine.rules import initial_position, legal_places
@@ -283,6 +284,36 @@ def test_jev_empty_or_incomplete_prompt_is_unplayable(
     monkeypatch.setattr(jev, "PROMPT_PATH", no_placeholder)
     with pytest.raises(jev.ExternalModelError, match=r"\{square\}"):
         jev.choose_move(initial_position())
+
+    duplicate = tmp_path / "duplicate.md"
+    duplicate.write_text(
+        "## instructions\n\nFirst.\n\n## option\n\nPlace on {square}.\n\n"
+        "## instructions\n\nSecond.\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(jev, "PROMPT_PATH", duplicate)
+    with pytest.raises(jev.ExternalModelError, match="重複"):
+        jev.choose_move(initial_position())
+
+
+def test_markdown_sections_keeps_heading_lines_inside_fences() -> None:
+    parts = markdown_sections(
+        "## instructions\n\nChoose.\n```\n## instructions\nexample\n```\n"
+        "Still here.\n\n## option\n\nPlace on {square}.\n"
+    )
+    assert "## instructions" in parts["instructions"]
+    assert "example" in parts["instructions"]
+    assert "Still here." in parts["instructions"]
+    assert parts["option"] == "Place on {square}."
+
+
+def test_markdown_sections_rejects_duplicate_and_unclosed_fence() -> None:
+    with pytest.raises(PromptFileError, match="重複"):
+        markdown_sections(
+            "## instructions\n\nFirst.\n\n## option\n\nX.\n\n## instructions\n\nSecond.\n"
+        )
+    with pytest.raises(PromptFileError, match="コードフェンス"):
+        markdown_sections("## instructions\n\n```\nnot closed\n")
 
 
 def test_jev_uses_updated_markdown_on_next_call(
