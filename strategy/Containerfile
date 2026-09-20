@@ -11,8 +11,9 @@ ENV UV_COMPILE_BYTECODE=1 \
 COPY strategy/pyproject.toml strategy/uv.lock ./
 COPY strategy/src ./src
 COPY models /models
+COPY prompts /prompts
 
-# editable のままにする。wheel 化すると Path(__file__).parents[4] が /data と /models を外れる。
+# editable のままにする。wheel 化すると Path(__file__).parents[4] が /data と /models と /prompts を外れる。
 RUN uv sync --frozen --no-dev
 
 CMD ["python", "-m", "reversi.api"]

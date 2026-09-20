@@ -486,6 +486,8 @@ def test_jev_source_uses_jev_model_and_skips_wthor() -> None:
     source = _module_source("jev.py")
     assert "typesafe/jev-1.13" in source
     assert "https://openrouter.ai" in source
+    assert "Choose exactly one legal Reversi" not in source
+    assert "Place a stone on" not in source
     roots = _imported_roots(source)
     assert "wthor" not in roots
     assert "reversi" in roots or "openrouter" in roots
@@ -1612,6 +1614,7 @@ def test_extra_genai_source_has_no_player_wizard() -> None:
     assert "https://openrouter.ai" in chat_source
     assert "chat.send" in chat_source or "chat" in chat_source
     assert "typesafe/jev-1.13" not in chat_source
+    assert "Choose exactly one legal Reversi" not in chat_source
     tree = ast.parse(chat_source)
     for node in ast.walk(tree):
         if (
