@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
+from typing import Any
 
 PROMPTS_DIR = Path(__file__).resolve().parents[4] / "prompts"
 
 __all__ = [
     "PROMPTS_DIR",
     "PromptFileError",
+    "load_json",
     "load_sections",
     "markdown_sections",
     "read_text",
@@ -65,3 +68,12 @@ def load_sections(path: Path, *names: str) -> dict[str, str]:
             raise PromptFileError(f"着手指示に {name} がありません")
         loaded[name] = value
     return loaded
+
+
+def load_json(path: Path) -> Any:
+    """UTF-8 の JSON 指示を読む。欠落・空・不正は継続不能とする。"""
+    raw = read_text(path)
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise PromptFileError("着手指示が JSON ではありません") from exc
