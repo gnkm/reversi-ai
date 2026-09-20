@@ -1,4 +1,4 @@
-"""カタログと戦略個体（ランダム・最多取り・位置評価・ミニマックス・定石・機械学習・LightGBM・強化学習・ニューラルネットワーク・生成 AI）。"""
+"""カタログと戦略個体（ランダム・最多取り・位置評価・ミニマックス・αβ・定石・機械学習・LightGBM・強化学習・ニューラルネットワーク・生成 AI）。"""
 
 from __future__ import annotations
 
@@ -14,6 +14,7 @@ from types import SimpleNamespace
 import pytest
 
 from reversi.agents import (
+    alphabeta,
     chat_completions,
     extra_genai,
     jev,
@@ -1915,6 +1916,134 @@ def test_minimax_source_does_not_call_models() -> None:
                 assert "ffothello.org" not in lowered
                 assert ".wtb" not in lowered
                 assert "openrouter.ai" not in lowered
+
+
+def test_catalog_lists_alphabeta() -> None:
+    item = _item_by_display_name("ルールベース (αβ)")
+    minimax_item = _item_by_display_name("ルールベース (ミニマックス)")
+    assert item.specimen_id == alphabeta.SPECIMEN_ID == "alphabeta"
+    assert item.category == alphabeta.CATEGORY == "rule_based"
+    assert item.display_name == alphabeta.DISPLAY_NAME
+    assert item.description == alphabeta.DESCRIPTION
+    assert item.description.strip()
+    assert _JAPANESE.search(item.description)
+    assert "Negamax" in item.description
+    assert "深さ 6" in item.description
+    assert "点数表" in item.description
+    assert item.specimen_id != minimax_item.specimen_id
+    assert item.display_name != minimax_item.display_name
+    assert alphabeta.SEARCH_DEPTH == 6
+    assert minimax.SEARCH_DEPTH == 4
+    assert get(alphabeta.SPECIMEN_ID) == item
+    assert get(minimax.SPECIMEN_ID) == minimax_item
+    with pytest.raises(KeyError):
+        get("rule_based")
+
+
+def test_alphabeta_leaf_score_matches_minimax_table() -> None:
+    board = empty_board().replacing(
+        {
+            Square.parse("a1"): Stone.BLACK,
+            Square.parse("b1"): Stone.WHITE,
+            Square.parse("c3"): Stone.BLACK,
+        }
+    )
+    assert alphabeta.leaf_score(board, Color.BLACK) == minimax.leaf_score(
+        board, Color.BLACK
+    )
+    assert alphabeta.leaf_score(board, Color.WHITE) == minimax.leaf_score(
+        board, Color.WHITE
+    )
+    assert alphabeta.leaf_score(board, Color.BLACK) == _spec_leaf_score(
+        board, Color.BLACK
+    )
+
+
+def test_alphabeta_depth_four_matches_minimax_squares() -> None:
+    positions = (
+        initial_position(),
+        play(initial_position(), Place(Square.parse("d3"))),
+        _position_from_rank8_rows(_CORNER_VS_TWO_FLIPS, Color.BLACK),
+        Position(_almost_full_white_with_black_on_b1().board, Color.WHITE),
+    )
+    two_empties = empty_board().replacing(
+        {
+            Square.parse("b1"): Stone.BLACK,
+            Square.parse("g8"): Stone.BLACK,
+            **{
+                Square(file=file, rank=rank): Stone.WHITE
+                for rank in range(8)
+                for file in range(8)
+                if (file, rank) not in {(0, 0), (1, 0), (6, 7), (7, 7)}
+            },
+        }
+    )
+    positions = (*positions, Position(two_empties, Color.WHITE))
+    for position in positions:
+        expected = minimax.choose_move(position)
+        assert alphabeta.choose_at_depth(position, 4) == expected
+        assert alphabeta.choose_at_depth(position, 4) == _plain_minimax_choose(position)
+        if expected is not None:
+            assert expected.square in legal_places(position)
+
+
+def test_alphabeta_game_path_keeps_depth_six() -> None:
+    assert alphabeta.SEARCH_DEPTH == 6
+    assert minimax.SEARCH_DEPTH == 4
+    snapshot = alphabeta.SEARCH_DEPTH
+    position = initial_position()
+    first = alphabeta.choose_move(position)
+    via_catalog = catalog_choose(alphabeta.SPECIMEN_ID, position)
+    assert first is not None
+    assert via_catalog == first
+    assert first.square in legal_places(position)
+    after = play(position, first)
+    second = alphabeta.choose_move(after)
+    assert second is not None
+    assert second.square in legal_places(after)
+    alphabeta.choose_move(_position_from_rank8_rows(_CORNER_VS_TWO_FLIPS, Color.BLACK))
+    assert alphabeta.SEARCH_DEPTH == snapshot == 6
+    assert alphabeta.choose_move is not minimax.choose_move
+    at_four = alphabeta.choose_at_depth(position, 4)
+    assert at_four == minimax.choose_move(position)
+    assert alphabeta.choose_move(position) == alphabeta.choose_at_depth(position, 6)
+    after_d3 = play(position, Place(Square.parse("d3")))
+    depth_four = alphabeta.choose_at_depth(after_d3, 4)
+    depth_six = alphabeta.choose_move(after_d3)
+    assert depth_four == minimax.choose_move(after_d3) == Place(Square.parse("e3"))
+    assert depth_six == Place(Square.parse("c5"))
+    assert depth_six != depth_four
+
+
+def test_alphabeta_does_not_move_when_no_legal_places() -> None:
+    assert alphabeta.choose_move(_almost_full_white_with_black_on_b1()) is None
+    assert alphabeta.choose_move(_both_sides_cannot_place()) is None
+    assert alphabeta.choose_at_depth(_almost_full_white_with_black_on_b1(), 4) is None
+
+
+def test_alphabeta_source_is_negamax_and_does_not_call_models() -> None:
+    source = _module_source("alphabeta.py")
+    assert "SEARCH_DEPTH = 6" in source
+    assert "def _negamax(" in source
+    assert "-beta" in source and "-alpha" in source
+    roots = _imported_roots(source)
+    assert roots.isdisjoint(_FORBIDDEN_IMPORT_ROOTS)
+    assert "minimax" not in roots
+    tree = ast.parse(source)
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                assert "minimax" not in alias.name.split(".")
+        elif isinstance(node, ast.ImportFrom):
+            module = node.module or ""
+            assert "minimax" not in module.split(".")
+            for alias in node.names:
+                assert alias.name != "minimax"
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            lowered = node.value.lower()
+            assert "ffothello.org" not in lowered
+            assert ".wtb" not in lowered
+            assert "openrouter.ai" not in lowered
 
 
 def _play_algebraic(*names: str) -> Position:
