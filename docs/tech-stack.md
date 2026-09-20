@@ -1,7 +1,7 @@
 ---
 title: 技術スタック
 product: Reversi Agents
-version: 0.2.9
+version: 0.2.10
 status: working
 date: 2026-09-20
 source: docs/srs.md
@@ -14,7 +14,7 @@ srs_version: 0.1.22
 | --- | --- |
 | 文書識別 | reversi-ai-tech-stack |
 | 対象ソフトウェア | Reversi Agents |
-| 版 | 0.2.9 |
+| 版 | 0.2.10 |
 | 状態 | 現行（設計。要求ではない） |
 | 日付 | 2026-09-20 |
 | 入力 | [`docs/srs.md`](srs.md) 0.1.22 |
@@ -127,6 +127,7 @@ strategy/            戦略プロセス（着手と学習）
 compose.yaml         Podman Compose。secret の中身は書かない
 compose.dev.yaml     開発用オーバーレイ。bind mount と reload だけ
 models/              学習成果物（小さい JSON / ONNX。原本棋譜は置かない）
+prompts/             生成 AI の固定指示（Markdown。戦略プロセスが対局時に読む）
 data/                運用者ローカル。WTHOR 原本と SQLite。Git 管理外
 ```
 
@@ -455,6 +456,7 @@ OpenRouter の API キーは `podman secret create` でホストに置く。名�
 
 | 版 | 日付 | 内容 |
 | --- | --- | --- |
+| 0.2.10 | 2026-09-20 | 生成 AI の固定指示を置く `prompts/` をリポジトリ配置に足す |
 | 0.2.9 | 2026-09-20 | 起動の正を Python の `podman-compose` とする（プラグインの `podman compose` は使わない） |
 | 0.2.8 | 2026-09-19 | 対局と学習の起動を Podman に揃え、ホストの pnpm/uv は試験と lint に限る |
 | 0.2.7 | 2026-09-19 | ファイル単位の配置は `docs/ARCHITECTURE.md` を正とする |

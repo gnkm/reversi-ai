@@ -1,13 +1,13 @@
 ---
 title: アーキテクチャ
 product: Reversi Agents
-version: 0.1.5
+version: 0.1.6
 status: working
 date: 2026-09-20
 source: docs/srs.md
 srs_version: 0.1.22
 tech_stack: docs/tech-stack.md
-tech_stack_version: 0.2.9
+tech_stack_version: 0.2.10
 ---
 
 # アーキテクチャ
@@ -16,10 +16,10 @@ tech_stack_version: 0.2.9
 | --- | --- |
 | 文書識別 | reversi-ai-architecture |
 | 対象ソフトウェア | Reversi Agents |
-| 版 | 0.1.5 |
+| 版 | 0.1.6 |
 | 状態 | 現行（設計。要求ではない） |
 | 日付 | 2026-09-20 |
-| 入力 | [`docs/srs.md`](srs.md) 0.1.22、[`docs/tech-stack.md`](tech-stack.md) 0.2.9 |
+| 入力 | [`docs/srs.md`](srs.md) 0.1.22、[`docs/tech-stack.md`](tech-stack.md) 0.2.10 |
 
 本文書は**配置と層**の設計正本である。ソフトウェア要求の正本は [`docs/srs.md`](srs.md) であり、本文書は shall を追加・変更・撤回しない。言語・ライブラリ・コンテナの選定は [`docs/tech-stack.md`](tech-stack.md) を正とする。ディレクトリ名は tech-stack 2.3 と一致させ、ファイル単位の置き場と目的は本文書を正とする。
 
@@ -144,7 +144,7 @@ reversi-ai/
 │           └── sse.ts                 # エージェント対エージェントの盤面更新
 │
 ├── strategy/                          # 戦略プロセス。着手と学習
-│   ├── Containerfile                  # FastAPI。secret と data/ をマウント
+│   ├── Containerfile                  # FastAPI。secret と data/・prompts/ を載せる
 │   ├── pyproject.toml                 # パッケージ reversi、Ruff、import-linter
 │   ├── uv.lock
 │   ├── src/reversi/
@@ -168,6 +168,7 @@ reversi-ai/
 │   │   │   ├── ml.py                  # 機械学習 (棋譜)。係数 JSON の積和のみ
 │   │   │   ├── rl.py                  # 強化学習 (自己対局)。線形重み。NN も OpenRouter も使わない
 │   │   │   ├── nn.py                  # ニューラルネットワーク (棋譜)。ONNX CPU
+│   │   │   ├── prompt.py              # prompts/ の Markdown を読む
 │   │   │   ├── jev.py                 # 生成 AI (Jev)。Decisions API
 │   │   │   └── chat_completions.py    # 追加の生成 AI。Chat Completions
 │   │   ├── api/                       # 内部 FastAPI。ブラウザからは到達させない
@@ -198,6 +199,10 @@ reversi-ai/
 │   ├── ml.json                        # ML 対局時の係数
 │   ├── rl.json                        # RL 対局時の重み
 │   └── nn.onnx                        # NN 対局時の順伝播
+│
+├── prompts/                           # 生成 AI の固定指示。戦略プロセスが対局時に読む
+│   ├── jev.md                         # 生成 AI (Jev) の Decisions 指示
+│   └── chat-completions.md            # 追加の生成 AI の Chat Completions 指示
 │
 ├── e2e/                               # Playwright。対象はマシン上の Google Chrome
 │   ├── playwright.config.ts
@@ -291,10 +296,11 @@ reversi-ai/
 | `ml.py` | 機械学習 (棋譜) | `models/ml.json` の積和。onnxruntime / PyTorch を import しない |
 | `rl.py` | 強化学習 (自己対局) | `models/rl.json`。NN 推論も OpenRouter も使わない |
 | `nn.py` | ニューラルネットワーク (棋譜) | `models/nn.onnx` を onnxruntime CPU で順伝播し、合法手へマスク |
-| `jev.py` | 生成 AI (Jev) | `typesafe/jev-1.13` の Decisions API。合法手の外を採用しない |
-| `chat_completions.py` | 生成 AI (〈呼称〉) | 運用者が与えたテキスト生成モデル ID |
+| `prompt.py` | （指示ファイル） | `prompts/` の Markdown を対局時に読む。欠落は継続不能 |
+| `jev.py` | 生成 AI (Jev) | `typesafe/jev-1.13` の Decisions API。指示は `prompts/jev.md`。合法手の外を採用しない |
+| `chat_completions.py` | 生成 AI (〈呼称〉) | 運用者が与えたテキスト生成モデル ID。固定の system は `prompts/chat-completions.md` |
 
-カテゴリ `random` は「ランダム」である。`position_table.py` は FUN-025 の点数表だけを持つ。`extra_genai.py` は `data/genai.json` を読む（対局者向けウィザードは置かない）。
+カテゴリ `random` は「ランダム」である。`position_table.py` は FUN-025 の点数表だけを持つ。`extra_genai.py` は `data/genai.json` を読む（対局者向けウィザードは置かない）。Jev の固定指示は `prompts/jev.md` に置き、`strategy/src` には埋め込まない。Markdown を変えてイメージを作り直すか、開発時の bind（`./prompts:/prompts`）を更新すると、次の着手呼出しからその指示を使う。
 
 ### 4.5 `strategy` — `reversi.api`
 
@@ -343,6 +349,7 @@ TypeScript 側は Zod（`web/server/src/schemas.ts`）、Python 側は Pydantic�
 | 置き場 | 中身 | Git |
 | --- | --- | --- |
 | `models/*.json`, `models/nn.onnx` | 対局時に読む学習成果物 | 含める |
+| `prompts/*.md` | 生成 AI の固定指示。戦略イメージへ COPY し、Compose では bind | 含める |
 | `data/games.sqlite` | 終局棋譜。`.wtb` ではない | 含めない |
 | `data/wthor/` | WTHOR 原本 | 含めない。再配布しない |
 | `data/genai.json` | 追加生成 AI のモデル ID と呼称 | 含めない |
@@ -446,6 +453,7 @@ Issue の検証欄と CI は、この節の生コマンドを使う。ラッパ�
 
 | 版 | 日付 | 内容 |
 | --- | --- | --- |
+| 0.1.6 | 2026-09-20 | 生成 AI の固定指示を `prompts/` に置き、strategy イメージが読む |
 | 0.1.5 | 2026-09-20 | 起動の正を `podman-compose` に揃え、文書表の日付をフロントマターと一致させる |
 | 0.1.4 | 2026-09-20 | 総当たり基準結果を `docs/benchmarks/` に置く |
 | 0.1.3 | 2026-09-20 | web はコンテナ内で `0.0.0.0` を聞き、ホストへ出す口は `127.0.0.1` のままにする |
