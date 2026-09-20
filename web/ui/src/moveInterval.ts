@@ -6,7 +6,11 @@ export const MIN_AGENT_MOVE_INTERVAL_SECONDS = 0;
 export const MAX_AGENT_MOVE_INTERVAL_SECONDS = 60;
 
 export function parseMoveIntervalSeconds(raw: string): number {
-  const n = Number(raw);
+  const trimmed = raw.trim();
+  if (trimmed === "") {
+    return DEFAULT_AGENT_MOVE_INTERVAL_SECONDS;
+  }
+  const n = Number(trimmed);
   if (!Number.isFinite(n)) {
     return DEFAULT_AGENT_MOVE_INTERVAL_SECONDS;
   }

@@ -150,7 +150,9 @@ describe("CatalogPage", () => {
     render(<CatalogPage onStarted={() => undefined} />);
     await screen.findByRole("heading", { name: "ランダム (一様)" });
     expect(screen.queryByLabelText(/着手間隔/)).toBeNull();
-    fireEvent.click(screen.getByRole("radio", { name: "エージェント対エージェント" }));
+    fireEvent.click(
+      screen.getByRole("radio", { name: "エージェント対エージェント" }),
+    );
     const input = screen.getByLabelText(/着手間隔/);
     expect((input as HTMLInputElement).value).toBe("1");
   });
@@ -179,7 +181,9 @@ describe("CatalogPage", () => {
       />,
     );
     await screen.findByRole("heading", { name: "ランダム (一様)" });
-    fireEvent.click(screen.getByRole("radio", { name: "エージェント対エージェント" }));
+    fireEvent.click(
+      screen.getByRole("radio", { name: "エージェント対エージェント" }),
+    );
     fireEvent.change(screen.getByLabelText(/着手間隔/), {
       target: { value: "2" },
     });

@@ -5,9 +5,9 @@ import {
   DEFAULT_AGENT_MOVE_INTERVAL_SECONDS,
   delayBeforeNextMoveMs,
   isBoardMoveUpdate,
+  type MovePresenterClock,
   moveIntervalMsFromSeconds,
   parseMoveIntervalSeconds,
-  type MovePresenterClock,
 } from "./moveInterval.ts";
 import type { Cell, GameState } from "./types.ts";
 
