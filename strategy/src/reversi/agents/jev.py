@@ -298,9 +298,7 @@ def _load_weights(raw: Mapping[str, Any]) -> tuple[
     dict[str, float],
     dict[str, dict[str, float]],
 ]:
-    if "jev" in raw or "confidence" in raw:
-        raise _fail_spec()
-    if "code" in raw and _finite_float(raw.get("code")) < 0.0:
+    if set(raw) != {"metrics", "scales", "stage"}:
         raise _fail_spec()
     metrics = _float_map(_mapping_field(raw, "metrics"), _METRIC_KEYS)
     scales = _float_map(_mapping_field(raw, "scales"), _METRIC_KEYS)

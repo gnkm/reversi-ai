@@ -624,6 +624,7 @@ def test_jev_spec_drops_synthesis_weights() -> None:
     weights = spec.get("weights", {})
     assert "jev" not in weights
     assert "confidence" not in weights
+    assert "code" not in weights
     loaded = jev._load_spec()
     assert not hasattr(loaded, "w_jev")
     assert not hasattr(loaded, "w_confidence")

@@ -114,7 +114,6 @@
     "confidence_threshold": 0.3
   },
   "weights": {
-    "code": 1.0,
     "metrics": {
       "position": 2.0,
       "mobility": 1.5,

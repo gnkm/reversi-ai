@@ -348,15 +348,21 @@ def test_jev_prompt_rejects_synthesis_weights(
     assert isinstance(weights, dict)
     assert "jev" not in weights
     assert "confidence" not in weights
+    assert "code" not in weights
     selection = spec["selection"]
     assert isinstance(selection, dict)
     for key in ("shortlist_size", "margin", "confidence_threshold"):
         assert key in selection
-    weights["jev"] = 4.0
-    weights["confidence"] = 1.0
+    weights["code"] = 1.0
     path = tmp_path / "synthesis.json"
     _write_spec(path, spec)
     monkeypatch.setattr(jev, "PROMPT_PATH", path)
+    with pytest.raises(jev.ExternalModelError, match="不正"):
+        jev.choose_move(initial_position())
+    del weights["code"]
+    weights["jev"] = 4.0
+    weights["confidence"] = 1.0
+    _write_spec(path, spec)
     with pytest.raises(jev.ExternalModelError, match="不正"):
         jev.choose_move(initial_position())
 

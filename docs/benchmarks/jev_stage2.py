@@ -482,7 +482,6 @@ def main() -> int:
                 flush=True,
             )
             samples.append(_evaluate_position(position, spec))
-            _atomic_write(output, _payload(samples, spec, args.per_stage))
         _atomic_write(output, _payload(samples, spec, args.per_stage))
     finally:
         if secret is not None:
