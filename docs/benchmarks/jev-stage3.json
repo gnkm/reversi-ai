@@ -1,5 +1,5 @@
 {
-  "recorded_at": "2026-09-20 14:15",
+  "recorded_at": "2026-09-20 14:38",
   "protocol": {
     "positions_per_stage": 6,
     "search_depth": 4,
@@ -35,14 +35,17 @@
     {
       "change": "drop_objective",
       "mean_loss_before": 40.22222222222222,
-      "mean_loss_after": 40.22222222222222,
+      "mean_loss_after": 39.44444444444444,
       "accepted": false,
       "n": 18,
       "asked_before": 8,
       "asked_after": 8,
       "mean_flips_jev_before": 4.166666666666667,
       "mean_flips_jev_after": 4.166666666666667,
-      "mean_flips_code_best": 3.888888888888889
+      "mean_flips_code_best": 3.888888888888889,
+      "holdout_mean_loss_before": 14.055555555555555,
+      "holdout_mean_loss_after": 14.222222222222221,
+      "holdout_n": 18
     },
     {
       "change": "gives_corner_newly",
@@ -103,6 +106,12 @@
     "mean_loss_accepted": 14.055555555555555,
     "improved": false,
     "trials": [
+      {
+        "change": "drop_objective",
+        "mean_loss_before": 14.055555555555555,
+        "mean_loss_after": 14.222222222222221,
+        "improved": false
+      },
       {
         "change": "gives_corner_newly",
         "mean_loss_before": 14.055555555555555,

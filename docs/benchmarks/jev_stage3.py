@@ -28,7 +28,7 @@ if str(HERE) not in sys.path:
 
 import jev_stage2 as stage2  # noqa: E402
 from reversi.agents import jev  # noqa: E402
-from reversi.engine.board import Board, Color, Square  # noqa: E402
+from reversi.engine.board import Board, Color, Square, Stone, all_squares  # noqa: E402
 from reversi.engine.rules import (  # noqa: E402
     Position,
     apply_place,
@@ -86,45 +86,68 @@ _orig_place_line = jev._place_line
 _active_extras: tuple[str, ...] = ()
 
 
+_AXES = ((1, 0), (0, 1), (1, 1), (1, -1))
+
+
 def _on_edge(square: Square, spec: jev._Spec) -> bool:
     return jev._kind_of(square, spec) in {"edge", "c"}
 
 
-def _fill_from(
+def _line_filled(board: Board, file: int, rank: int, dfile: int, drank: int) -> bool:
+    for sign in (1, -1):
+        cur_file, cur_rank = file, rank
+        while True:
+            cur_file += sign * dfile
+            cur_rank += sign * drank
+            if not (0 <= cur_file < 8 and 0 <= cur_rank < 8):
+                break
+            if board.stone_at(Square(file=cur_file, rank=cur_rank)) is Stone.EMPTY:
+                return False
+    return True
+
+
+def _axis_closed(
+    file: int,
+    rank: int,
+    dfile: int,
+    drank: int,
     board: Board,
-    own: object,
-    start: tuple[int, int],
-    delta: tuple[int, int],
     stable: set[tuple[int, int]],
-) -> None:
-    file, rank = start
-    dfile, drank = delta
-    while True:
-        file += dfile
-        rank += drank
-        if not (0 <= file < 8 and 0 <= rank < 8):
-            return
-        if board.stone_at(Square(file=file, rank=rank)) is own:
-            stable.add((file, rank))
+) -> bool:
+    if _line_filled(board, file, rank, dfile, drank):
+        return True
+    for sign in (1, -1):
+        neighbor = (file + sign * dfile, rank + sign * drank)
+        nfile, nrank = neighbor
+        if not (0 <= nfile < 8 and 0 <= nrank < 8):
             continue
-        return
+        if neighbor not in stable:
+            return False
+    return True
 
 
 def _stable_count(board: Board, color: Color) -> int:
+    """保守的な確定石。角を種にし、軸が埋まっているか安定石に挟まれていれば足す。"""
     own = color.stone
     stable: set[tuple[int, int]] = set()
-    from_corner = {
-        (0, 0): ((0, 1), (1, 0)),
-        (7, 0): ((0, 1), (-1, 0)),
-        (0, 7): ((0, -1), (1, 0)),
-        (7, 7): ((0, -1), (-1, 0)),
-    }
-    for (file, rank), deltas in from_corner.items():
-        if board.stone_at(Square(file=file, rank=rank)) is not own:
-            continue
-        stable.add((file, rank))
-        for delta in deltas:
-            _fill_from(board, own, (file, rank), delta, stable)
+    for file, rank in ((0, 0), (7, 0), (0, 7), (7, 7)):
+        if board.stone_at(Square(file=file, rank=rank)) is own:
+            stable.add((file, rank))
+    changed = True
+    while changed:
+        changed = False
+        for square in all_squares():
+            if board.stone_at(square) is not own:
+                continue
+            coord = (square.file, square.rank)
+            if coord in stable:
+                continue
+            if all(
+                _axis_closed(square.file, square.rank, dfile, drank, board, stable)
+                for dfile, drank in _AXES
+            ):
+                stable.add(coord)
+                changed = True
     return len(stable)
 
 

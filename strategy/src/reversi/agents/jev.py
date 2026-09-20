@@ -361,10 +361,7 @@ def _load_spec(path: Path | None = None) -> _Spec:
     if not isinstance(loaded, dict):
         raise _fail_spec()
     question_id, instructions = _load_question(_mapping_field(loaded, "questions"))
-    if "objective" in loaded:
-        objective = _text_field(loaded, "objective")
-    else:
-        objective = ""
+    objective = _text_field(loaded, "objective")
     vocab = _mapping_field(loaded, "vocabulary")
     buckets = _mapping_field(loaded, "buckets")
     empty_buckets = _bucket_map(_mapping_field(buckets, "empty"), _STAGE_KEYS)
