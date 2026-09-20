@@ -1,9 +1,9 @@
 ---
 title: 技術スタック
 product: Reversi Agents
-version: 0.2.8
+version: 0.2.9
 status: working
-date: 2026-09-19
+date: 2026-09-20
 source: docs/srs.md
 srs_version: 0.1.22
 ---
@@ -14,9 +14,9 @@ srs_version: 0.1.22
 | --- | --- |
 | 文書識別 | reversi-ai-tech-stack |
 | 対象ソフトウェア | Reversi Agents |
-| 版 | 0.2.8 |
+| 版 | 0.2.9 |
 | 状態 | 現行（設計。要求ではない） |
-| 日付 | 2026-09-19 |
+| 日付 | 2026-09-20 |
 | 入力 | [`docs/srs.md`](srs.md) 0.1.22 |
 
 本文書は実装言語・配置・ライブラリの**設計判断**である。ソフトウェア要求の正本は [`docs/srs.md`](srs.md) であり、本文書は shall を追加・変更・撤回しない。SRS は実装言語とフレームワークを制約しない（`docs/srs.md` 3.6 末尾）。ここに書いた版番号は採用時の目安であり、実装開始時の現行安定版に置き換えてよい。
@@ -279,7 +279,7 @@ Biome に McCabe 循環的複雑度の規則は無い。ESLint の `complexity` 
 
 ### 3.11 コンテナと秘密情報
 
-対局と学習の実行は Podman とする。`web` と `strategy` を同一 Pod に置き、`podman compose` で起動する。イメージは各ディレクトリの Containerfile から作る。`data/` はボリュームとして戦略コンテナへ渡す。学習は待ち受けせず、同じ strategy イメージを `podman compose run` する。ホストの `pnpm dev` や `uv run python -m reversi.api` を対局の正にしない。ホットリロードは `compose.dev.yaml` のオーバーレイだけを足す。
+対局と学習の実行は Podman とする。`web` と `strategy` を同一 Pod に置き、Python の `podman-compose` で起動する。プラグインの `podman compose` は `secrets.external` を扱えないので使わない。イメージは各ディレクトリの Containerfile から作る。`data/` はボリュームとして戦略コンテナへ渡す。学習は待ち受けせず、同じ strategy イメージを `podman-compose run` する。ホストの `pnpm dev` や `uv run python -m reversi.api` を対局の正にしない。ホットリロードは `compose.dev.yaml` のオーバーレイだけを足す。
 
 OpenRouter の API キーは `podman secret create` でホストに置く。名前は `openrouter-api-key`。compose から戦略コンテナへだけ secret として渡し、`/run/secrets/openrouter-api-key` を読む。リポジトリ、イメージ、`.env`、ウェブコンテナには入れない。
 
@@ -430,8 +430,8 @@ OpenRouter の API キーは `podman secret create` でホストに置く。名�
 1. Podman がある個人 PC
 2. mkcert で `127.0.0.1` 用の証明書を `data/certs/` に置く
 3. 生成 AI を使うときだけ `podman secret create openrouter-api-key -` で API キーを渡す（標準入力。ファイルをリポジトリに置かない）
-4. `podman compose up --build` で `https://127.0.0.1:<port>/` を出す
-5. （任意）WTHOR を `data/` に置き、同じ strategy イメージで `podman compose run --rm strategy python -m reversi.train.*` する。対局には再学習は不要
+4. `podman-compose up --build` で `https://127.0.0.1:<port>/` を出す
+5. （任意）WTHOR を `data/` に置き、同じ strategy イメージで `podman-compose run --rm strategy python -m reversi.train.*` する。対局には再学習は不要
 
 資格情報が無い環境でも、生成 AI 以外の個体と対局エンジンは試験できる。pytest / Vitest / lint はホストでよい。ホストの `pnpm dev` を対局サービスの第二の正にしない。
 
@@ -455,6 +455,7 @@ OpenRouter の API キーは `podman secret create` でホストに置く。名�
 
 | 版 | 日付 | 内容 |
 | --- | --- | --- |
+| 0.2.9 | 2026-09-20 | 起動の正を Python の `podman-compose` とする（プラグインの `podman compose` は使わない） |
 | 0.2.8 | 2026-09-19 | 対局と学習の起動を Podman に揃え、ホストの pnpm/uv は試験と lint に限る |
 | 0.2.7 | 2026-09-19 | ファイル単位の配置は `docs/ARCHITECTURE.md` を正とする |
 | 0.2.6 | 2026-09-19 | 対局の既定起動を Podman とし、OpenRouter の API キーを Podman secret で渡す |

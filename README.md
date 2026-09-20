@@ -20,6 +20,7 @@
 
 - 個人用のパソコン（目安としてメモリ 16 GiB まで）
 - [Podman](https://podman.io/)
+- [podman-compose](https://github.com/containers/podman-compose)（Python。起動の正はこちら。プラグインの `podman compose` は本リポジトリの external secret を扱えない）
 - [mkcert](https://github.com/FiloSottile/mkcert)（ブラウザ向けの証明書）
 - Google Chrome
 - （「生成 AI (Jev)」と対局する場合）[OpenRouter](https://openrouter.ai/) の API キー
@@ -150,7 +151,7 @@ curl -sk https://127.0.0.1:3000/api/games \
 | ニューラルネットワーク (棋譜) | 対局前に学習したネットワークで着手する |
 | 生成 AI (Jev) | OpenRouter 上の Jev が合法手から選ぶ |
 
-学習し直さなくても、これらの相手とは対局できます。自分で学習し直す手順は次節です。基準の総当たり結果は [docs/benchmarks/round-robin.md](docs/benchmarks/round-robin.md) です（数値の正本は JSON）。
+学習し直さなくても、これらの相手とは対局できます。自分で学習し直す手順は次節です。基準の総当たり結果は [docs/benchmarks/round-robin.md](docs/benchmarks/round-robin.md) です（数値の正本は JSON）。その成績は JSON の `git.blobs` が指す学習成果物に対する記録であり、いまの `models/` と blob が異なれば一致しません。
 
 ## 学習し直す（任意）
 

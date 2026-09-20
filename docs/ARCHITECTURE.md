@@ -1,13 +1,13 @@
 ---
 title: アーキテクチャ
 product: Reversi Agents
-version: 0.1.4
+version: 0.1.5
 status: working
 date: 2026-09-20
 source: docs/srs.md
 srs_version: 0.1.22
 tech_stack: docs/tech-stack.md
-tech_stack_version: 0.2.8
+tech_stack_version: 0.2.9
 ---
 
 # アーキテクチャ
@@ -16,10 +16,10 @@ tech_stack_version: 0.2.8
 | --- | --- |
 | 文書識別 | reversi-ai-architecture |
 | 対象ソフトウェア | Reversi Agents |
-| 版 | 0.1.4 |
+| 版 | 0.1.5 |
 | 状態 | 現行（設計。要求ではない） |
-| 日付 | 2026-09-19 |
-| 入力 | [`docs/srs.md`](srs.md) 0.1.22、[`docs/tech-stack.md`](tech-stack.md) 0.2.8 |
+| 日付 | 2026-09-20 |
+| 入力 | [`docs/srs.md`](srs.md) 0.1.22、[`docs/tech-stack.md`](tech-stack.md) 0.2.9 |
 
 本文書は**配置と層**の設計正本である。ソフトウェア要求の正本は [`docs/srs.md`](srs.md) であり、本文書は shall を追加・変更・撤回しない。言語・ライブラリ・コンテナの選定は [`docs/tech-stack.md`](tech-stack.md) を正とする。ディレクトリ名は tech-stack 2.3 と一致させ、ファイル単位の置き場と目的は本文書を正とする。
 
@@ -61,7 +61,7 @@ flowchart LR
 | --- | --- | --- |
 | `web` コンテナ（Hono） | ホスト `127.0.0.1` のみ HTTPS | UI 配信、Origin 照合、SSE、戦略プロセスへ中継 |
 | `strategy` コンテナ（FastAPI） | Pod 内のみ。ホストへ出さない | 規則、全エージェントの着手、進行中 1 局、終局の永続化、OpenRouter |
-| 学習（`podman compose run`） | 待ち受けしない | 対局と同じ strategy イメージ。ML / RL / NN の書き出し |
+| 学習（`podman-compose run`） | 待ち受けしない | 対局と同じ strategy イメージ。ML / RL / NN の書き出し |
 
 同時対局は 1。進行中の局は戦略プロセスのメモリ上。終局だけ SQLite へ書く。
 
@@ -366,7 +366,7 @@ tech-stack 第 5 節に加え、配置として次を置かない。
 
 動かすもの（対局・学習）は Podman。測るもの（pytest、Vitest、Biome、Ruff、lefthook）はホスト。根拠は [`docs/tech-stack.md`](tech-stack.md) 3.11 と 4.8。
 
-コンテナの `CMD` と `podman compose run` は、同じ `python -m` / `node` 入口を指す。コンソールスクリプトやルートの pnpm から Python を叩く入口は置かない。
+コンテナの `CMD` と `podman-compose run` は、同じ `python -m` / `node` 入口を指す。コンソールスクリプトやルートの pnpm から Python を叩く入口は置かない。起動の正は Python の `podman-compose` である。プラグインの `podman compose`（docker-compose）は `secrets.external` を扱えず使わない。
 
 ### 8.1 一度だけ
 
@@ -384,10 +384,10 @@ podman secret create openrouter-api-key -
 運用者も開発者も同じ入口である。
 
 ```bash
-podman compose up --build
+podman-compose up --build
 ```
 
-ブラウザは `https://127.0.0.1:<compose が付けるポート>/`。停止は `podman compose down`。
+ブラウザは `https://127.0.0.1:<compose が付けるポート>/`。停止は `podman-compose down`。
 
 | サービス | 入口 | 待ち受け |
 | --- | --- | --- |
@@ -399,7 +399,7 @@ web コンテナが Pod 内で `0.0.0.0:3000` を聞くのはよい。戦略コ�
 ホットリロードが要るときだけ、別スタックを増やさずオーバーレイを足す。
 
 ```bash
-podman compose -f compose.yaml -f compose.dev.yaml up --build
+podman-compose -f compose.yaml -f compose.dev.yaml up --build
 ```
 
 `compose.dev.yaml` はソースの bind mount と reload だけを足す。secret・公開ポート・サービス名は `compose.yaml` のままにする。
@@ -409,13 +409,13 @@ podman compose -f compose.yaml -f compose.dev.yaml up --build
 対局と同じ strategy イメージで、待ち受けせず一発起動する。ホストの `uv run` を正にしない。
 
 ```bash
-podman compose run --rm strategy python -m reversi.train.ml \
+podman-compose run --rm strategy python -m reversi.train.ml \
   --wthor /data/wthor --games /data/games.sqlite --out /models/ml.json
 
-podman compose run --rm strategy python -m reversi.train.rl \
+podman-compose run --rm strategy python -m reversi.train.rl \
   --out /models/rl.json
 
-podman compose run --rm strategy python -m reversi.train.nn \
+podman-compose run --rm strategy python -m reversi.train.nn \
   --wthor /data/wthor --games /data/games.sqlite --out /models/nn.onnx
 ```
 
@@ -436,7 +436,7 @@ pnpm exec depcruise --config .dependency-cruiser.cjs web
 E2E はアプリを Podman で上げ、Playwright はホストの Google Chrome で `https://127.0.0.1` を叩く。
 
 ```bash
-podman compose up --build --wait
+podman-compose up --build --wait
 pnpm exec playwright test --project=chrome
 ```
 
@@ -446,6 +446,7 @@ Issue の検証欄と CI は、この節の生コマンドを使う。ラッパ�
 
 | 版 | 日付 | 内容 |
 | --- | --- | --- |
+| 0.1.5 | 2026-09-20 | 起動の正を `podman-compose` に揃え、文書表の日付をフロントマターと一致させる |
 | 0.1.4 | 2026-09-20 | 総当たり基準結果を `docs/benchmarks/` に置く |
 | 0.1.3 | 2026-09-20 | web はコンテナ内で `0.0.0.0` を聞き、ホストへ出す口は `127.0.0.1` のままにする |
 | 0.1.2 | 2026-09-19 | Biome の検査対象を CI と同じ `web` にする |
