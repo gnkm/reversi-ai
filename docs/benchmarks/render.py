@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
-"""round-robin.json から GitHub 閲覧用の Markdown を書く。数値の正本は JSON。"""
+"""round-robin.json と archive/ から GitHub 閲覧用の Markdown を書く。数値の正本は JSON。"""
 
 from __future__ import annotations
 
 import json
 from collections.abc import Mapping, Sequence
 from pathlib import Path
+from typing import NamedTuple
 
 DIR = Path(__file__).resolve().parent
 SOURCE = DIR / "round-robin.json"
 OUTPUT = DIR / "round-robin.md"
+ARCHIVE = DIR / "archive"
+HISTORY = DIR / "history.md"
 
 SHORT_NAME = {
     "random_uniform": "一様",
@@ -114,6 +117,152 @@ def markdown_table(headers: Sequence[str], rows: Sequence[Sequence[str]]) -> str
     return "\n".join(lines)
 
 
+def md_cell(text: str) -> str:
+    return text.replace("|", "\\|").replace("\n", " ")
+
+
+def archive_filename(recorded_at: str) -> str:
+    """`recorded_at`（例: 2026-09-20 13:23）から archive のファイル名を作る。"""
+    stamp = str(recorded_at).strip().replace(":", "").replace(" ", "-")
+    return f"{stamp}.json"
+
+
+class Snapshot(NamedTuple):
+    recorded_at: str
+    models_commit: str
+    trigger: str
+    points: dict[str, float]
+    specimen_ids: tuple[str, ...]
+    href: str
+
+
+def trigger_line(data: Mapping[str, object]) -> str:
+    protocol = data["protocol"]
+    assert isinstance(protocol, Mapping)
+    notes = protocol["notes"]
+    assert isinstance(notes, list)
+    if not notes:
+        return ""
+    return str(notes[0])
+
+
+def snapshot_from(data: Mapping[str, object], href: str) -> Snapshot:
+    git = data["git"]
+    assert isinstance(git, Mapping)
+    specimens = data["specimens"]
+    standings = data["standings"]
+    assert isinstance(specimens, list)
+    assert isinstance(standings, list)
+    return Snapshot(
+        recorded_at=str(data["recorded_at"]),
+        models_commit=str(git["models_commit"]),
+        trigger=trigger_line(data),
+        points={
+            str(row["specimen_id"]): float(row["points"]) for row in standings
+        },
+        specimen_ids=tuple(str(item["specimen_id"]) for item in specimens),
+        href=href,
+    )
+
+
+def collect_snapshots(
+    latest: Mapping[str, object],
+    archive_dir: Path,
+) -> list[Snapshot]:
+    snapshots: list[Snapshot] = []
+    seen: set[str] = set()
+    if archive_dir.is_dir():
+        for path in sorted(archive_dir.glob("*.json")):
+            data = json.loads(path.read_text(encoding="utf-8"))
+            assert isinstance(data, dict)
+            recorded_at = str(data["recorded_at"])
+            if recorded_at in seen:
+                continue
+            seen.add(recorded_at)
+            snapshots.append(snapshot_from(data, f"archive/{path.name}"))
+    latest_at = str(latest["recorded_at"])
+    if latest_at not in seen:
+        snapshots.append(snapshot_from(latest, "round-robin.json"))
+    snapshots.sort(key=lambda item: item.recorded_at, reverse=True)
+    return snapshots
+
+
+def specimen_columns(
+    latest: Mapping[str, object],
+    snapshots: Sequence[Snapshot],
+) -> list[str]:
+    specimens = latest["specimens"]
+    assert isinstance(specimens, list)
+    ids = [str(item["specimen_id"]) for item in specimens]
+    seen = set(ids)
+    for snap in snapshots:
+        for sid in snap.specimen_ids:
+            if sid not in seen:
+                ids.append(sid)
+                seen.add(sid)
+    return ids
+
+
+def render_history(
+    latest: Mapping[str, object],
+    archive_dir: Path,
+) -> str:
+    snapshots = collect_snapshots(latest, archive_dir)
+    columns = specimen_columns(latest, snapshots)
+    generation_rows = [
+        [
+            md_cell(snap.recorded_at),
+            f"`{snap.models_commit}`",
+            md_cell(snap.trigger),
+            f"[JSON]({snap.href})",
+        ]
+        for snap in snapshots
+    ]
+    point_headers = ["記録"] + [md_cell(SHORT_NAME.get(sid, sid)) for sid in columns]
+    point_rows = []
+    for snap in snapshots:
+        cells = [f"[{md_cell(snap.recorded_at)}]({snap.href})"]
+        for sid in columns:
+            if sid in snap.points:
+                cells.append(fmt_points(snap.points[sid]))
+            else:
+                cells.append("—")
+        point_rows.append(cells)
+
+    lines = [
+        "<!-- このファイルは docs/benchmarks/render.py が archive/ と round-robin.json から書く。手で直さない。 -->",
+        "",
+        "# 総当たりの勝ち点推移",
+        "",
+        "最新の数値の正本は [`round-robin.json`](round-robin.json) である。過去の正本は [`archive/`](archive/) に、現行と同じ形で残る。最新の閲覧用は [`round-robin.md`](round-robin.md) である。",
+        "",
+        "写しを作り直す:",
+        "",
+        "```bash",
+        "python3 docs/benchmarks/render.py",
+        "```",
+        "",
+        f"総当たりを取り直すときは、いまの `round-robin.json` を `archive/{archive_filename(str(latest['recorded_at']))}` のような名前でコピーしてから置き換え、上のコマンドで本ファイルと `round-robin.md` を書き直す。",
+        "",
+        "同じ `specimen_id` を世代をまたいで追う。旧世代を別個体としては出さない。",
+        "",
+        "## 世代",
+        "",
+        markdown_table(
+            ["記録", "学習成果物", "きっかけ", "正本"],
+            generation_rows,
+        ),
+        "",
+        "## 勝ち点",
+        "",
+        "行が世代、列がカタログ個体の略称。勝ち点は勝 1・分 0.5。記録日時からその時点の JSON へ辿れる。",
+        "",
+        markdown_table(point_headers, point_rows),
+        "",
+    ]
+    return "\n".join(lines)
+
+
 def render(data: Mapping[str, object]) -> str:
     protocol = data["protocol"]
     git = data["git"]
@@ -188,7 +337,7 @@ def render(data: Mapping[str, object]) -> str:
         "",
         "# カタログ個体の総当たり",
         "",
-        "数値の正本は [`round-robin.json`](round-robin.json) である。本ファイルは GitHub 上の閲覧用の写しである。",
+        "数値の正本は [`round-robin.json`](round-robin.json) である。本ファイルは GitHub 上の閲覧用の写しである。勝ち点の推移は [`history.md`](history.md) である。",
         "",
         "写しを作り直す:",
         "",
@@ -263,7 +412,9 @@ def render(data: Mapping[str, object]) -> str:
 
 def main() -> None:
     data = json.loads(SOURCE.read_text(encoding="utf-8"))
+    assert isinstance(data, dict)
     OUTPUT.write_text(render(data).rstrip() + "\n", encoding="utf-8")
+    HISTORY.write_text(render_history(data, ARCHIVE).rstrip() + "\n", encoding="utf-8")
 
 
 if __name__ == "__main__":
