@@ -10,6 +10,7 @@ from typing import Any
 from openrouter import OpenRouter
 from openrouter.utils.retries import BackoffStrategy, RetryConfig
 
+from reversi.agents.prompt import PROMPTS_DIR, PromptFileError, load_sections
 from reversi.engine.board import BOARD_SIZE, Square
 from reversi.engine.rules import Place, Position, legal_places
 
@@ -23,6 +24,8 @@ DESCRIPTION = (
 )
 DECISIONS_SERVER = "https://openrouter.ai"
 SECRET_PATH = Path("/run/secrets/openrouter-api-key")
+PROMPT_PATH = PROMPTS_DIR / "jev.md"
+_SQUARE_PLACEHOLDER = "{square}"
 # Hono の戦略中継は 60 秒。それより先に失敗させ、ロックを返す。
 DECISIONS_TIMEOUT_MS = 55_000
 _QUESTION_ID = "move"
@@ -35,6 +38,7 @@ __all__ = [
     "DESCRIPTION",
     "DISPLAY_NAME",
     "MODEL_ID",
+    "PROMPT_PATH",
     "SECRET_PATH",
     "SPECIMEN_ID",
     "ExternalModelError",
@@ -72,16 +76,27 @@ def _board_state(position: Position, places: Sequence[Square]) -> dict[str, Any]
     }
 
 
+def _prompt_sections() -> dict[str, str]:
+    try:
+        return load_sections(PROMPT_PATH, "instructions", "option")
+    except PromptFileError as exc:
+        raise ExternalModelError(str(exc)) from exc
+
+
+def _option_text(template: str, square: Square) -> str:
+    if _SQUARE_PLACEHOLDER not in template:
+        raise ExternalModelError("着手指示の option に {square} がありません")
+    return template.replace(_SQUARE_PLACEHOLDER, square.algebraic)
+
+
 def _questions(places: Sequence[Square]) -> dict[str, Any]:
+    parts = _prompt_sections()
     return {
         _QUESTION_ID: {
             "type": "choice",
-            "instructions": (
-                "Choose exactly one legal Reversi move for the side to move. "
-                "Each option is an algebraic square. a1 is bottom-left for Black."
-            ),
+            "instructions": parts["instructions"],
             "criteria": {
-                square.algebraic: f"Place a stone on {square.algebraic}."
+                square.algebraic: _option_text(parts["option"], square)
                 for square in places
             },
         }
@@ -117,6 +132,8 @@ def _legal_square(algebraic: str, places: Sequence[Square]) -> Square:
 
 def _call_openrouter(position: Position, places: Sequence[Square]) -> Square:
     key = read_secret()
+    questions = _questions(places)
+    state = _board_state(position, places)
     try:
         with OpenRouter(
             api_key=key,
@@ -125,8 +142,8 @@ def _call_openrouter(position: Position, places: Sequence[Square]) -> Square:
         ) as client:
             response = client.alpha.decisions.create(
                 model=MODEL_ID,
-                questions=_questions(places),
-                state=_board_state(position, places),
+                questions=questions,
+                state=state,
                 retries=_NO_RETRY,
                 timeout_ms=DECISIONS_TIMEOUT_MS,
             )
