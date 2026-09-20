@@ -25,9 +25,8 @@ SPECIMEN_ID = "jev"
 CATEGORY = "generative_ai"
 DISPLAY_NAME = "生成 AI (Jev)"
 DESCRIPTION = (
-    "OpenRouter 上の Jev を Decisions API で呼び、コードがほぼ互角とみなした"
-    "候補を Choice で選ぶ。着手後の盤の点数で絞り込み、confidence が足りなければ"
-    "コードの最善手を指す。対局中に WTHOR は参照しない。"
+    "コード評価の最善手で着手する。OpenRouter 上の Jev による絞り込みは"
+    "段階 5 の対局で不採用のため呼ばない。対局中に WTHOR は参照しない。"
 )
 DECISIONS_SERVER = "https://openrouter.ai"
 SECRET_PATH = Path("/run/secrets/openrouter-api-key")
@@ -46,7 +45,7 @@ _BOARD_CORNERS = frozenset({"a1", "h1", "a8", "h8"})
 
 STAGE1_CONFIG_NAMES = ("v1_constant", "v2_jev0", "v2_code0", "v2_as_is")
 STAGE1_CODE_ONLY = frozenset({"v1_constant", "v2_jev0"})
-DEFAULT_STAGE1_CONFIG = "v2_as_is"
+DEFAULT_STAGE1_CONFIG = "v2_jev0"
 # 第 1 版（#71）の優先係数。答えは noul の中央 0.5 に固定し、コード評価だけを測る。
 _V1_CONSTANT_ANSWER = 0.5
 _V1_ANSWER_WEIGHTS = {
