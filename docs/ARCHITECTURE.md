@@ -1,7 +1,7 @@
 ---
 title: アーキテクチャ
 product: Reversi Agents
-version: 0.1.30
+version: 0.1.31
 status: working
 date: 2026-09-20
 source: docs/srs.md
@@ -16,7 +16,7 @@ tech_stack_version: 0.2.19
 | --- | --- |
 | 文書識別 | reversi-ai-architecture |
 | 対象ソフトウェア | Reversi Agents |
-| 版 | 0.1.30 |
+| 版 | 0.1.31 |
 | 状態 | 現行（設計。要求ではない） |
 | 日付 | 2026-09-20 |
 | 入力 | [`docs/srs.md`](srs.md) 0.1.24、[`docs/tech-stack.md`](tech-stack.md) 0.2.19 |
@@ -179,7 +179,7 @@ reversi-ai/
 │   │   │   ├── most_flips.py          # ルールベース (最多取り)
 │   │   │   ├── positional.py          # ルールベース (位置評価)
 │   │   │   ├── minimax.py             # ルールベース (ミニマックス) 深さ 4
-│   │   │   ├── alphabeta.py           # ルールベース (αβ) 深さ 6。Move Ordering。葉は Mobility・Corner・石差
+│   │   │   ├── alphabeta.py           # ルールベース (αβ) 深さ 6。Move Ordering。葉は Mobility・Corner・X/C・Frontier・石差。W は空きマス（Game Phase）
 │   │   │   ├── opening.py             # ルールベース (定石) 虎・牛・鼠
 │   │   │   ├── ml.py                  # 機械学習 (棋譜)。係数 JSON の積和のみ
 │   │   │   ├── lgbm.py                # 機械学習 (LightGBM)。ネイティブテキストを読む
@@ -315,7 +315,7 @@ reversi-ai/
 | `most_flips.py` | ルールベース (最多取り) | 裏返す相手石が最大の手 |
 | `positional.py` | ルールベース (位置評価) | 着手直後の自石点数合計が最大の手 |
 | `minimax.py` | ルールベース (ミニマックス) | 深さ 4。葉は位置評価表の差。アルファベータは同一の葉評価になる範囲で可 |
-| `alphabeta.py` | ルールベース (αβ) | 深さ 6 の Negamax 形式の αβ。探索前に合法手を Move Ordering（角、相手手数、安全な辺、通常、C、X。角が空なら X / C は後ろ）。葉は Mobility 差・Corner 差・石数差の一次結合。根の同点は a1…h8 であり探索順ではタイブレークしない。対局中に深さを変えない |
+| `alphabeta.py` | ルールベース (αβ) | 深さ 6 の Negamax 形式の αβ。探索前に合法手を Move Ordering（角、相手手数、安全な辺、通常、C、X。角が空なら X / C は後ろ）。葉は Mobility 差・Corner 差・X/C・Frontier 差・石数差の一次結合。石数の重みは空きマス数（Game Phase）で変える。根の同点は a1…h8 であり探索順ではタイブレークしない。対局中に深さを変えない |
 | `opening.py` | ルールベース (定石) | 虎・牛・鼠の 3 列と 8 対称。外れは位置評価 |
 | `ml.py` | 機械学習 (棋譜) | `models/ml.json` の積和。onnxruntime / PyTorch を import しない |
 | `lgbm.py` | 機械学習 (LightGBM) | `models/lgbm.txt` を LightGBM ネイティブ形式で読む。onnxruntime / PyTorch / joblib / pickle を import しない |
@@ -426,6 +426,7 @@ web コンテナが Pod 内で `0.0.0.0:3000` を聞くのはよい。戦略コ�
 
 | 版 | 日付 | 内容 |
 | --- | --- | --- |
+| 0.1.31 | 2026-09-20 | ルールベース (αβ) の葉に Frontier・X/C・Game Phase を足す |
 | 0.1.30 | 2026-09-20 | Jev 段階 5 の対局記録を置き、カタログ既定をコード最善にする |
 | 0.1.29 | 2026-09-20 | ルールベース (αβ) の探索に Move Ordering を入れる |
 | 0.1.28 | 2026-09-20 | Jev の絞り込みパラメータをオフラインで調整する記録を置く |
