@@ -95,7 +95,7 @@ class FakeEventSource {
   }
 }
 
-function renderAgents() {
+function renderAgents(moveIntervalMs = 0) {
   const opening = game({
     black: { kind: "specimen", specimen_id: "random_uniform" },
     white: { kind: "specimen", specimen_id: "random_uniform" },
@@ -108,6 +108,7 @@ function renderAgents() {
       specimenNames={names}
       onGame={(next) => seen.push(next)}
       onBack={() => undefined}
+      moveIntervalMs={moveIntervalMs}
     />,
   );
   return { opening, seen };
@@ -117,6 +118,7 @@ afterEach(() => {
   cleanup();
   FakeEventSource.instances = [];
   vi.unstubAllGlobals();
+  vi.useRealTimers();
 });
 
 describe("GamePage", () => {
@@ -286,6 +288,53 @@ describe("GamePage", () => {
     expect(
       screen.getByText("外部モデルの失敗により、この対局は続けられません。"),
     ).toBeTruthy();
+  });
+
+  it("着手間隔の未変更時は 1 秒待ってから次の着手（パスを含む）を提示する", () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("EventSource", FakeEventSource);
+    const opening = game({
+      black: { kind: "specimen", specimen_id: "random_uniform" },
+      white: { kind: "specimen", specimen_id: "random_uniform" },
+      legal_moves: ["c4", "d3", "e6", "f5"],
+    });
+    const seen: GameState[] = [];
+    render(
+      <GamePage
+        game={opening}
+        specimenNames={names}
+        onGame={(next) => seen.push(next)}
+        onBack={() => undefined}
+      />,
+    );
+    const moved = game({
+      ...opening,
+      last_move: { type: "place", square: "f5" },
+      official_score: { black: 4, white: 1 },
+    });
+    const passed = game({
+      ...moved,
+      last_move: { type: "pass" },
+    });
+    FakeEventSource.instances[0]?.emit("move_applied", {
+      type: "move_applied",
+      move: moved.last_move,
+      game: moved,
+    });
+    expect(seen).toEqual([]);
+    vi.advanceTimersByTime(999);
+    expect(seen).toEqual([]);
+    vi.advanceTimersByTime(1);
+    expect(seen).toEqual([moved]);
+    FakeEventSource.instances[0]?.emit("move_applied", {
+      type: "move_applied",
+      move: passed.last_move,
+      game: passed,
+    });
+    vi.advanceTimersByTime(999);
+    expect(seen).toEqual([moved]);
+    vi.advanceTimersByTime(1);
+    expect(seen).toEqual([moved, passed]);
   });
 
   it("終局イベントのあとの SSE 切断では GET しない", async () => {
