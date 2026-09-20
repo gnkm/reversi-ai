@@ -625,10 +625,35 @@ def test_jev_questions_do_not_scale_with_legal_places() -> None:
     assert set(opening_state.keys()) == set(one_state.keys())
 
 
-def test_jev_source_does_not_delegate_to_minimax() -> None:
+def test_jev_does_not_delegate_to_minimax_choose_move(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     source = _module_source("jev.py")
-    assert "minimax" not in source
-    assert "choose_move" in source
+    tree = ast.parse(source)
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                assert "minimax" not in alias.name.split(".")
+                assert alias.asname != "minimax"
+        elif isinstance(node, ast.ImportFrom):
+            module = node.module or ""
+            assert "minimax" not in module.split(".")
+            for alias in node.names:
+                assert alias.name != "minimax"
+                assert alias.asname != "minimax"
+    called = {"n": 0}
+
+    def boom(*_args: object, **_kwargs: object) -> None:
+        called["n"] += 1
+        raise AssertionError("カタログのミニマックス個体へ委譲してはいけない")
+
+    monkeypatch.setattr(minimax, "choose_move", boom)
+    monkeypatch.setattr(jev, "_call_openrouter", lambda _position, legal: legal[0])
+    position = initial_position()
+    places = legal_places(position)
+    move = jev.choose_move(position)
+    assert move == Place(places[0])
+    assert called["n"] == 0
 
 
 def test_jev_rejects_out_of_range_stage_probabilities() -> None:
