@@ -1,0 +1,308 @@
+{
+  "recorded_at": "2026-09-20 13:07",
+  "baseline": "v1_constant",
+  "v1_constant_answer": 0.5,
+  "protocol": {
+    "opponents": [
+      "most_flips",
+      "positional",
+      "opening"
+    ],
+    "both_colors": true,
+    "include_self_play": false,
+    "scoring": {
+      "win": 1.0,
+      "draw": 0.5,
+      "loss": 0.0
+    },
+    "notes": [
+      "カタログに 4 体は置かず、検証用の切替で 4 構成を同じ相手・同じ条件で対局した。",
+      "v1_constant は第 1 版の min-max 正規化と優先係数で、Jev の答えを 0.5 に固定した。",
+      "v2_jev0 は現行の固定 scales 評価だけで、Jev 項は 0。",
+      "v2_code0 は現行合成のコード項を 0 にし、Jev の Choice だけ。",
+      "v2_as_is は prompts/jev.json の現行合成。",
+      "基準線はコードだけの構成のうち勝ち点（同点なら石差・勝数）が最も高いもの。",
+      "資格情報と課金が要る対局は CI に載せない。本スクリプトはホストで明示実行する。"
+    ]
+  },
+  "configs": [
+    {
+      "name": "v1_constant",
+      "wins": 4,
+      "draws": 0,
+      "losses": 2,
+      "points": 4.0,
+      "stone_diff": 76,
+      "games": 6
+    },
+    {
+      "name": "v2_jev0",
+      "wins": 3,
+      "draws": 0,
+      "losses": 3,
+      "points": 3.0,
+      "stone_diff": -26,
+      "games": 6
+    },
+    {
+      "name": "v2_code0",
+      "wins": 4,
+      "draws": 0,
+      "losses": 2,
+      "points": 4.0,
+      "stone_diff": 16,
+      "games": 6
+    },
+    {
+      "name": "v2_as_is",
+      "wins": 2,
+      "draws": 0,
+      "losses": 4,
+      "points": 2.0,
+      "stone_diff": -90,
+      "games": 6
+    }
+  ],
+  "games": [
+    {
+      "config": "v1_constant",
+      "opponent": "most_flips",
+      "jev_color": "black",
+      "result": "win",
+      "official_black": 49,
+      "official_white": 15,
+      "stones_black": 49,
+      "stones_white": 15
+    },
+    {
+      "config": "v1_constant",
+      "opponent": "most_flips",
+      "jev_color": "white",
+      "result": "win",
+      "official_black": 17,
+      "official_white": 47,
+      "stones_black": 17,
+      "stones_white": 47
+    },
+    {
+      "config": "v1_constant",
+      "opponent": "positional",
+      "jev_color": "black",
+      "result": "win",
+      "official_black": 53,
+      "official_white": 11,
+      "stones_black": 53,
+      "stones_white": 11
+    },
+    {
+      "config": "v1_constant",
+      "opponent": "positional",
+      "jev_color": "white",
+      "result": "loss",
+      "official_black": 42,
+      "official_white": 22,
+      "stones_black": 42,
+      "stones_white": 22
+    },
+    {
+      "config": "v1_constant",
+      "opponent": "opening",
+      "jev_color": "black",
+      "result": "win",
+      "official_black": 34,
+      "official_white": 30,
+      "stones_black": 34,
+      "stones_white": 30
+    },
+    {
+      "config": "v1_constant",
+      "opponent": "opening",
+      "jev_color": "white",
+      "result": "loss",
+      "official_black": 39,
+      "official_white": 25,
+      "stones_black": 39,
+      "stones_white": 25
+    },
+    {
+      "config": "v2_jev0",
+      "opponent": "most_flips",
+      "jev_color": "black",
+      "result": "win",
+      "official_black": 36,
+      "official_white": 28,
+      "stones_black": 36,
+      "stones_white": 28
+    },
+    {
+      "config": "v2_jev0",
+      "opponent": "most_flips",
+      "jev_color": "white",
+      "result": "win",
+      "official_black": 21,
+      "official_white": 43,
+      "stones_black": 21,
+      "stones_white": 43
+    },
+    {
+      "config": "v2_jev0",
+      "opponent": "positional",
+      "jev_color": "black",
+      "result": "win",
+      "official_black": 39,
+      "official_white": 25,
+      "stones_black": 39,
+      "stones_white": 25
+    },
+    {
+      "config": "v2_jev0",
+      "opponent": "positional",
+      "jev_color": "white",
+      "result": "loss",
+      "official_black": 46,
+      "official_white": 18,
+      "stones_black": 46,
+      "stones_white": 18
+    },
+    {
+      "config": "v2_jev0",
+      "opponent": "opening",
+      "jev_color": "black",
+      "result": "loss",
+      "official_black": 19,
+      "official_white": 45,
+      "stones_black": 19,
+      "stones_white": 45
+    },
+    {
+      "config": "v2_jev0",
+      "opponent": "opening",
+      "jev_color": "white",
+      "result": "loss",
+      "official_black": 40,
+      "official_white": 24,
+      "stones_black": 40,
+      "stones_white": 24
+    },
+    {
+      "config": "v2_code0",
+      "opponent": "most_flips",
+      "jev_color": "black",
+      "result": "win",
+      "official_black": 36,
+      "official_white": 28,
+      "stones_black": 36,
+      "stones_white": 28
+    },
+    {
+      "config": "v2_code0",
+      "opponent": "most_flips",
+      "jev_color": "white",
+      "result": "loss",
+      "official_black": 48,
+      "official_white": 16,
+      "stones_black": 48,
+      "stones_white": 16
+    },
+    {
+      "config": "v2_code0",
+      "opponent": "positional",
+      "jev_color": "black",
+      "result": "win",
+      "official_black": 54,
+      "official_white": 10,
+      "stones_black": 54,
+      "stones_white": 10
+    },
+    {
+      "config": "v2_code0",
+      "opponent": "positional",
+      "jev_color": "white",
+      "result": "win",
+      "official_black": 26,
+      "official_white": 38,
+      "stones_black": 26,
+      "stones_white": 38
+    },
+    {
+      "config": "v2_code0",
+      "opponent": "opening",
+      "jev_color": "black",
+      "result": "loss",
+      "official_black": 17,
+      "official_white": 47,
+      "stones_black": 17,
+      "stones_white": 47
+    },
+    {
+      "config": "v2_code0",
+      "opponent": "opening",
+      "jev_color": "white",
+      "result": "win",
+      "official_black": 25,
+      "official_white": 39,
+      "stones_black": 25,
+      "stones_white": 39
+    },
+    {
+      "config": "v2_as_is",
+      "opponent": "most_flips",
+      "jev_color": "black",
+      "result": "win",
+      "official_black": 37,
+      "official_white": 27,
+      "stones_black": 37,
+      "stones_white": 27
+    },
+    {
+      "config": "v2_as_is",
+      "opponent": "most_flips",
+      "jev_color": "white",
+      "result": "loss",
+      "official_black": 38,
+      "official_white": 26,
+      "stones_black": 38,
+      "stones_white": 26
+    },
+    {
+      "config": "v2_as_is",
+      "opponent": "positional",
+      "jev_color": "black",
+      "result": "loss",
+      "official_black": 22,
+      "official_white": 42,
+      "stones_black": 22,
+      "stones_white": 42
+    },
+    {
+      "config": "v2_as_is",
+      "opponent": "positional",
+      "jev_color": "white",
+      "result": "loss",
+      "official_black": 52,
+      "official_white": 12,
+      "stones_black": 52,
+      "stones_white": 12
+    },
+    {
+      "config": "v2_as_is",
+      "opponent": "opening",
+      "jev_color": "black",
+      "result": "win",
+      "official_black": 39,
+      "official_white": 25,
+      "stones_black": 39,
+      "stones_white": 25
+    },
+    {
+      "config": "v2_as_is",
+      "opponent": "opening",
+      "jev_color": "white",
+      "result": "loss",
+      "official_black": 53,
+      "official_white": 11,
+      "stones_black": 53,
+      "stones_white": 11
+    }
+  ]
+}
