@@ -34,7 +34,15 @@ from reversi.agents.random_uniform import (
     choose_move,
 )
 from reversi.encode import VECTOR_SIZE
-from reversi.engine.board import Board, Color, Square, Stone, all_squares, empty_board
+from reversi.engine.board import (
+    BOARD_SIZE,
+    Board,
+    Color,
+    Square,
+    Stone,
+    all_squares,
+    empty_board,
+)
 from reversi.engine.rules import (
     PassMove,
     Place,
@@ -2072,35 +2080,139 @@ def test_minimax_source_does_not_call_models() -> None:
                 assert "openrouter.ai" not in lowered
 
 
-_PHASE2_CORNERS = frozenset(Square.parse(name) for name in ("a1", "a8", "h1", "h8"))
+_PHASE4_CORNERS = frozenset(Square.parse(name) for name in ("a1", "a8", "h1", "h8"))
+_PHASE4_X = {
+    Square.parse("b2"): Square.parse("a1"),
+    Square.parse("b7"): Square.parse("a8"),
+    Square.parse("g2"): Square.parse("h1"),
+    Square.parse("g7"): Square.parse("h8"),
+}
+_PHASE4_C = {
+    Square.parse("a2"): Square.parse("a1"),
+    Square.parse("b1"): Square.parse("a1"),
+    Square.parse("a7"): Square.parse("a8"),
+    Square.parse("b8"): Square.parse("a8"),
+    Square.parse("g1"): Square.parse("h1"),
+    Square.parse("h2"): Square.parse("h1"),
+    Square.parse("g8"): Square.parse("h8"),
+    Square.parse("h7"): Square.parse("h8"),
+}
+_PHASE4_NEIGHBOR_DELTAS = (
+    (-1, -1),
+    (-1, 0),
+    (-1, 1),
+    (0, -1),
+    (0, 1),
+    (1, -1),
+    (1, 0),
+    (1, 1),
+)
 
 
-def _phase2_parts(board: Board, color: Color) -> tuple[int, int, int]:
-    """(Mobility 差, Corner 差, 石数差)。正規化しない生の差。"""
+def _phase4_danger_diff(
+    board: Board,
+    color: Color,
+    related: dict[Square, Square],
+) -> int:
+    own = color.stone
+    opponent = color.opponent.stone
+    total = 0
+    for square, corner in related.items():
+        if board.stone_at(corner) is not Stone.EMPTY:
+            continue
+        stone = board.stone_at(square)
+        if stone is own:
+            total += 1
+        elif stone is opponent:
+            total -= 1
+    return total
+
+
+def _phase4_is_frontier(board: Board, square: Square) -> bool:
+    for delta_file, delta_rank in _PHASE4_NEIGHBOR_DELTAS:
+        file = square.file + delta_file
+        rank = square.rank + delta_rank
+        if 0 <= file < BOARD_SIZE and 0 <= rank < BOARD_SIZE:
+            neighbor = Square(file=file, rank=rank)
+            if board.stone_at(neighbor) is Stone.EMPTY:
+                return True
+    return False
+
+
+def _phase4_disc_weight(empty: int) -> int:
+    if empty >= 40:
+        return 1
+    if empty >= 20:
+        return 5
+    if empty >= 10:
+        return 20
+    return 100
+
+
+def _phase4_parts(
+    board: Board, color: Color
+) -> tuple[int, int, int, int, int, int, int]:
+    """(Mobility, Corner, 石数, X, C, Frontier, 空きマス)。差は自分 − 相手。"""
     own_places = len(legal_places(Position(board, color)))
     opp_places = len(legal_places(Position(board, color.opponent)))
     own = color.stone
-    opponent = color.opponent.stone
     corners = 0
     discs = 0
+    frontier = 0
+    empty = 0
     for square in all_squares():
         stone = board.stone_at(square)
-        if stone is own:
-            sign = 1
-        elif stone is opponent:
-            sign = -1
-        else:
+        if stone is Stone.EMPTY:
+            empty += 1
             continue
+        sign = 1 if stone is own else -1
         discs += sign
-        if square in _PHASE2_CORNERS:
+        if square in _PHASE4_CORNERS:
             corners += sign
-    return own_places - opp_places, corners, discs
+        if _phase4_is_frontier(board, square):
+            frontier += sign
+    x_squares = _phase4_danger_diff(board, color, _PHASE4_X)
+    c_squares = _phase4_danger_diff(board, color, _PHASE4_C)
+    return (
+        own_places - opp_places,
+        corners,
+        discs,
+        x_squares,
+        c_squares,
+        frontier,
+        empty,
+    )
 
 
-def _phase2_leaf_score(board: Board, color: Color) -> int:
-    """提案書 Phase 2 の葉。50 × Mobility 差 + 1000 × Corner 差 + 1 × 石数差。"""
-    mobility, corner, disc = _phase2_parts(board, color)
-    return 50 * mobility + 1000 * corner + disc
+def _phase4_leaf_score(board: Board, color: Color) -> int:
+    """Phase 4 の葉。W は空きマス数（Game Phase）。"""
+    mobility, corner, disc, x_squares, c_squares, frontier, empty = _phase4_parts(
+        board, color
+    )
+    weight = _phase4_disc_weight(empty)
+    return (
+        50 * mobility
+        + 1000 * corner
+        - 150 * x_squares
+        - 80 * c_squares
+        - 10 * frontier
+        + weight * disc
+    )
+
+
+def _board_with_empty_black_lead(empty: int) -> Board:
+    occupied = BOARD_SIZE * BOARD_SIZE - empty
+    whites = max((occupied - 1) // 2, 0)
+    blacks = occupied - whites
+    updates: dict[Square, Stone] = {}
+    for index, square in enumerate(all_squares()):
+        if index < blacks:
+            updates[square] = Stone.BLACK
+        elif index < blacks + whites:
+            updates[square] = Stone.WHITE
+        else:
+            break
+    return empty_board().replacing(updates)
 
 
 def test_catalog_lists_alphabeta() -> None:
@@ -2117,6 +2229,8 @@ def test_catalog_lists_alphabeta() -> None:
     assert "Mobility" in item.description
     assert "Corner" in item.description
     assert "Move Ordering" in item.description
+    assert "Frontier" in item.description
+    assert "Game Phase" in item.description
     assert "点数表" not in item.description
     assert item.specimen_id != minimax_item.specimen_id
     assert item.display_name != minimax_item.display_name
@@ -2124,6 +2238,7 @@ def test_catalog_lists_alphabeta() -> None:
     assert minimax.SEARCH_DEPTH == 4
     assert get(alphabeta.SPECIMEN_ID) == item
     assert get(minimax.SPECIMEN_ID) == minimax_item
+    assert sum(1 for listed in items() if listed.specimen_id == alphabeta.SPECIMEN_ID) == 1
     with pytest.raises(KeyError):
         get("rule_based")
 
@@ -2141,16 +2256,22 @@ def test_alphabeta_leaf_prefers_own_corner_lead() -> None:
             Square.parse("h8"): Stone.WHITE,
         }
     )
-    extra_mob, extra_corner, extra_disc = _phase2_parts(extra, Color.BLACK)
-    even_mob, even_corner, even_disc = _phase2_parts(even, Color.BLACK)
+    extra_mob, extra_corner, extra_disc, extra_x, extra_c, extra_f, _empty = (
+        _phase4_parts(extra, Color.BLACK)
+    )
+    even_mob, even_corner, even_disc, even_x, even_c, even_f, _even_empty = (
+        _phase4_parts(even, Color.BLACK)
+    )
     assert extra_mob == even_mob == 0
     assert extra_disc == even_disc == 0
+    assert extra_x == extra_c == extra_f == 0
+    assert even_x == even_c == even_f == 0
     assert extra_corner == 1
     assert even_corner == 0
     extra_score = alphabeta.leaf_score(extra, Color.BLACK)
     even_score = alphabeta.leaf_score(even, Color.BLACK)
-    assert extra_score == _phase2_leaf_score(extra, Color.BLACK) == 1000
-    assert even_score == _phase2_leaf_score(even, Color.BLACK) == 0
+    assert extra_score == _phase4_leaf_score(extra, Color.BLACK) == 1000
+    assert even_score == _phase4_leaf_score(even, Color.BLACK) == 0
     assert extra_score > even_score
     assert alphabeta.leaf_score(extra, Color.WHITE) == -1000
 
@@ -2180,15 +2301,21 @@ def test_alphabeta_leaf_prefers_own_mobility_lead() -> None:
             Square.parse("f4"): Stone.WHITE,
         }
     )
-    more_mob, more_corner, more_disc = _phase2_parts(more, Color.BLACK)
-    even_mob, even_corner, even_disc = _phase2_parts(even, Color.BLACK)
+    more_mob, more_corner, more_disc, more_x, more_c, more_f, _more_empty = (
+        _phase4_parts(more, Color.BLACK)
+    )
+    even_mob, even_corner, even_disc, even_x, even_c, even_f, _even_empty = (
+        _phase4_parts(even, Color.BLACK)
+    )
     assert more_corner == even_corner == 0
     assert more_disc == even_disc == 0
+    assert more_x == more_c == more_f == 0
+    assert even_x == even_c == even_f == 0
     assert more_mob > even_mob
     more_score = alphabeta.leaf_score(more, Color.BLACK)
     even_score = alphabeta.leaf_score(even, Color.BLACK)
-    assert more_score == _phase2_leaf_score(more, Color.BLACK) == 50 * more_mob
-    assert even_score == _phase2_leaf_score(even, Color.BLACK) == 50 * even_mob
+    assert more_score == _phase4_leaf_score(more, Color.BLACK) == 50 * more_mob
+    assert even_score == _phase4_leaf_score(even, Color.BLACK) == 50 * even_mob
     assert more_score > even_score
 
 
@@ -2201,9 +2328,9 @@ def test_alphabeta_leaf_does_not_use_position_table() -> None:
         }
     )
     table = minimax.leaf_score(board, Color.BLACK)
-    phase2 = alphabeta.leaf_score(board, Color.BLACK)
-    assert phase2 == _phase2_leaf_score(board, Color.BLACK)
-    assert phase2 != table
+    phase4 = alphabeta.leaf_score(board, Color.BLACK)
+    assert phase4 == _phase4_leaf_score(board, Color.BLACK)
+    assert phase4 != table
     assert table == _spec_leaf_score(board, Color.BLACK)
     source = _module_source("alphabeta.py")
     assert "score_at" not in source
@@ -2257,6 +2384,8 @@ def test_alphabeta_source_is_negamax_and_does_not_call_models() -> None:
     assert "position_table" not in source
     assert "Mobility" in source
     assert "Corner" in source
+    assert "Frontier" in source
+    assert "Game Phase" in source
     assert "def ordered_places(" in source
     assert "_X_SQUARES" in source
     assert "_C_SQUARES" in source
@@ -2336,6 +2465,217 @@ def test_alphabeta_root_tiebreak_is_coordinate_not_ordering() -> None:
     assert ordered_place == unordered_place == Place(Square.parse("d3"))
     assert ordered_value == unordered_value
     assert alphabeta.choose_move(position) == ordered_place
+
+
+def test_alphabeta_leaf_penalizes_x_on_empty_corner() -> None:
+    danger = empty_board().replacing(
+        {
+            Square.parse("b2"): Stone.BLACK,
+            Square.parse("e5"): Stone.WHITE,
+        }
+    )
+    inner = empty_board().replacing(
+        {
+            Square.parse("c3"): Stone.BLACK,
+            Square.parse("e5"): Stone.WHITE,
+        }
+    )
+    danger_parts = _phase4_parts(danger, Color.BLACK)
+    inner_parts = _phase4_parts(inner, Color.BLACK)
+    assert danger_parts[0] == inner_parts[0] == 0
+    assert danger_parts[1] == inner_parts[1] == 0
+    assert danger_parts[2] == inner_parts[2] == 0
+    assert danger_parts[4] == inner_parts[4] == 0
+    assert danger_parts[5] == inner_parts[5] == 0
+    assert danger_parts[3] == 1
+    assert inner_parts[3] == 0
+    danger_score = alphabeta.leaf_score(danger, Color.BLACK)
+    inner_score = alphabeta.leaf_score(inner, Color.BLACK)
+    assert danger_score == _phase4_leaf_score(danger, Color.BLACK) == -150
+    assert inner_score == _phase4_leaf_score(inner, Color.BLACK) == 0
+    assert danger_score < inner_score
+
+
+def test_alphabeta_leaf_penalizes_c_on_empty_corner() -> None:
+    danger = empty_board().replacing(
+        {
+            Square.parse("a2"): Stone.BLACK,
+            Square.parse("e5"): Stone.WHITE,
+        }
+    )
+    inner = empty_board().replacing(
+        {
+            Square.parse("c3"): Stone.BLACK,
+            Square.parse("e5"): Stone.WHITE,
+        }
+    )
+    danger_parts = _phase4_parts(danger, Color.BLACK)
+    inner_parts = _phase4_parts(inner, Color.BLACK)
+    assert danger_parts[0] == inner_parts[0] == 0
+    assert danger_parts[1] == inner_parts[1] == 0
+    assert danger_parts[2] == inner_parts[2] == 0
+    assert danger_parts[3] == inner_parts[3] == 0
+    assert danger_parts[5] == inner_parts[5] == 0
+    assert danger_parts[4] == 1
+    assert inner_parts[4] == 0
+    danger_score = alphabeta.leaf_score(danger, Color.BLACK)
+    inner_score = alphabeta.leaf_score(inner, Color.BLACK)
+    assert danger_score == _phase4_leaf_score(danger, Color.BLACK) == -80
+    assert inner_score == _phase4_leaf_score(inner, Color.BLACK) == 0
+    assert danger_score < inner_score
+
+
+def test_alphabeta_leaf_releases_xc_after_owning_corner() -> None:
+    x_danger = empty_board().replacing(
+        {
+            Square.parse("b2"): Stone.BLACK,
+            Square.parse("e5"): Stone.WHITE,
+        }
+    )
+    x_held = empty_board().replacing(
+        {
+            Square.parse("a1"): Stone.BLACK,
+            Square.parse("b2"): Stone.BLACK,
+            Square.parse("e5"): Stone.WHITE,
+        }
+    )
+    c_danger = empty_board().replacing(
+        {
+            Square.parse("a2"): Stone.BLACK,
+            Square.parse("e5"): Stone.WHITE,
+        }
+    )
+    c_held = empty_board().replacing(
+        {
+            Square.parse("a1"): Stone.BLACK,
+            Square.parse("a2"): Stone.BLACK,
+            Square.parse("e5"): Stone.WHITE,
+        }
+    )
+    assert _phase4_parts(x_danger, Color.BLACK)[3] == 1
+    assert _phase4_parts(x_held, Color.BLACK)[3] == 0
+    assert _phase4_parts(c_danger, Color.BLACK)[4] == 1
+    assert _phase4_parts(c_held, Color.BLACK)[4] == 0
+    assert alphabeta.leaf_score(x_danger, Color.BLACK) == _phase4_leaf_score(
+        x_danger, Color.BLACK
+    )
+    assert alphabeta.leaf_score(x_held, Color.BLACK) == _phase4_leaf_score(
+        x_held, Color.BLACK
+    )
+    assert alphabeta.leaf_score(c_danger, Color.BLACK) == _phase4_leaf_score(
+        c_danger, Color.BLACK
+    )
+    assert alphabeta.leaf_score(c_held, Color.BLACK) == _phase4_leaf_score(
+        c_held, Color.BLACK
+    )
+    assert alphabeta.leaf_score(x_danger, Color.BLACK) < alphabeta.leaf_score(
+        x_held, Color.BLACK
+    )
+    assert alphabeta.leaf_score(c_danger, Color.BLACK) < alphabeta.leaf_score(
+        c_held, Color.BLACK
+    )
+
+
+def test_alphabeta_leaf_prefers_fewer_own_frontier() -> None:
+    few = empty_board().replacing(
+        {
+            Square.parse("c3"): Stone.BLACK,
+            Square.parse("d3"): Stone.BLACK,
+            Square.parse("e3"): Stone.BLACK,
+            Square.parse("c4"): Stone.BLACK,
+            Square.parse("d4"): Stone.BLACK,
+            Square.parse("e4"): Stone.BLACK,
+            Square.parse("c5"): Stone.BLACK,
+            Square.parse("d5"): Stone.BLACK,
+            Square.parse("e5"): Stone.BLACK,
+            Square.parse("f3"): Stone.WHITE,
+            Square.parse("g3"): Stone.WHITE,
+            Square.parse("h3"): Stone.WHITE,
+            Square.parse("f4"): Stone.WHITE,
+            Square.parse("g4"): Stone.WHITE,
+            Square.parse("h4"): Stone.WHITE,
+            Square.parse("f5"): Stone.WHITE,
+            Square.parse("g5"): Stone.WHITE,
+            Square.parse("h5"): Stone.WHITE,
+        }
+    )
+    many = empty_board().replacing(
+        {
+            Square.parse("c3"): Stone.BLACK,
+            Square.parse("d3"): Stone.BLACK,
+            Square.parse("e3"): Stone.BLACK,
+            Square.parse("c4"): Stone.BLACK,
+            Square.parse("e4"): Stone.BLACK,
+            Square.parse("c5"): Stone.BLACK,
+            Square.parse("d5"): Stone.BLACK,
+            Square.parse("e5"): Stone.BLACK,
+            Square.parse("b4"): Stone.BLACK,
+            Square.parse("f3"): Stone.WHITE,
+            Square.parse("g3"): Stone.WHITE,
+            Square.parse("h3"): Stone.WHITE,
+            Square.parse("f4"): Stone.WHITE,
+            Square.parse("g4"): Stone.WHITE,
+            Square.parse("h4"): Stone.WHITE,
+            Square.parse("f5"): Stone.WHITE,
+            Square.parse("g5"): Stone.WHITE,
+            Square.parse("h5"): Stone.WHITE,
+        }
+    )
+    few_parts = _phase4_parts(few, Color.BLACK)
+    many_parts = _phase4_parts(many, Color.BLACK)
+    assert few_parts[1] == many_parts[1]
+    assert few_parts[2] == many_parts[2]
+    assert few_parts[3] == many_parts[3]
+    assert few_parts[4] == many_parts[4]
+    assert few_parts[0] == many_parts[0]
+    assert few_parts[5] < many_parts[5]
+    few_score = alphabeta.leaf_score(few, Color.BLACK)
+    many_score = alphabeta.leaf_score(many, Color.BLACK)
+    assert few_score == _phase4_leaf_score(few, Color.BLACK)
+    assert many_score == _phase4_leaf_score(many, Color.BLACK)
+    assert few_score > many_score
+
+
+def test_alphabeta_leaf_disc_weight_follows_empty_count() -> None:
+    assert _phase4_disc_weight(40) == 1
+    assert _phase4_disc_weight(39) == 5
+    assert _phase4_disc_weight(20) == 5
+    assert _phase4_disc_weight(19) == 20
+    assert _phase4_disc_weight(10) == 20
+    assert _phase4_disc_weight(9) == 100
+    assert _phase4_disc_weight(9) > _phase4_disc_weight(40)
+    samples = (40, 39, 20, 19, 10, 9)
+    for empty in samples:
+        board = _board_with_empty_black_lead(empty)
+        parts = _phase4_parts(board, Color.BLACK)
+        assert parts[6] == empty
+        assert parts[2] != 0
+        score = alphabeta.leaf_score(board, Color.BLACK)
+        assert score == _phase4_leaf_score(board, Color.BLACK)
+    early = _board_with_empty_black_lead(40)
+    late = _board_with_empty_black_lead(9)
+    early_mob, early_corner, early_disc, early_x, early_c, early_f, _ = _phase4_parts(
+        early, Color.BLACK
+    )
+    late_mob, late_corner, late_disc, late_x, late_c, late_f, _ = _phase4_parts(
+        late, Color.BLACK
+    )
+    assert early_disc != 0 and late_disc != 0
+    early_other = (
+        50 * early_mob
+        + 1000 * early_corner
+        - 150 * early_x
+        - 80 * early_c
+        - 10 * early_f
+    )
+    late_other = (
+        50 * late_mob + 1000 * late_corner - 150 * late_x - 80 * late_c - 10 * late_f
+    )
+    early_weight = (alphabeta.leaf_score(early, Color.BLACK) - early_other) / early_disc
+    late_weight = (alphabeta.leaf_score(late, Color.BLACK) - late_other) / late_disc
+    assert early_weight == 1
+    assert late_weight == 100
+    assert late_weight > early_weight
 
 
 def _play_algebraic(*names: str) -> Position:
