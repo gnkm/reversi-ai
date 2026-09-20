@@ -2,7 +2,7 @@
 
 # カタログ個体の総当たり
 
-数値の正本は [`round-robin.json`](round-robin.json) である。本ファイルは GitHub 上の閲覧用の写しである。
+数値の正本は [`round-robin.json`](round-robin.json) である。本ファイルは GitHub 上の閲覧用の写しである。勝ち点の推移は [`history.md`](history.md) である。
 
 写しを作り直す:
 

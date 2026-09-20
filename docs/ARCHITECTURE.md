@@ -1,7 +1,7 @@
 ---
 title: アーキテクチャ
 product: Reversi Agents
-version: 0.1.14
+version: 0.1.15
 status: working
 date: 2026-09-20
 source: docs/srs.md
@@ -16,7 +16,7 @@ tech_stack_version: 0.2.16
 | --- | --- |
 | 文書識別 | reversi-ai-architecture |
 | 対象ソフトウェア | Reversi Agents |
-| 版 | 0.1.14 |
+| 版 | 0.1.15 |
 | 状態 | 現行（設計。要求ではない） |
 | 日付 | 2026-09-20 |
 | 入力 | [`docs/srs.md`](srs.md) 0.1.24、[`docs/tech-stack.md`](tech-stack.md) 0.2.16 |
@@ -110,9 +110,11 @@ reversi-ai/
 │   ├── ARCHITECTURE.md                # 本ファイル。配置と層
 │   ├── openapi.yml                    # 対局 API の契約（OpenAPI 3.1）
 │   ├── benchmarks/
-│   │   ├── round-robin.json           # 総当たり基準結果。数値の正本
-│   │   ├── round-robin.md             # GitHub 閲覧用。JSON から生成
-│   │   └── render.py                  # round-robin.md を JSON から書く
+│   │   ├── round-robin.json           # 総当たり基準結果。最新の数値の正本
+│   │   ├── round-robin.md             # 最新の GitHub 閲覧用。JSON から生成
+│   │   ├── history.md                 # 勝ち点推移。archive と現行 JSON から生成
+│   │   ├── render.py                  # round-robin.md と history.md を書く
+│   │   └── archive/                   # 過去の総当たり正本（現行と同じ形）
 │   └── source-of-truth/
 │       └── 01-seed.md                 # シード。AI は編集禁止
 │
@@ -410,6 +412,7 @@ web コンテナが Pod 内で `0.0.0.0:3000` を聞くのはよい。戦略コ�
 
 | 版 | 日付 | 内容 |
 | --- | --- | --- |
+| 0.1.15 | 2026-09-20 | 総当たりの過去正本を `benchmarks/archive/` に残し、勝ち点推移を `history.md` とする |
 | 0.1.14 | 2026-09-20 | 対局の `up` は `web` と `strategy` を明示し、`train` を載せない |
 | 0.1.13 | 2026-09-20 | 運用コマンド列の正を README へ委譲し、第 8 節は待ち受けと `CMD` と `train` を `up` に載せないことに限る |
 | 0.1.12 | 2026-09-20 | Jev は原子質問を 1 呼出しで送り、`jev.py` が typed answers とコード特徴を合成する |
