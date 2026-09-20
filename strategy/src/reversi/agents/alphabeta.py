@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from random import Random
 
-from reversi.engine.board import BOARD_SIZE, Board, Color, Square, Stone, all_squares
+from reversi.engine.board import BOARD_SIZE, Board, Color, Square, Stone
 from reversi.engine.rules import (
     DIRECTIONS,
     Move,
@@ -83,11 +83,10 @@ def leaf_score(board: Board, color: Color) -> int:
     """color 視点の Mobility・Corner・X/C・Frontier・石数差の一次結合。"""
     mobility = _mobility_diff(board, color)
     corner = _stone_diff(board, color, _CORNERS)
-    disc = _stone_diff(board, color, all_squares())
     x_squares = _danger_diff(board, color, _X_SQUARES)
     c_squares = _danger_diff(board, color, _C_SQUARES)
-    frontier = _frontier_diff(board, color)
-    weight = _disc_weight(_empty_count(board))
+    disc, frontier, empty = _disc_frontier_empty(board, color)
+    weight = _disc_weight(empty)
     return (
         _MOBILITY_WEIGHT * mobility
         + _CORNER_WEIGHT * corner
@@ -157,29 +156,6 @@ def _stone_diff(board: Board, color: Color, squares: tuple[Square, ...]) -> int:
     return total
 
 
-def _adjacent(square: Square) -> tuple[Square, ...]:
-    found: list[Square] = []
-    for delta_file, delta_rank in DIRECTIONS:
-        file = square.file + delta_file
-        rank = square.rank + delta_rank
-        if 0 <= file < BOARD_SIZE and 0 <= rank < BOARD_SIZE:
-            found.append(Square(file=file, rank=rank))
-    return tuple(found)
-
-
-_NEIGHBORS: dict[Square, tuple[Square, ...]] = {
-    square: _adjacent(square) for square in all_squares()
-}
-
-
-def _empty_count(board: Board) -> int:
-    total = 0
-    for square in all_squares():
-        if board.stone_at(square) is Stone.EMPTY:
-            total += 1
-    return total
-
-
 def _disc_weight(empty: int) -> int:
     """空きマス数（Game Phase）に応じた石数差の係数 W。"""
     if empty >= 40:
@@ -191,27 +167,38 @@ def _disc_weight(empty: int) -> int:
     return 100
 
 
-def _has_empty_neighbor(board: Board, square: Square) -> bool:
-    for neighbor in _NEIGHBORS[square]:
-        if board.stone_at(neighbor) is Stone.EMPTY:
+def _empty_adjacent(
+    cells: tuple[tuple[Stone, ...], ...], file: int, rank: int
+) -> bool:
+    for delta_file, delta_rank in DIRECTIONS:
+        neighbor_file = file + delta_file
+        neighbor_rank = rank + delta_rank
+        if (
+            0 <= neighbor_file < BOARD_SIZE
+            and 0 <= neighbor_rank < BOARD_SIZE
+            and cells[neighbor_rank][neighbor_file] is Stone.EMPTY
+        ):
             return True
     return False
 
 
-def _frontier_diff(board: Board, color: Color) -> int:
-    """空きマスに 8 近傍で隣接する石の差（自分 − 相手）。"""
+def _disc_frontier_empty(board: Board, color: Color) -> tuple[int, int, int]:
+    """石数差・Frontier 差・空きマス数を 1 回の盤面走査で集計する。"""
     own = color.stone
-    opponent = color.opponent.stone
-    total = 0
-    for square in all_squares():
-        stone = board.stone_at(square)
-        if stone is Stone.EMPTY or not _has_empty_neighbor(board, square):
-            continue
-        if stone is own:
-            total += 1
-        elif stone is opponent:
-            total -= 1
-    return total
+    cells = board.cells
+    disc = 0
+    frontier = 0
+    empty = 0
+    for rank, row in enumerate(cells):
+        for file, stone in enumerate(row):
+            if stone is Stone.EMPTY:
+                empty += 1
+                continue
+            sign = 1 if stone is own else -1
+            disc += sign
+            if _empty_adjacent(cells, file, rank):
+                frontier += sign
+    return disc, frontier, empty
 
 
 def _danger_diff(
