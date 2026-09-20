@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from math import isfinite
 from pathlib import Path
 from random import Random
+from string import Formatter
 from typing import Any
 
 from openrouter import OpenRouter
@@ -39,6 +40,7 @@ _AMOUNT_KEYS = ("few", "some", "many")
 _YES_NO_KEYS = ("true", "false")
 _SIDE_KEYS = ("black", "white")
 _PLACE_FIELDS = ("kind", "takes_corner", "gives_corner", "opponent_places", "flips")
+_BOARD_CORNERS = frozenset({"a1", "h1", "a8", "h8"})
 
 __all__ = [
     "CATEGORY",
@@ -207,6 +209,8 @@ def _load_kinds(raw: Mapping[str, Any]) -> dict[str, frozenset[str]]:
     expected = {square.algebraic for square in all_squares()}
     if seen != expected:
         raise _fail_spec()
+    if kinds["corner"] != _BOARD_CORNERS:
+        raise _fail_spec()
     return kinds
 
 
@@ -250,6 +254,23 @@ def _load_weights(raw: Mapping[str, Any]) -> tuple[
     return w_jev, w_code, w_confidence, metrics, scales, stage
 
 
+def _place_line_fields(template: str) -> set[str]:
+    names: set[str] = set()
+    for _, name, _, _ in Formatter().parse(template):
+        if name is None:
+            continue
+        if not name or name.isdigit() or "." in name or "[" in name:
+            raise _fail_spec()
+        names.add(name)
+    return names
+
+
+def _require_place_line(template: str) -> str:
+    if _place_line_fields(template) != set(_PLACE_FIELDS):
+        raise _fail_spec()
+    return template
+
+
 def _load_spec(path: Path | None = None) -> _Spec:
     target = PROMPT_PATH if path is None else path
     try:
@@ -275,7 +296,7 @@ def _load_spec(path: Path | None = None) -> _Spec:
         objective=_text_field(loaded, "objective"),
         question_id=question_id,
         instructions=instructions,
-        place_line=_text_field(loaded, "place_line"),
+        place_line=_require_place_line(_text_field(loaded, "place_line")),
         kinds=_load_kinds(_mapping_field(loaded, "kinds")),
         kind_words=_word_map(_mapping_field(vocab, "kind"), _KIND_KEYS),
         yes_no=_word_map(_mapping_field(vocab, "yes_no"), _YES_NO_KEYS),
@@ -413,8 +434,12 @@ def _parse_probabilities(
         return None
     parsed: dict[str, float] = {}
     for square in places:
-        value = raw.get(square.algebraic)
-        parsed[square.algebraic] = 0.0 if value is None else _unit_answer(value)
+        key = square.algebraic
+        if key not in raw:
+            raise ExternalModelError("合成できません")
+        parsed[key] = _unit_answer(raw[key])
+    if not any(value > 0.0 for value in parsed.values()):
+        raise ExternalModelError("合成できません")
     return parsed
 
 

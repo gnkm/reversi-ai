@@ -452,6 +452,43 @@ def test_jev_empty_or_incomplete_prompt_is_unplayable(
         jev.choose_move(initial_position())
 
 
+def test_jev_place_line_must_include_all_fact_fields(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    secret = tmp_path / "openrouter-api-key"
+    secret.write_text(_API_KEY, encoding="utf-8")
+    monkeypatch.setattr(jev, "SECRET_PATH", secret)
+    spec = _repo_spec()
+    spec["place_line"] = "{kind}. Occupies a corner: {takes_corner}."
+    path = tmp_path / "missing-fields.json"
+    _write_spec(path, spec)
+    monkeypatch.setattr(jev, "PROMPT_PATH", path)
+    with pytest.raises(jev.ExternalModelError, match="不正"):
+        jev.choose_move(initial_position())
+
+
+def test_jev_kinds_corner_must_match_board(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    secret = tmp_path / "openrouter-api-key"
+    secret.write_text(_API_KEY, encoding="utf-8")
+    monkeypatch.setattr(jev, "SECRET_PATH", secret)
+    spec = _repo_spec()
+    kinds = spec["kinds"]
+    assert isinstance(kinds, dict)
+    kinds["corner"] = ["a1", "h1", "a8", "d4"]
+    interior = kinds["interior"]
+    assert isinstance(interior, list)
+    kinds["interior"] = [name for name in interior if name != "d4"] + ["h8"]
+    path = tmp_path / "wrong-corners.json"
+    _write_spec(path, spec)
+    monkeypatch.setattr(jev, "PROMPT_PATH", path)
+    with pytest.raises(jev.ExternalModelError, match="不正"):
+        jev.choose_move(initial_position())
+
+
 def test_markdown_sections_keeps_heading_lines_inside_fences() -> None:
     parts = markdown_sections(
         "## instructions\n\nChoose.\n```\n## instructions\nexample\n```\n"

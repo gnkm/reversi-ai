@@ -670,19 +670,64 @@ def test_jev_rejects_out_of_range_place_probabilities() -> None:
     position = initial_position()
     places = legal_places(position)
     chosen = places[0].algebraic
+    invalid = {square.algebraic: 0.0 for square in places}
+    invalid[chosen] = -0.1
     answers = {
         spec.question_id: {
             "type": "choice",
             "choice": chosen,
-            "probabilities": {chosen: -0.1},
+            "probabilities": invalid,
             "confidence": 1.0,
         }
     }
     with pytest.raises(jev.ExternalModelError, match="合成できません"):
         jev._answers_from_response(SimpleNamespace(answers=answers), spec, places)
-    answers[spec.question_id]["probabilities"] = {chosen: 1.5}
+    invalid[chosen] = 1.5
+    answers[spec.question_id]["probabilities"] = invalid
     with pytest.raises(jev.ExternalModelError, match="合成できません"):
         jev._answers_from_response(SimpleNamespace(answers=answers), spec, places)
+
+
+def test_jev_incomplete_probabilities_are_unplayable() -> None:
+    spec = jev._load_spec()
+    position = _position_from_rank8_rows(_CORNER_VS_TWO_FLIPS, Color.BLACK)
+    places = legal_places(position)
+    chosen = Square.parse("d2").algebraic
+    assert Square.parse("a1") in places
+    payload = {
+        spec.question_id: {
+            "type": "choice",
+            "choice": chosen,
+            "confidence": 1.0,
+        }
+    }
+    payload[spec.question_id]["probabilities"] = {}
+    with pytest.raises(jev.ExternalModelError, match="合成できません"):
+        jev._answers_from_response(SimpleNamespace(answers=payload), spec, places)
+    payload[spec.question_id]["probabilities"] = {chosen: 1.0}
+    with pytest.raises(jev.ExternalModelError, match="合成できません"):
+        jev._answers_from_response(SimpleNamespace(answers=payload), spec, places)
+    payload[spec.question_id]["probabilities"] = {
+        square.algebraic: 0.0 for square in places
+    }
+    with pytest.raises(jev.ExternalModelError, match="合成できません"):
+        jev._answers_from_response(SimpleNamespace(answers=payload), spec, places)
+
+
+def test_jev_missing_probabilities_use_choice() -> None:
+    spec = jev._load_spec()
+    position = _position_from_rank8_rows(_CORNER_VS_TWO_FLIPS, Color.BLACK)
+    places = legal_places(position)
+    chosen = Square.parse("d2")
+    answers = {
+        spec.question_id: {
+            "type": "choice",
+            "choice": chosen.algebraic,
+            "confidence": 1.0,
+        }
+    }
+    parsed = jev._answers_from_response(SimpleNamespace(answers=answers), spec, places)
+    assert jev._select_square(position, places, parsed, spec) == chosen
 
 
 def _black_feature_index(square: Square) -> int:
