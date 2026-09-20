@@ -257,3 +257,14 @@ def test_containerfile_bakes_train_group_only_on_train_target() -> None:
     )[0]
     assert "--group train" not in strategy_stage
     assert "--group train" not in train_stage
+
+
+def test_compose_train_is_runnable_without_profile() -> None:
+    text = (Path(__file__).resolve().parents[2] / "compose.yaml").read_text(
+        encoding="utf-8",
+    )
+    train_block = text.split("\n  train:", 1)[1].split("\nsecrets:", 1)[0]
+    assert "profiles:" not in train_block
+    assert "x-podman:" not in train_block
+    assert 'restart: "no"' in train_block
+    assert "python" in train_block and "pass" in train_block

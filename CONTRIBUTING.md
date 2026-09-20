@@ -23,7 +23,7 @@ shall を変える PR は CODEOWNERS（`docs/srs.md`）のレビューを必須�
 
 ## 起動・試験・lint
 
-対局と学習の起動、試験、検査の**コマンドの正本**は [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) の「起動とコマンド」である。Issue の検証欄と CI も、その節の生コマンドを使う。ラッパ（Makefile 等）は置かない。
+対局と学習の**運用コマンドの正本**は [README.md](README.md) である（準備、`up` / `down`、学習の一発起動、成果物を読ませる再起動）。試験・lint・E2E の**コマンドの正本**は本ファイルである。配置と層（待ち受け、`CMD`、`train` を `up` に載せないこと）は [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) である。Issue の検証欄と CI も、それぞれの正本の生コマンドを使う。ラッパ（Makefile 等）は置かない。
 
 動かすもの（対局・学習）は Podman。測るもの（pytest、Vitest、Biome、Ruff、lefthook）はホストである。ホストの `pnpm dev` や `python -m reversi.api` を対局サービスの正にしない。利用者向けの起動と対局操作は [README.md](README.md) を参照する。
 
@@ -33,7 +33,7 @@ shall を変える PR は CODEOWNERS（`docs/srs.md`）のレビューを必須�
 - 戦略（pytest、Ruff、import-linter、xenon）: Python 3.12 と uv。`uv run --directory strategy` が依存を解決する
 - コミット前検査: [`lefthook.yml`](lefthook.yml)（Biome の書式、osv-scanner、gitleaks、import-linter、xenon、dependency-cruiser）。Ruff はフックに含めず、次節のホストコマンドで走らせる
 
-証明書と Podman secret の一度きりの準備は、正本の 8.1 節および [README.md](README.md) の「準備」に従う。
+証明書と Podman secret の一度きりの準備は [README.md](README.md) の「準備」に従う。
 
 ### ホットリロード
 
@@ -66,11 +66,13 @@ pnpm exec depcruise --config .dependency-cruiser.cjs web
 E2E はアプリを Podman で上げ、Playwright はホストの Google Chrome で `https://127.0.0.1` を叩く。
 
 ```bash
-podman-compose up --build --wait
+podman-compose up --build --wait web strategy
 pnpm exec playwright test --project=chrome
 ```
 
-資格情報が無い環境では、生成 AI を試験ダブルのままにする。OpenRouter の secret は CI に渡さない。学習の起動は正本の 8.3 節を使う。ホストの `uv run` を学習の正にしない。
+`web` と `strategy` だけを待つ。`train` は待ち受けせず、`up` の常時起動対象ではない。
+
+資格情報が無い環境では、生成 AI を試験ダブルのままにする。OpenRouter の secret は CI に渡さない。学習の起動は [README.md](README.md) の「学習し直す」を使う。ホストの `uv run` を学習の正にしない。
 
 ## Git ブランチ命名規則
 
