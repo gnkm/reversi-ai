@@ -1,11 +1,11 @@
 ---
 title: 技術スタック
 product: Reversi Agents
-version: 0.2.11
+version: 0.2.12
 status: working
 date: 2026-09-20
 source: docs/srs.md
-srs_version: 0.1.22
+srs_version: 0.1.24
 ---
 
 # 技術スタック
@@ -14,10 +14,10 @@ srs_version: 0.1.22
 | --- | --- |
 | 文書識別 | reversi-ai-tech-stack |
 | 対象ソフトウェア | Reversi Agents |
-| 版 | 0.2.11 |
+| 版 | 0.2.12 |
 | 状態 | 現行（設計。要求ではない） |
 | 日付 | 2026-09-20 |
-| 入力 | [`docs/srs.md`](srs.md) 0.1.22 |
+| 入力 | [`docs/srs.md`](srs.md) 0.1.24 |
 
 本文書は実装言語・配置・ライブラリの**設計判断**である。ソフトウェア要求の正本は [`docs/srs.md`](srs.md) であり、本文書は shall を追加・変更・撤回しない。SRS は実装言語とフレームワークを制約しない（`docs/srs.md` 3.6 末尾）。ここに書いた版番号は採用時の目安であり、実装開始時の現行安定版に置き換えてよい。
 
@@ -57,7 +57,7 @@ srs_version: 0.1.22
 | 学習 | 同じ Python パッケージ。学習用イメージ | ML・RL・NN。対局時エンジンを自己対局と棋譜再生に使う。torch は学習イメージだけ |
 | 永続化 | SQLite（Python の `sqlite3`） | 終局棋譜。アカウント表は作らない |
 | 生成 AI | OpenRouter 公式 Python SDK（戦略プロセスのみ） | Jev は Decisions API。追加のテキスト生成モデルは Chat Completions |
-| ML の学習と対局時 | scikit-learn で学習。対局時は係数の積和（NN ランタイムを使わない） | WTHOR + 永続化対局 |
+| ML の学習と対局時 | Ridge は scikit-learn で学習し係数 JSON の積和。LightGBM はネイティブテキストを対局時に読む（NN ランタイムを使わない） | WTHOR + 永続化対局 |
 | RL の学習と対局時 | NumPy の線形 TD 等。対局時も同じ重み。NN も OpenRouter も使わない | 自己対局 |
 | NN の学習と対局時 | PyTorch（CPU）で学習し ONNX へ。対局時は onnxruntime（CPU、Python） | 教師あり |
 | 検証 | pytest（規則・エージェント） / Playwright（Chrome E2E） / Vitest（Hono の Origin 等） | SRS の T と D |
@@ -87,7 +87,7 @@ flowchart LR
   engine[対局エンジン Python]
   agents[エージェント個体]
   sqlite[(SQLite 棋譜)]
-  models[成果物 JSON / ONNX]
+  models[成果物 JSON / LightGBM / ONNX]
   secret[Podman secret]
   or[OpenRouter HTTPS]
   train[学習 同一パッケージ]
@@ -102,7 +102,7 @@ flowchart LR
   py --> sqlite
   secret -->|戦略コンテナのみ| py
   train --> engine
-  train -->|JSON / ONNX 書き出し| models
+  train -->|JSON / LightGBM / ONNX 書き出し| models
 ```
 
 上図はプロセス分割の設計である。SRS の論理図（1.3.2）を置き換えない。
@@ -126,7 +126,7 @@ strategy/            戦略プロセス（着手と学習）
   Containerfile
 compose.yaml         Podman Compose。secret の中身は書かない
 compose.dev.yaml     開発用オーバーレイ。bind mount と reload だけ
-models/              学習成果物（小さい JSON / ONNX。原本棋譜は置かない）
+models/              学習成果物（小さい JSON / LightGBM テキスト / ONNX。原本棋譜は置かない）
 prompts/             生成 AI の固定指示（Markdown。戦略プロセスが対局時に読む）
 data/                運用者ローカル。WTHOR 原本と SQLite。Git 管理外
 ```
@@ -184,16 +184,17 @@ Hono は盤の合法手計算を持たない。人間の着手指定は戦略プ
 | ランダム (一様) | 合法手の一様乱択 | なし |
 | ルールベース 4 個体 | 最多取り・位置評価・ミニマックス（深さ 4）・定石。外部モデルも学習済み重みも読まない | なし |
 | 機械学習 (棋譜) | 線形モデルの係数の積和。NN ランタイムを使わない | scikit-learn。WTHOR + 永続化対局 |
+| 機械学習 (LightGBM) | LightGBM ネイティブテキストの推論。NN ランタイムも joblib / pickle も使わない | LightGBM。WTHOR + 永続化対局 |
 | 強化学習 (自己対局) | 線形関数近似の重み。NN 推論も OpenRouter も使わない | NumPy。同じエンジンで自己対局。WTHOR を使わない |
 | ニューラルネットワーク (棋譜) | ONNX の順伝播のみ（CPU、onnxruntime） | PyTorch CPU。WTHOR + 永続化対局 |
 | 生成 AI (Jev) | OpenRouter Decisions API。`typesafe/jev-1.13` | なし。WTHOR を見ない |
 | 生成 AI (呼称) の追加 | Chat Completions。運用者が与えたテキスト生成モデル ID | なし |
 
-線形モデルと NN をファイル種別で分ける（JSON 対 ONNX）。ML / RL の対局経路に onnxruntime も PyTorch も載せない。これが SRS-FUN-029 / 030 の検査で見える担保である。scikit-learn の公式 persistence は pickle / joblib / ONNX であり、係数 JSON は公式形式ではない。対局用成果物のスキーマは本ソフトウェアが定義し、学習スクリプトが `coef_` 等を書き出す。チェックポイントに joblib を使ってよいが、対局の ML / RL 個体は joblib を読まない。
+線形モデルと NN をファイル種別で分ける（JSON 対 ONNX）。LightGBM 個体はネイティブテキスト（`models/lgbm.txt`）とし、ONNX 経由にしない。ML / RL の対局経路に onnxruntime も PyTorch も載せない。これが SRS-FUN-029 / 030 の検査で見える担保である。scikit-learn の公式 persistence は pickle / joblib / ONNX であり、係数 JSON は公式形式ではない。対局用成果物のスキーマは本ソフトウェアが定義し、学習スクリプトが `coef_` 等を書き出す。チェックポイントに joblib を使ってよいが、対局の ML / RL / LightGBM 個体は joblib を読まない。
 
 NN の層数・ユニット数は要求ではない。16 GiB・GPU 無しに収まる小さい全結合（盤の 3 値 64 マスを入力し、合法手へマスクした政策）を初期値とする。精度の数値目標は置かない。
 
-特徴量の切り方は要求ではない。ML と RL は同じ入力符号化を使う。NN は隠れ層を持つネットに盤を渡して、カテゴリの差が成果物とコードの両方に残るようにする。符号化は Python 内に一つだけ置く。
+特徴量の切り方は要求ではない。ML（Ridge と LightGBM）と RL は同じ入力符号化を使う。NN は隠れ層を持つネットに盤を渡して、カテゴリの差が成果物とコードの両方に残るようにする。符号化は Python 内に一つだけ置く。
 
 WTHOR の `.wtb` は Python で読み、8×8 以外は捨てる（SRS-DAT-003）。原本ファイルを静的配信しない。運用者は `data/` に置く。対局サービスは WTHOR 原本を HTTP で出さない。
 
@@ -352,6 +353,7 @@ OpenRouter の API キーは `podman secret create` でホストに置く。名�
 | 案 | 結果 | 理由 |
 | --- | --- | --- |
 | ML: sklearn → 係数 JSON、RL: NumPy 線形 TD → 重み JSON、NN: PyTorch CPU → ONNX。対局時も Python。ML/RL は積和のみ | 採用 | 学習と対局が同じ言語。ML/RL の対局経路に NN ランタイムが無い |
+| LightGBM: 学習も対局も lightgbm。成果物はネイティブテキスト。ONNX / pickle / joblib は使わない | 採用（機械学習の追加個体） | Ridge 個体と学習器・ファイル種別で区別する。NN ランタイムを対局経路に載せない |
 | 対局時の ML/RL/NN 推論だけ TypeScript | 見送り | 符号化とエンジンを二重に持つことになる |
 | すべて PyTorch（ML/RL も MLP） | 不採用 | SRS-FUN-029 / 030 の「対局時 NN 推論禁止」に反しうる |
 | すべて scikit-learn | 見送り | ML には適する。NN カテゴリと RL 自己対局の本体にはならない |
@@ -460,6 +462,7 @@ OpenRouter の API キーは `podman secret create` でホストに置く。名�
 
 | 版 | 日付 | 内容 |
 | --- | --- | --- |
+| 0.2.12 | 2026-09-20 | 機械学習 (LightGBM) を対局時ネイティブテキストで載せる（ONNX / pickle は使わない） |
 | 0.2.11 | 2026-09-20 | 学習を `train` イメージに分け、対局用 strategy から torch を外す |
 | 0.2.10 | 2026-09-20 | 生成 AI の固定指示を置く `prompts/` をリポジトリ配置に足す |
 | 0.2.9 | 2026-09-20 | 起動の正を Python の `podman-compose` とする（プラグインの `podman compose` は使わない） |

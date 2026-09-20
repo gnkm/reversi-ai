@@ -66,6 +66,8 @@ def _agent_files() -> tuple[str, ...]:
     names = ["rl.py"]
     if (_SRC / "agents" / "ml.py").is_file():
         names.append("ml.py")
+    if (_SRC / "agents" / "lgbm.py").is_file():
+        names.append("lgbm.py")
     return tuple(names)
 
 
@@ -173,6 +175,60 @@ def test_play_time_ml_and_rl_files_avoid_nn_runtimes() -> None:
         assert "sklearn" not in roots
         assert "torch" not in roots
         assert "onnxruntime" not in roots
+        assert "joblib" not in roots
+        assert "pickle" not in roots
+
+
+def test_lgbm_play_path_imports_lightgbm_not_nn_runtime() -> None:
+    source = _read("agents", "lgbm.py")
+    roots = _imported_roots(source)
+    assert "lightgbm" in roots
+    assert "torch" not in roots
+    assert "onnxruntime" not in roots
+    assert "sklearn" not in roots
+    assert "joblib" not in roots
+    assert "pickle" not in roots
+    assert "openrouter" not in roots
+    assert roots.isdisjoint(_NN_RUNTIME_ROOTS)
+    modules = _imported_modules(source)
+    assert "reversi.train" not in modules
+    assert all(not name.startswith("reversi.train") for name in modules)
+    for literal in _string_literals(source):
+        lowered = literal.lower()
+        assert "ffothello.org" not in lowered
+        assert ".wtb" not in lowered
+        assert "openrouter.ai" not in lowered
+
+
+def test_lgbm_training_script_uses_lightgbm_and_wthor_and_games() -> None:
+    source = _read("train", "lgbm.py")
+    roots = _imported_roots(source)
+    modules = _imported_modules(source)
+    assert "lightgbm" in roots
+    assert "sklearn" not in roots
+    assert "torch" not in roots
+    assert "onnxruntime" not in roots
+    assert "joblib" not in roots
+    assert "pickle" not in roots
+    assert roots.isdisjoint(_NN_RUNTIME_ROOTS)
+    assert "reversi.train.wthor" in modules or any(
+        name.startswith("reversi.train.wthor") for name in modules
+    )
+    tree = ast.parse(source)
+    option_strings: list[str] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call):
+            func = node.func
+            attr = func.attr if isinstance(func, ast.Attribute) else ""
+            if attr == "add_argument":
+                for arg in node.args:
+                    if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+                        option_strings.append(arg.value)
+    assert "--wthor" in option_strings
+    assert "--games" in option_strings
+    for literal in _string_literals(source):
+        lowered = literal.lower()
+        assert "openrouter.ai" not in lowered
 
 
 def _train_group_packages() -> tuple[str, ...]:

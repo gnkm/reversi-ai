@@ -147,6 +147,7 @@ curl -sk https://127.0.0.1:3000/api/games \
 | ルールベース (ミニマックス) | 先を読んで位置評価する |
 | ルールベース (定石) | 短い定石に乗り、外れたら位置評価する |
 | 機械学習 (棋譜) | 対局前に学習したモデルで着手する |
+| 機械学習 (LightGBM) | 対局前に LightGBM で学習したモデルで着手する |
 | 強化学習 (自己対局) | 自己対局で得た方針で着手する |
 | ニューラルネットワーク (棋譜) | 対局前に学習したネットワークで着手する |
 | 生成 AI (Jev) | OpenRouter 上の Jev が合法手から選ぶ |
@@ -157,7 +158,7 @@ curl -sk https://127.0.0.1:3000/api/games \
 
 対局用の `strategy` ではなく、学習用サービスを待ち受けせず一発起動します。実行時に `uv sync` はしません。ホストの `uv run` は学習の正ではありません。専用 GPU は不要です。
 
-**機械学習 (棋譜)** と **ニューラルネットワーク (棋譜)** は、[WTHOR](https://www.ffothello.org/informatique/la-base-wthor) の 8×8 棋譜（`.wtb`）と、終局して残った自対局（`data/games.sqlite`）を使います。WTHOR の ZIP を手元で展開し、拡張子が `.wtb` のファイルを `data/wthor/` の直下に置いてください。ファイル名は問いません（例: `2024.wtb`、`2025.wtb`）。置いた `.wtb` をすべて読みます。このリポジトリから原本は配りません。再配布しないでください。
+**機械学習 (棋譜)**、**機械学習 (LightGBM)**、**ニューラルネットワーク (棋譜)** は、[WTHOR](https://www.ffothello.org/informatique/la-base-wthor) の 8×8 棋譜（`.wtb`）と、終局して残った自対局（`data/games.sqlite`）を使います。WTHOR の ZIP を手元で展開し、拡張子が `.wtb` のファイルを `data/wthor/` の直下に置いてください。ファイル名は問いません（例: `2024.wtb`、`2025.wtb`）。置いた `.wtb` をすべて読みます。このリポジトリから原本は配りません。再配布しないでください。
 
 **強化学習 (自己対局)** は自己対局だけで学びます。WTHOR は使いません。
 
@@ -166,6 +167,9 @@ mkdir -p data/wthor
 
 podman-compose run --rm train python -m reversi.train.ml \
   --wthor /data/wthor --games /data/games.sqlite --out /models/ml.json
+
+podman-compose run --rm train python -m reversi.train.lgbm \
+  --wthor /data/wthor --games /data/games.sqlite --out /models/lgbm.txt
 
 podman-compose run --rm train python -m reversi.train.rl \
   --out /models/rl.json
