@@ -488,6 +488,7 @@ def test_jev_source_uses_jev_model_and_skips_wthor() -> None:
     assert "https://openrouter.ai" in source
     assert "Choose exactly one legal Reversi" not in source
     assert "Place a stone on" not in source
+    assert "more discs" not in source
     roots = _imported_roots(source)
     assert "wthor" not in roots
     assert "reversi" in roots or "openrouter" in roots
