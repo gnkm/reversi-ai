@@ -136,4 +136,58 @@ describe("CatalogPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "対局を開始" }));
     await waitFor(() => expect(started).toEqual([OPENING]));
   });
+
+  it("エージェント対エージェントを選ぶと着手間隔を設定でき未変更時は 1 秒である", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        return new Response(JSON.stringify({ items: ITEMS }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }),
+    );
+    render(<CatalogPage onStarted={() => undefined} />);
+    await screen.findByRole("heading", { name: "ランダム (一様)" });
+    expect(screen.queryByLabelText(/着手間隔/)).toBeNull();
+    fireEvent.click(
+      screen.getByRole("radio", { name: "エージェント対エージェント" }),
+    );
+    const input = screen.getByLabelText(/着手間隔/);
+    expect((input as HTMLInputElement).value).toBe("1");
+  });
+
+  it("着手間隔を変えるとそのミリ秒が対局開始へ渡る", async () => {
+    const intervals: number[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url.endsWith("/api/catalog")) {
+          return new Response(JSON.stringify({ items: ITEMS }), {
+            status: 200,
+          });
+        }
+        expect(url.endsWith("/api/games")).toBe(true);
+        expect(init?.method).toBe("POST");
+        return new Response(JSON.stringify(OPENING), { status: 201 });
+      }),
+    );
+    render(
+      <CatalogPage
+        onStarted={(_game, _items, moveIntervalMs) => {
+          intervals.push(moveIntervalMs);
+        }}
+      />,
+    );
+    await screen.findByRole("heading", { name: "ランダム (一様)" });
+    fireEvent.click(
+      screen.getByRole("radio", { name: "エージェント対エージェント" }),
+    );
+    fireEvent.change(screen.getByLabelText(/着手間隔/), {
+      target: { value: "2" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "対局を開始" }));
+    await waitFor(() => expect(intervals).toEqual([2000]));
+  });
 });

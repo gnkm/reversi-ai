@@ -2,9 +2,9 @@
 title: ソフトウェア要求仕様書 (Software Requirements Specification)
 product: Reversi Agents
 document_id: reversi-ai-SRS
-version: 0.1.22
+version: 0.1.23
 status: working
-date: 2026-09-19
+date: 2026-09-20
 standard: ISO/IEC/IEEE 29148:2018
 source_of_truth: docs/source-of-truth/01-seed.md
 ---
@@ -15,9 +15,9 @@ source_of_truth: docs/source-of-truth/01-seed.md
 | --- | --- |
 | 文書識別 | reversi-ai-SRS |
 | 対象ソフトウェア | Reversi Agents |
-| 版 | 0.1.22 |
+| 版 | 0.1.23 |
 | 状態 | 現行 (Working) |
-| 日付 | 2026-09-19 |
+| 日付 | 2026-09-20 |
 | 準拠 | ISO/IEC/IEEE 29148:2018（内容項目は箇条 9.6。章立ては 29148:2011 図 8 / JIS X 0166:2014 の例示アウトラインを用い、2018 で独立項となった項目を追加した） |
 | 入力 | [`docs/source-of-truth/01-seed.md`](source-of-truth/01-seed.md)（以下「シード」） |
 
@@ -50,6 +50,7 @@ source_of_truth: docs/source-of-truth/01-seed.md
 | 0.1.20 | 2026-09-19 | 未決の詳細要求は残っていない。配分 TBD の要求は無く、TBD-APR-001 を閉じる |
 | 0.1.21 | 2026-09-19 | 開発中の要求正本を本文書とする。shall 変更は Issue と CODEOWNERS レビュー付き PR |
 | 0.1.22 | 2026-09-19 | 「床」を最低条件の意味で使っていた箇所を、通常の日本語に直す。shall は変えない |
+| 0.1.23 | 2026-09-20 | エージェント対エージェントの着手間隔をウェブ UI で設定できる（未設定時は 1 秒） |
 
 ## 目次
 
@@ -392,6 +393,14 @@ shall の追加・変更・撤回は、対象 Issue を起票したうえで本�
 - **優先度 / 配分:** 必須 / 初版
 - **検証:** D, T
 - **補足:** 印の形状は設計事項である。石の移動や裏返りのアニメーションは初版の要求としない
+
+##### SRS-INT-UI-015 エージェント対エージェントの着手間隔
+
+- **要求:** エージェント対エージェントモードにおいて、利用者インタフェースは着手間隔を設定する手段を提供しなければならない。未設定時の間隔は 1 秒でなければならない。盤面画面は、連続する更新のあいだに設定した間隔以上待ってから、次の着手（パスを含む）を提示しなければならない。人手の着手指示を待たず終局まで進むこと（[SRS-FUN-009](#srs-fun-009)）を変えてはならない。
+- **根拠:** ステークホルダ要求。シードにこの数値は無い
+- **優先度 / 配分:** 必須 / 初版
+- **検証:** D, T
+- **補足:** 入力部品の種類、許容範囲、値の永続化、間隔を UI の表示側で掛けるか戦略プロセスで掛けるかは設計事項である。対象はウェブ UI のエージェント対エージェントである。利用者対エージェント、API のみの対局、戦略プロセス内部の着手決定速度は対象外でよい
 
 ピクセル寸法、配色、フォント、一覧の段組は設計事項である。
 
@@ -918,6 +927,7 @@ Jev のメッセージ様式は OpenRouter / TypeSafe の公開 API に従う。
 | SRS-INT-UI-012 | ● | | ● | |
 | SRS-INT-UI-013 | | | ● | ● |
 | SRS-INT-UI-014 | | | ● | ● |
+| SRS-INT-UI-015 | | | ● | ● |
 | SRS-INT-SW-001 | ● | | | ● |
 | SRS-INT-SW-002 | | | ● | |
 | SRS-INT-CM-001 | ● | | | ● |
@@ -1051,11 +1061,11 @@ Jev のメッセージ様式は OpenRouter / TypeSafe の公開 API に従う。
 | AI モデルサービス: OpenRouter（少なくとも Jev。他モデル可） | SRS-INT-SW-001, SRS-CON-001, SRS-FUN-022 |
 | 参照: WTHOR 棋譜 | 第 2 章 REF-WTHOR, SRS-DAT-001, SRS-FUN-015 |
 
-シードに無いが対局定義上必要な規則（盤、合法手、パス、終局、勝敗）は SRS-FUN-002–007 として追加し、出典を REF-WOF / REF-WOF-SCORE とした。
+シードに無いが対局定義上必要な規則（盤、合法手、パス、終局、勝敗）は SRS-FUN-002–007 として追加し、出典を REF-WOF / REF-WOF-SCORE とした。シードに無いステークホルダ要求として、エージェント対エージェントの着手間隔（未設定時 1 秒）を SRS-INT-UI-015 とした。
 
 ### 5.4 要求索引
 
-SRS-INT-UI-001, SRS-INT-UI-002, SRS-INT-UI-003, SRS-INT-UI-004, SRS-INT-UI-005, SRS-INT-UI-006, SRS-INT-UI-007, SRS-INT-UI-008, SRS-INT-UI-009, SRS-INT-UI-010, SRS-INT-UI-011, SRS-INT-UI-012, SRS-INT-UI-013, SRS-INT-UI-014, SRS-INT-SW-001, SRS-INT-SW-002, SRS-INT-CM-001, SRS-INT-CM-002, SRS-FUN-001, SRS-FUN-002, SRS-FUN-003, SRS-FUN-004, SRS-FUN-005, SRS-FUN-006, SRS-FUN-007, SRS-FUN-008, SRS-FUN-009, SRS-FUN-010, SRS-FUN-011, SRS-FUN-012, SRS-FUN-013, SRS-FUN-014, SRS-FUN-015, SRS-FUN-016, SRS-FUN-017, SRS-FUN-018, SRS-FUN-019, SRS-FUN-020, SRS-FUN-021, SRS-FUN-022, SRS-FUN-023, SRS-FUN-024, SRS-FUN-025, SRS-FUN-026, SRS-FUN-027, SRS-FUN-028, SRS-FUN-029, SRS-FUN-030, SRS-FUN-031, SRS-USE-001, SRS-USE-002, SRS-PER-001, SRS-PER-002, SRS-PER-003, SRS-DAT-001, SRS-DAT-002, SRS-DAT-003, SRS-DAT-004, SRS-CON-001, SRS-CON-002, SRS-CON-003, SRS-CON-004, SRS-STD-001, SRS-ATR-REL-001, SRS-ATR-SEC-001, SRS-ATR-SEC-002, SRS-ATR-SEC-003, SRS-ATR-SEC-004, SRS-ATR-SEC-005, SRS-ATR-POR-001.
+SRS-INT-UI-001, SRS-INT-UI-002, SRS-INT-UI-003, SRS-INT-UI-004, SRS-INT-UI-005, SRS-INT-UI-006, SRS-INT-UI-007, SRS-INT-UI-008, SRS-INT-UI-009, SRS-INT-UI-010, SRS-INT-UI-011, SRS-INT-UI-012, SRS-INT-UI-013, SRS-INT-UI-014, SRS-INT-UI-015, SRS-INT-SW-001, SRS-INT-SW-002, SRS-INT-CM-001, SRS-INT-CM-002, SRS-FUN-001, SRS-FUN-002, SRS-FUN-003, SRS-FUN-004, SRS-FUN-005, SRS-FUN-006, SRS-FUN-007, SRS-FUN-008, SRS-FUN-009, SRS-FUN-010, SRS-FUN-011, SRS-FUN-012, SRS-FUN-013, SRS-FUN-014, SRS-FUN-015, SRS-FUN-016, SRS-FUN-017, SRS-FUN-018, SRS-FUN-019, SRS-FUN-020, SRS-FUN-021, SRS-FUN-022, SRS-FUN-023, SRS-FUN-024, SRS-FUN-025, SRS-FUN-026, SRS-FUN-027, SRS-FUN-028, SRS-FUN-029, SRS-FUN-030, SRS-FUN-031, SRS-USE-001, SRS-USE-002, SRS-PER-001, SRS-PER-002, SRS-PER-003, SRS-DAT-001, SRS-DAT-002, SRS-DAT-003, SRS-DAT-004, SRS-CON-001, SRS-CON-002, SRS-CON-003, SRS-CON-004, SRS-STD-001, SRS-ATR-REL-001, SRS-ATR-SEC-001, SRS-ATR-SEC-002, SRS-ATR-SEC-003, SRS-ATR-SEC-004, SRS-ATR-SEC-005, SRS-ATR-POR-001.
 
 ### 5.5 WTHOR 利用条件の調査
 

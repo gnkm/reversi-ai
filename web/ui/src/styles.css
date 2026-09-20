@@ -63,7 +63,8 @@ fieldset label {
 }
 
 button,
-select {
+select,
+input {
   font: inherit;
 }
 
