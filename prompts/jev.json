@@ -1,10 +1,53 @@
 {
   "objective": "Win by having more discs than the opponent at the end of the game.",
+  "origin": "board[0][0] is a1 (Black's lower left). Rows are ranks 1-8 toward White, columns are files a-h.",
   "questions": {
-    "place": {
+    "corner_priority": {
+      "type": "noul",
+      "instructions": "Should the side to move prioritize occupying corners as a goal this turn?",
+      "criteria": {
+        "true": "Corners are the right strategic priority now.",
+        "false": "Corners are not the right priority this turn."
+      }
+    },
+    "mobility_priority": {
+      "type": "noul",
+      "instructions": "Should the side to move prioritize keeping more options than the opponent, rather than grabbing discs?",
+      "criteria": {
+        "true": "Keeping options open matters more than grabbing discs this turn.",
+        "false": "Occupying strong squares or taking discs matters more than options this turn."
+      }
+    },
+    "position_priority": {
+      "type": "noul",
+      "instructions": "Should the side to move prioritize valuable square control this turn?",
+      "criteria": {
+        "true": "Occupying valuable squares is the right priority now.",
+        "false": "Square control is not the main priority this turn."
+      }
+    },
+    "material_importance": {
+      "type": "score",
+      "instructions": "How important is taking discs this turn for the side to move?",
+      "criteria": [
+        "Taking discs this turn barely matters.",
+        "Taking some discs is useful but not decisive.",
+        "Taking discs this turn is important."
+      ]
+    },
+    "stage": {
       "type": "choice",
-      "instructions": "Compare the legal places. Each place is written with the same facts. Choose the place that best helps you win."
+      "instructions": "Which phase best describes this position for the side to move?",
+      "criteria": {
+        "opening": "The opening fight for the center is still going.",
+        "midgame": "The fight is about edges, corners, and options.",
+        "endgame": "The game is close to finishing and remaining empty squares will soon be filled."
+      }
     }
+  },
+  "choice": {
+    "id": "place",
+    "instructions": "Compare the legal places. Each place is written with the same facts. Choose the place that best helps you win."
   },
   "place_line": "{kind}. Occupies a corner: {takes_corner}. Gives a corner next: {gives_corner}. Opponent replies: {opponent_places}. Discs turned: {flips}.",
   "vocabulary": {
@@ -114,6 +157,12 @@
     "confidence_threshold": 0.3
   },
   "weights": {
+    "answers": {
+      "corner_priority": 2.0,
+      "mobility_priority": 1.5,
+      "position_priority": 1.5,
+      "material_importance": 1.2
+    },
     "metrics": {
       "position": 2.0,
       "mobility": 1.5,
