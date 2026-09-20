@@ -27,7 +27,7 @@ SHORT_NAME = {
     "jev": "Jev",
 }
 
-# mermaid xychart 既定パレットは淡色が多く 10 本では潰れる。白地でも色相が分かれる 10 色。
+# mermaid xychart 既定パレットは淡色が多く 10 本では潰れる。白地でも色相が分かれる固定色。
 XY_PLOT_COLORS = (
     "#0077BB",
     "#D62728",
@@ -50,6 +50,43 @@ def fmt_points(value: float) -> str:
 
 def mermaid_label(text: str) -> str:
     return '"' + text.replace('"', "") + '"'
+
+
+def _hsl_hex(hue: float, sat: float = 0.70, light: float = 0.42) -> str:
+    hue_norm = (hue % 360.0) / 360.0
+
+    def hue_to_rgb(p: float, q: float, t: float) -> float:
+        if t < 0:
+            t += 1
+        if t > 1:
+            t -= 1
+        if t < 1 / 6:
+            return p + (q - p) * 6 * t
+        if t < 1 / 2:
+            return q
+        if t < 2 / 3:
+            return p + (q - p) * (2 / 3 - t) * 6
+        return p
+
+    q = light * (1 + sat) if light < 0.5 else light + sat - light * sat
+    p = 2 * light - q
+    red = hue_to_rgb(p, q, hue_norm + 1 / 3)
+    green = hue_to_rgb(p, q, hue_norm)
+    blue = hue_to_rgb(p, q, hue_norm - 1 / 3)
+    return f"#{round(red * 255):02X}{round(green * 255):02X}{round(blue * 255):02X}"
+
+
+def plot_palette(count: int) -> str:
+    colors = list(XY_PLOT_COLORS)
+    extra = 0
+    while len(colors) < count:
+        colors.append(_hsl_hex(37.0 + extra * 137.508))
+        extra += 1
+    return ", ".join(colors[: max(count, 1)])
+
+
+def specimen_label(sid: str) -> str:
+    return SHORT_NAME.get(sid, sid)
 
 
 def wdl(row: Mapping[str, object]) -> str:
@@ -207,9 +244,16 @@ def change_line(previous: Snapshot | None, current: Snapshot) -> str:
         parts.append("更新 " + "、".join(changed))
     if removed:
         parts.append("削除 " + "、".join(removed))
-    if len(current.specimen_ids) != len(previous.specimen_ids):
+    previous_ids = set(previous.specimen_ids)
+    added_ids = [sid for sid in current.specimen_ids if sid not in previous_ids]
+    removed_ids = [
+        sid for sid in previous.specimen_ids if sid not in set(current.specimen_ids)
+    ]
+    if added_ids:
+        parts.append("追加個体 " + "、".join(specimen_label(sid) for sid in added_ids))
+    if removed_ids:
         parts.append(
-            f"個体 {len(previous.specimen_ids)} → {len(current.specimen_ids)}"
+            "削除個体 " + "、".join(specimen_label(sid) for sid in removed_ids)
         )
     extra = [
         note
@@ -316,7 +360,7 @@ def render_history(
         [str(index) for index in range(1, len(chronological) + 1)]
         + [mermaid_label(" ")] * x_pad
     )
-    palette = ", ".join(XY_PLOT_COLORS)
+    palette = plot_palette(len(columns))
     line_plots: list[str] = []
     last_index = len(chronological) - 1
     for sid in columns:

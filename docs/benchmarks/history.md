@@ -22,7 +22,7 @@ python3 docs/benchmarks/render.py
 | --- | --- | --- | --- |
 | 2026-09-20 17:12 | `951b5e9d61cbd9de39dd481c8ea7d6b2f4deb489` | 生成 AI (Jev) は prompts/jev.json の原子質問を jev.py で合成して着手する。 | [JSON](round-robin.json) |
 | 2026-09-20 16:44 | `c694f324cec437e5438c6a4a23e4889f0d59b372` | 更新 models/nn.onnx | [JSON](archive/2026-09-20-1644.json) |
-| 2026-09-20 13:23 | `e259b3bfef6c6361674aa2e9369664fe3943ed92` | 追加 models/lgbm.txt。更新 models/ml.json。個体 9 → 10 | [JSON](archive/2026-09-20-1323.json) |
+| 2026-09-20 13:23 | `e259b3bfef6c6361674aa2e9369664fe3943ed92` | 追加 models/lgbm.txt。更新 models/ml.json。追加個体 LGBM | [JSON](archive/2026-09-20-1323.json) |
 | 2026-09-20 08:16 | `3753d6430d309fb2462435417b6808ec806509a2` | 初回（9 個体） | [JSON](archive/2026-09-20-0816.json) |
 
 ## 勝ち点
