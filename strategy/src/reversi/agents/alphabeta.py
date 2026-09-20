@@ -1,4 +1,4 @@
-"""深さ 6 の Negamax（αβ）で合法手を選ぶ個体。葉は Mobility・Corner・石差。"""
+"""深さ 6 の Negamax（αβ）で合法手を選ぶ個体。葉は Mobility・Corner・X/C・Frontier・石差。"""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ from random import Random
 
 from reversi.engine.board import BOARD_SIZE, Board, Color, Square, Stone, all_squares
 from reversi.engine.rules import (
+    DIRECTIONS,
     Move,
     Place,
     Position,
@@ -21,15 +22,19 @@ DISPLAY_NAME = "ルールベース (αβ)"
 DESCRIPTION = (
     "深さ 6 の Negamax 形式のアルファベータ探索で合法手を選ぶ。"
     "探索前に合法手を Move Ordering で並べる（角、相手の合法手を減らす手、安全な辺、通常、C、X）。"
-    "葉の評価は Mobility 差・Corner 差・石数差の一次結合である。"
+    "葉の評価は Mobility 差・Corner 差・X/C・Frontier 差・石数差の一次結合である。"
+    "石数の重みは空きマス数（Game Phase）で変える。"
     "深さを対局中に変えない。対局中に学習済みモデルも OpenRouter も呼ばない。"
 )
 SEARCH_DEPTH = 6
 
-# score = 50 × Mobility差 + 1000 × Corner差 + 1 × 石数差（W は序盤例の固定値）。
+# score = 50×Mobility差 + 1000×Corner差 − 150×X差 − 80×C差 − 10×Frontier差 + W×石数差。
+# W は空きマス数（Game Phase）。40 以上は 1、20〜39 は 5、10〜19 は 20、9 以下は 100。
 _MOBILITY_WEIGHT = 50
 _CORNER_WEIGHT = 1000
-_DISC_WEIGHT = 1
+_X_WEIGHT = 150
+_C_WEIGHT = 80
+_FRONTIER_WEIGHT = 10
 _CORNERS: tuple[Square, ...] = (
     Square.parse("a1"),
     Square.parse("a8"),
@@ -56,9 +61,9 @@ _C_SQUARES: dict[Square, Square] = {
     Square.parse("h7"): Square.parse("h8"),
 }
 
-# Mobility 差は高々 64、角差は高々 4。この番兵には届かない。
-_NEG_INF = -10_000
-_POS_INF = 10_000
+# 葉は W=100 でも |score| は数万程度。この番兵には届かない。
+_NEG_INF = -1_000_000
+_POS_INF = 1_000_000
 
 __all__ = [
     "CATEGORY",
@@ -75,11 +80,22 @@ __all__ = [
 
 
 def leaf_score(board: Board, color: Color) -> int:
-    """color 視点の Mobility 差・Corner 差・石数差の一次結合。"""
+    """color 視点の Mobility・Corner・X/C・Frontier・石数差の一次結合。"""
     mobility = _mobility_diff(board, color)
     corner = _stone_diff(board, color, _CORNERS)
     disc = _stone_diff(board, color, all_squares())
-    return _MOBILITY_WEIGHT * mobility + _CORNER_WEIGHT * corner + _DISC_WEIGHT * disc
+    x_squares = _danger_diff(board, color, _X_SQUARES)
+    c_squares = _danger_diff(board, color, _C_SQUARES)
+    frontier = _frontier_diff(board, color)
+    weight = _disc_weight(_empty_count(board))
+    return (
+        _MOBILITY_WEIGHT * mobility
+        + _CORNER_WEIGHT * corner
+        - _X_WEIGHT * x_squares
+        - _C_WEIGHT * c_squares
+        - _FRONTIER_WEIGHT * frontier
+        + weight * disc
+    )
 
 
 def choose_move(position: Position, rng: Random | None = None) -> Place | None:
@@ -133,6 +149,83 @@ def _stone_diff(board: Board, color: Color, squares: tuple[Square, ...]) -> int:
     opponent = color.opponent.stone
     total = 0
     for square in squares:
+        stone = board.stone_at(square)
+        if stone is own:
+            total += 1
+        elif stone is opponent:
+            total -= 1
+    return total
+
+
+def _adjacent(square: Square) -> tuple[Square, ...]:
+    found: list[Square] = []
+    for delta_file, delta_rank in DIRECTIONS:
+        file = square.file + delta_file
+        rank = square.rank + delta_rank
+        if 0 <= file < BOARD_SIZE and 0 <= rank < BOARD_SIZE:
+            found.append(Square(file=file, rank=rank))
+    return tuple(found)
+
+
+_NEIGHBORS: dict[Square, tuple[Square, ...]] = {
+    square: _adjacent(square) for square in all_squares()
+}
+
+
+def _empty_count(board: Board) -> int:
+    total = 0
+    for square in all_squares():
+        if board.stone_at(square) is Stone.EMPTY:
+            total += 1
+    return total
+
+
+def _disc_weight(empty: int) -> int:
+    """空きマス数（Game Phase）に応じた石数差の係数 W。"""
+    if empty >= 40:
+        return 1
+    if empty >= 20:
+        return 5
+    if empty >= 10:
+        return 20
+    return 100
+
+
+def _has_empty_neighbor(board: Board, square: Square) -> bool:
+    for neighbor in _NEIGHBORS[square]:
+        if board.stone_at(neighbor) is Stone.EMPTY:
+            return True
+    return False
+
+
+def _frontier_diff(board: Board, color: Color) -> int:
+    """空きマスに 8 近傍で隣接する石の差（自分 − 相手）。"""
+    own = color.stone
+    opponent = color.opponent.stone
+    total = 0
+    for square in all_squares():
+        stone = board.stone_at(square)
+        if stone is Stone.EMPTY or not _has_empty_neighbor(board, square):
+            continue
+        if stone is own:
+            total += 1
+        elif stone is opponent:
+            total -= 1
+    return total
+
+
+def _danger_diff(
+    board: Board,
+    color: Color,
+    related: dict[Square, Square],
+) -> int:
+    """空き角に紐づく X / C の石の差（自分 − 相手）。角を取っていれば解除。"""
+    own = color.stone
+    opponent = color.opponent.stone
+    total = 0
+    for square, corner in related.items():
+        if board.stone_at(corner) is not Stone.EMPTY:
+            continue
         stone = board.stone_at(square)
         if stone is own:
             total += 1
