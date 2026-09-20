@@ -11,6 +11,7 @@ from types import SimpleNamespace
 import pytest
 
 from reversi.agents import chat_completions, extra_genai, jev
+from reversi.agents.prompt import PromptFileError, markdown_sections
 from reversi.api import openrouter_key
 from reversi.engine.board import Square
 from reversi.engine.rules import initial_position, legal_places
@@ -173,6 +174,11 @@ def test_jev_decisions_call_uses_https_and_model_id(
     assert isinstance(questions, dict)
     criteria = questions["move"]["criteria"]
     assert set(criteria) == {square.algebraic for square in places}
+    prompt_text = jev.PROMPT_PATH.read_text(encoding="utf-8")
+    assert questions["move"]["instructions"] in prompt_text
+    assert "Choose exactly one legal Reversi" in questions["move"]["instructions"]
+    first = places[0].algebraic
+    assert criteria[first] == f"Place a stone on {first}."
 
 
 def test_jev_http_error_from_sdk_is_unplayable(
@@ -214,6 +220,143 @@ def test_jev_rejects_choice_outside_legal_from_response(
     monkeypatch.setattr(jev, "OpenRouter", _fake_openrouter(illegal))
     with pytest.raises(jev.ExternalModelError, match="合法手"):
         jev.choose_move(position)
+
+
+def _write_jev_prompt(path: Path, instructions: str, option: str) -> Path:
+    path.write_text(
+        f"## instructions\n\n{instructions}\n\n## option\n\n{option}\n",
+        encoding="utf-8",
+    )
+    return path
+
+
+def test_jev_prompt_path_is_repo_markdown() -> None:
+    root = Path(__file__).resolve().parents[2]
+    assert jev.PROMPT_PATH == root / "prompts" / "jev.md"
+    assert jev.PROMPT_PATH.is_file()
+    assert chat_completions.PROMPT_PATH == root / "prompts" / "chat-completions.md"
+    assert chat_completions.PROMPT_PATH.is_file()
+
+
+def test_jev_missing_prompt_file_is_unplayable_without_calling_openrouter(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    secret = tmp_path / "openrouter-api-key"
+    secret.write_text(_API_KEY, encoding="utf-8")
+    monkeypatch.setattr(jev, "SECRET_PATH", secret)
+    monkeypatch.setattr(jev, "PROMPT_PATH", tmp_path / "missing.md")
+    called = {"n": 0}
+
+    class Boom:
+        def __init__(self, **kwargs: object) -> None:
+            del kwargs
+            called["n"] += 1
+            raise AssertionError("指示ファイル欠落時に OpenRouter を呼んではいけない")
+
+    monkeypatch.setattr(jev, "OpenRouter", Boom)
+    with pytest.raises(jev.ExternalModelError, match="着手指示"):
+        jev.choose_move(initial_position())
+    assert called["n"] == 0
+
+
+def test_jev_empty_or_incomplete_prompt_is_unplayable(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    secret = tmp_path / "openrouter-api-key"
+    secret.write_text(_API_KEY, encoding="utf-8")
+    monkeypatch.setattr(jev, "SECRET_PATH", secret)
+    empty = tmp_path / "empty.md"
+    empty.write_text(" \n", encoding="utf-8")
+    monkeypatch.setattr(jev, "PROMPT_PATH", empty)
+    with pytest.raises(jev.ExternalModelError, match="空"):
+        jev.choose_move(initial_position())
+
+    incomplete = tmp_path / "incomplete.md"
+    incomplete.write_text("## instructions\n\nOnly this.\n", encoding="utf-8")
+    monkeypatch.setattr(jev, "PROMPT_PATH", incomplete)
+    with pytest.raises(jev.ExternalModelError, match="option"):
+        jev.choose_move(initial_position())
+
+    no_placeholder = tmp_path / "no-placeholder.md"
+    _write_jev_prompt(no_placeholder, "Go.", "No placeholder.")
+    monkeypatch.setattr(jev, "PROMPT_PATH", no_placeholder)
+    with pytest.raises(jev.ExternalModelError, match=r"\{square\}"):
+        jev.choose_move(initial_position())
+
+    duplicate = tmp_path / "duplicate.md"
+    duplicate.write_text(
+        "## instructions\n\nFirst.\n\n## option\n\nPlace on {square}.\n\n"
+        "## instructions\n\nSecond.\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(jev, "PROMPT_PATH", duplicate)
+    with pytest.raises(jev.ExternalModelError, match="重複"):
+        jev.choose_move(initial_position())
+
+
+def test_markdown_sections_keeps_heading_lines_inside_fences() -> None:
+    parts = markdown_sections(
+        "## instructions\n\nChoose.\n```\n## instructions\nexample\n```\n"
+        "Still here.\n\n## option\n\nPlace on {square}.\n"
+    )
+    assert "## instructions" in parts["instructions"]
+    assert "example" in parts["instructions"]
+    assert "Still here." in parts["instructions"]
+    assert parts["option"] == "Place on {square}."
+
+
+def test_markdown_sections_rejects_duplicate_and_unclosed_fence() -> None:
+    with pytest.raises(PromptFileError, match="重複"):
+        markdown_sections(
+            "## instructions\n\nFirst.\n\n## option\n\nX.\n\n## instructions\n\nSecond.\n"
+        )
+    with pytest.raises(PromptFileError, match="コードフェンス"):
+        markdown_sections("## instructions\n\n```\nnot closed\n")
+
+
+def test_jev_uses_updated_markdown_on_next_call(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    secret = tmp_path / "openrouter-api-key"
+    secret.write_text(_API_KEY, encoding="utf-8")
+    monkeypatch.setattr(jev, "SECRET_PATH", secret)
+    prompt = _write_jev_prompt(
+        tmp_path / "jev.md",
+        "First instruction text.",
+        "Put on {square}.",
+    )
+    monkeypatch.setattr(jev, "PROMPT_PATH", prompt)
+    position = initial_position()
+    places = legal_places(position)
+    chosen = places[0]
+
+    def respond(kwargs: dict[str, object]) -> SimpleNamespace:
+        del kwargs
+        return SimpleNamespace(
+            answers={"move": SimpleNamespace(choice=chosen.algebraic, type="choice")}
+        )
+
+    fake = _fake_openrouter(respond)
+    monkeypatch.setattr(jev, "OpenRouter", fake)
+    assert jev.choose_move(position) is not None
+    first = fake.last_create
+    assert isinstance(first, dict)
+    assert first["questions"]["move"]["instructions"] == "First instruction text."
+    assert first["questions"]["move"]["criteria"][chosen.algebraic] == (
+        f"Put on {chosen.algebraic}."
+    )
+
+    _write_jev_prompt(prompt, "Second instruction text.", "Drop on {square}.")
+    assert jev.choose_move(position) is not None
+    second = fake.last_create
+    assert isinstance(second, dict)
+    assert second["questions"]["move"]["instructions"] == "Second instruction text."
+    assert second["questions"]["move"]["criteria"][chosen.algebraic] == (
+        f"Drop on {chosen.algebraic}."
+    )
 
 
 def _fake_chat_openrouter(
@@ -282,6 +425,9 @@ def test_extra_genai_chat_uses_https_and_given_model_id(
     messages = send["messages"]
     assert isinstance(messages, list)
     assert messages[0]["role"] == "system"
+    prompt_text = chat_completions.PROMPT_PATH.read_text(encoding="utf-8")
+    assert messages[0]["content"] in prompt_text
+    assert "Choose exactly one legal Reversi" in messages[0]["content"]
     assert chosen.algebraic in messages[1]["content"] or "legal_places" in messages[1]["content"]
 
 
@@ -322,6 +468,28 @@ def test_extra_genai_chat_rejects_choice_outside_legal(
     monkeypatch.setattr(chat_completions, "OpenRouter", _fake_chat_openrouter(illegal))
     with pytest.raises(jev.ExternalModelError, match="合法手"):
         chat_completions.choose_move(position, "vendor/extra-chat-model")
+
+
+def test_extra_genai_missing_prompt_file_is_unplayable_without_calling_openrouter(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    secret = tmp_path / "openrouter-api-key"
+    secret.write_text(_API_KEY, encoding="utf-8")
+    monkeypatch.setattr(chat_completions, "SECRET_PATH", secret)
+    monkeypatch.setattr(chat_completions, "PROMPT_PATH", tmp_path / "missing.md")
+    called = {"n": 0}
+
+    class Boom:
+        def __init__(self, **kwargs: object) -> None:
+            del kwargs
+            called["n"] += 1
+            raise AssertionError("指示ファイル欠落時に OpenRouter を呼んではいけない")
+
+    monkeypatch.setattr(chat_completions, "OpenRouter", Boom)
+    with pytest.raises(jev.ExternalModelError, match="着手指示"):
+        chat_completions.choose_move(initial_position(), "vendor/extra-chat-model")
+    assert called["n"] == 0
 
 
 def test_extra_genai_config_path_is_gitignored_data_file() -> None:
