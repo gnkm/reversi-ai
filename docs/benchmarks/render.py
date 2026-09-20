@@ -218,7 +218,7 @@ def render_history(
         ]
         for snap in snapshots
     ]
-    point_headers = ["記録"] + [SHORT_NAME.get(sid, sid) for sid in columns]
+    point_headers = ["記録"] + [md_cell(SHORT_NAME.get(sid, sid)) for sid in columns]
     point_rows = []
     for snap in snapshots:
         cells = [f"[{md_cell(snap.recorded_at)}]({snap.href})"]
