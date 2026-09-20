@@ -26,6 +26,7 @@ dev = [
     "xenon>=0.9.3",
 ]
 train = [
+    "onnx>=1.16",
     "torch>=2.4",
 ]
 
