@@ -792,6 +792,137 @@ def test_jev_logs_candidate_code_probability_and_selection(
     assert selected_count == 1
 
 
+def test_jev_stage1_configs_switch_without_adding_catalog_names(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    position = _position_from_rank8_rows(_CORNER_VS_TWO_FLIPS, Color.BLACK)
+    places = legal_places(position)
+    a1 = Square.parse("a1")
+    d2 = Square.parse("d2")
+    assert a1 in places and d2 in places
+    called = {"n": 0}
+
+    def boom(*_args: object, **_kwargs: object) -> Square:
+        called["n"] += 1
+        raise AssertionError("コードだけの構成は OpenRouter を呼んではいけない")
+
+    monkeypatch.setattr(jev, "_call_openrouter", boom)
+    with jev.stage1_config("v2_jev0"):
+        even = jev.choose_move(position)
+        focused_spec = jev._spec_for_config(jev._load_spec(), "v2_jev0")
+        even_sel = jev._select_square(position, places, _jev_parsed(places), focused_spec)
+        d2_sel = jev._select_square(
+            position, places, _jev_parsed(places, focused="d2"), focused_spec
+        )
+    assert even is not None
+    assert even.square == even_sel == d2_sel == a1
+    assert called["n"] == 0
+
+    with jev.stage1_config("v1_constant"):
+        first = jev.choose_move(position)
+        second = jev.choose_move(position)
+    assert first is not None and second is not None
+    assert first == second
+    assert first.square in places
+    assert called["n"] == 0
+
+    spec = jev._load_spec()
+    code0 = jev._spec_for_config(spec, "v2_code0")
+    as_is = jev._spec_for_config(spec, "v2_as_is")
+    assert code0.w_code == 0.0 and code0.w_jev == spec.w_jev
+    assert as_is.w_code == spec.w_code and as_is.w_jev == spec.w_jev
+    assert jev._select_square(
+        position, places, _jev_parsed(places, focused="d2"), code0
+    ) == d2
+    assert jev._select_square(
+        position, places, _jev_parsed(places, focused="d2"), as_is
+    ) == d2
+    assert jev._select_square(position, places, _jev_parsed(places), as_is) == a1
+
+    names = [item.display_name for item in items()]
+    assert names.count("生成 AI (Jev)") == 1
+    for extra in jev.STAGE1_CONFIG_NAMES:
+        assert extra not in names
+    assert get(jev.SPECIMEN_ID).display_name == "生成 AI (Jev)"
+
+
+def test_jev_stage1_jev0_does_not_need_secret(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(jev, "SECRET_PATH", tmp_path / "missing")
+    monkeypatch.setattr(
+        jev,
+        "_call_openrouter",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("jev: 0 は OpenRouter を呼んではいけない")
+        ),
+    )
+    position = initial_position()
+    with jev.stage1_config("v2_jev0"):
+        move = jev.choose_move(position)
+    assert move is not None
+    assert move.square in legal_places(position)
+    with jev.stage1_config("v1_constant"):
+        constant = jev.choose_move(position)
+    assert constant is not None
+    assert constant.square in legal_places(position)
+
+
+def test_jev_stage1_code0_failure_is_unplayable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def boom(_position: Position, _places: Sequence[Square]) -> Square:
+        raise jev.ExternalModelError("試験用の失敗")
+
+    monkeypatch.setattr(jev, "_call_openrouter", boom)
+    position = initial_position()
+    with jev.stage1_config("v2_code0"), pytest.raises(
+        jev.ExternalModelError, match="失敗"
+    ):
+        jev.choose_move(position)
+    with jev.stage1_config("v2_as_is"), pytest.raises(
+        jev.ExternalModelError, match="失敗"
+    ):
+        jev.choose_move(position)
+
+
+def test_jev_stage1_unknown_config_is_rejected() -> None:
+    with pytest.raises(ValueError, match="未知"), jev.stage1_config("v3_shortlist"):
+        pass
+    assert jev._active_stage1_config == jev.DEFAULT_STAGE1_CONFIG
+
+
+def test_jev_stage1_baseline_is_stronger_code_only_config() -> None:
+    weaker = {"name": "v1_constant", "points": 1.0, "stone_diff": 40, "wins": 1}
+    stronger = {"name": "v2_jev0", "points": 4.0, "stone_diff": -10, "wins": 4}
+    loud = {"name": "v2_code0", "points": 99.0, "stone_diff": 99, "wins": 99}
+    current = {"name": "v2_as_is", "points": 0.0, "stone_diff": 0, "wins": 0}
+    assert (
+        jev.select_stage1_baseline([weaker, stronger, loud, current]) == "v2_jev0"
+    )
+    tied_v1 = {"name": "v1_constant", "points": 3.0, "stone_diff": 10, "wins": 3}
+    tied_v2 = {"name": "v2_jev0", "points": 3.0, "stone_diff": 10, "wins": 3}
+    assert jev.select_stage1_baseline([tied_v2, tied_v1, loud, current]) == "v2_jev0"
+
+
+def test_jev_stage1_record_names_code_only_baseline() -> None:
+    root = Path(__file__).resolve().parents[2] / "docs" / "benchmarks"
+    candidates = sorted(root.glob("jev-stage1*.json"))
+    assert candidates, "段階 1 の記録 JSON が docs/benchmarks/ に無い"
+    data = json.loads(candidates[-1].read_text(encoding="utf-8"))
+    configs = data["configs"]
+    names = {row["name"] for row in configs}
+    required = set(jev.STAGE1_CONFIG_NAMES)
+    assert required <= names
+    assert data.get("baseline") in names
+    assert data["baseline"] in jev.STAGE1_CODE_ONLY
+    for row in configs:
+        assert "wins" in row or "stone_diff" in row or "points" in row
+    assert jev.select_stage1_baseline(configs) == data["baseline"]
+    assert [item.display_name for item in items()].count("生成 AI (Jev)") == 1
+
+
 def _black_feature_index(square: Square) -> int:
     return square.rank * 8 + square.file
 
