@@ -1396,6 +1396,27 @@ def test_nn_training_skips_corrupt_persisted_games(tmp_path: Path) -> None:
     assert [example.square.algebraic for example in examples] == ["f5"]
 
 
+def test_nn_training_writes_onnx_when_torch_is_installed(tmp_path: Path) -> None:
+    pytest.importorskip("torch")
+    pytest.importorskip("onnx")
+    from reversi.agents.nn import infer_logits
+    from reversi.train.nn import train_and_write
+
+    out = tmp_path / "nn.onnx"
+    n_examples = train_and_write(
+        out,
+        wthor=tmp_path / "missing-wthor",
+        games=tmp_path / "missing.sqlite",
+        hidden=8,
+        epochs=1,
+        seed=0,
+    )
+    assert n_examples == 0
+    assert out.is_file()
+    logits = infer_logits(initial_position().board, out)
+    assert len(logits) == 64
+
+
 def _write_extra_genai(path: Path, entries: list[dict[str, str]]) -> Path:
     path.write_text(json.dumps(entries), encoding="utf-8")
     return path
