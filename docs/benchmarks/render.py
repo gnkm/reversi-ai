@@ -27,6 +27,20 @@ SHORT_NAME = {
     "jev": "Jev",
 }
 
+# mermaid xychart 既定パレットは淡色が多く 10 本では潰れる。白地でも色相が分かれる 10 色。
+XY_PLOT_COLORS = (
+    "#0077BB",
+    "#D62728",
+    "#009988",
+    "#FF7F0E",
+    "#9467BD",
+    "#8C564B",
+    "#E377C2",
+    "#17BECF",
+    "#2CA02C",
+    "#6A3D9A",
+)
+
 
 def fmt_points(value: float) -> str:
     if value == int(value):
@@ -130,25 +144,27 @@ def archive_filename(recorded_at: str) -> str:
 class Snapshot(NamedTuple):
     recorded_at: str
     models_commit: str
-    trigger: str
     points: dict[str, float]
+    ranks: dict[str, int]
     specimen_ids: tuple[str, ...]
+    blobs: dict[str, str]
+    notes: tuple[str, ...]
     href: str
 
 
-def trigger_line(data: Mapping[str, object]) -> str:
+def snapshot_notes(data: Mapping[str, object]) -> tuple[str, ...]:
     protocol = data["protocol"]
     assert isinstance(protocol, Mapping)
     notes = protocol["notes"]
     assert isinstance(notes, list)
-    if not notes:
-        return ""
-    return str(notes[0])
+    return tuple(str(item) for item in notes)
 
 
 def snapshot_from(data: Mapping[str, object], href: str) -> Snapshot:
     git = data["git"]
     assert isinstance(git, Mapping)
+    blobs = git["blobs"]
+    assert isinstance(blobs, Mapping)
     specimens = data["specimens"]
     standings = data["standings"]
     assert isinstance(specimens, list)
@@ -156,13 +172,68 @@ def snapshot_from(data: Mapping[str, object], href: str) -> Snapshot:
     return Snapshot(
         recorded_at=str(data["recorded_at"]),
         models_commit=str(git["models_commit"]),
-        trigger=trigger_line(data),
         points={
             str(row["specimen_id"]): float(row["points"]) for row in standings
         },
+        ranks={str(row["specimen_id"]): int(row["rank"]) for row in standings},
         specimen_ids=tuple(str(item["specimen_id"]) for item in specimens),
+        blobs={str(path): str(digest) for path, digest in blobs.items()},
+        notes=snapshot_notes(data),
         href=href,
     )
+
+
+def is_protocol_note(note: str) -> bool:
+    return any(
+        marker in note
+        for marker in ("総当たり", "非決定的", "順次実行", "git.blobs")
+    )
+
+
+def change_line(previous: Snapshot | None, current: Snapshot) -> str:
+    if previous is None:
+        return f"初回（{len(current.specimen_ids)} 個体）"
+    parts: list[str] = []
+    added = [path for path in current.blobs if path not in previous.blobs]
+    removed = [path for path in previous.blobs if path not in current.blobs]
+    changed = [
+        path
+        for path in current.blobs
+        if path in previous.blobs and current.blobs[path] != previous.blobs[path]
+    ]
+    if added:
+        parts.append("追加 " + "、".join(added))
+    if changed:
+        parts.append("更新 " + "、".join(changed))
+    if removed:
+        parts.append("削除 " + "、".join(removed))
+    if len(current.specimen_ids) != len(previous.specimen_ids):
+        parts.append(
+            f"個体 {len(previous.specimen_ids)} → {len(current.specimen_ids)}"
+        )
+    extra = [
+        note
+        for note in current.notes
+        if note not in previous.notes and not is_protocol_note(note)
+    ]
+    parts.extend(extra)
+    if not parts:
+        return "学習成果物の blob は同一"
+    return "。".join(parts)
+
+
+def generation_changes(snapshots: Sequence[Snapshot]) -> dict[str, str]:
+    chronological = list(reversed(snapshots))
+    result: dict[str, str] = {}
+    previous: Snapshot | None = None
+    for snap in chronological:
+        result[snap.recorded_at] = change_line(previous, snap)
+        previous = snap
+    return result
+
+
+def rank_out_value(snapshots: Sequence[Snapshot]) -> int:
+    return max(len(snap.specimen_ids) for snap in snapshots) + 1
 
 
 def collect_snapshots(
@@ -209,30 +280,60 @@ def render_history(
 ) -> str:
     snapshots = collect_snapshots(latest, archive_dir)
     columns = specimen_columns(latest, snapshots)
+    changes = generation_changes(snapshots)
     generation_rows = [
         [
             md_cell(snap.recorded_at),
             f"`{snap.models_commit}`",
-            md_cell(snap.trigger),
+            md_cell(changes[snap.recorded_at]),
             f"[JSON]({snap.href})",
         ]
         for snap in snapshots
     ]
     point_headers = ["記録"] + [md_cell(SHORT_NAME.get(sid, sid)) for sid in columns]
     point_rows = []
+    rank_rows = []
     for snap in snapshots:
-        cells = [f"[{md_cell(snap.recorded_at)}]({snap.href})"]
+        point_cells = [f"[{md_cell(snap.recorded_at)}]({snap.href})"]
+        rank_cells = [f"[{md_cell(snap.recorded_at)}]({snap.href})"]
         for sid in columns:
             if sid in snap.points:
-                cells.append(fmt_points(snap.points[sid]))
+                point_cells.append(fmt_points(snap.points[sid]))
             else:
-                cells.append("—")
-        point_rows.append(cells)
+                point_cells.append("—")
+            if sid in snap.ranks:
+                rank_cells.append(str(snap.ranks[sid]))
+            else:
+                rank_cells.append("—")
+        point_rows.append(point_cells)
+        rank_rows.append(rank_cells)
+
+    rank_out = rank_out_value(snapshots)
+    chronological = list(reversed(snapshots))
+    # 終端ラベルが SVG 右端で見切れないよう、実データより右に空カテゴリを置く。
+    x_pad = 2
+    x_axis = ", ".join(
+        [str(index) for index in range(1, len(chronological) + 1)]
+        + [mermaid_label(" ")] * x_pad
+    )
+    palette = ", ".join(XY_PLOT_COLORS)
+    line_plots: list[str] = []
+    last_index = len(chronological) - 1
+    for sid in columns:
+        name = SHORT_NAME.get(sid, sid)
+        values: list[str] = []
+        for index, snap in enumerate(chronological):
+            rank = snap.ranks[sid] if sid in snap.ranks else rank_out
+            if index == last_index:
+                values.append(f"{rank} {mermaid_label(name)}")
+            else:
+                values.append(str(rank))
+        line_plots.append(f"    line {mermaid_label(name)} [{', '.join(values)}]")
 
     lines = [
         "<!-- このファイルは docs/benchmarks/render.py が archive/ と round-robin.json から書く。手で直さない。 -->",
         "",
-        "# 総当たりの勝ち点推移",
+        "# 総当たりの勝ち点と順位の推移",
         "",
         "最新の数値の正本は [`round-robin.json`](round-robin.json) である。過去の正本は [`archive/`](archive/) に、現行と同じ形で残る。最新の閲覧用は [`round-robin.md`](round-robin.md) である。",
         "",
@@ -248,8 +349,10 @@ def render_history(
         "",
         "## 世代",
         "",
+        "学習成果物は `models/` の重みである。JSON の `git.blobs` が各ファイルの blob SHA を指す。表の列は、そのファイルがその時点で載っていた Git コミット（`git.models_commit`）である。コミット SHA が違っても blob が同じなら同じ重みである。成績の再現ピンは blob であり、いまの `models/` と異なれば一致しない。",
+        "",
         markdown_table(
-            ["記録", "学習成果物", "きっかけ", "正本"],
+            ["記録", "学習成果物", "変更点", "正本"],
             generation_rows,
         ),
         "",
@@ -258,6 +361,34 @@ def render_history(
         "行が世代、列がカタログ個体の略称。勝ち点は勝 1・分 0.5。記録日時からその時点の JSON へ辿れる。",
         "",
         markdown_table(point_headers, point_rows),
+        "",
+        "## 順位",
+        "",
+        "行が世代、列がカタログ個体の略称。1 が首位。カタログに無い世代は —。",
+        "",
+        markdown_table(point_headers, rank_rows),
+        "",
+        f"横軸は古い順の世代（通し番号。時刻は上の表）。縦軸は順位。1 が上、{rank_out} がランク外。カタログに無い世代は最下位より下のランク外として描く。点と点は直線で結ぶ。線の色は個体ごとで、終端に略称を置く。凡例は出さない。",
+        "",
+        "```mermaid",
+        "---",
+        "config:",
+        "    xyChart:",
+        "        width: 1100",
+        "        height: 580",
+        "        showLegend: false",
+        "        plotReservedSpacePercent: 30",
+        "        titlePadding: 16",
+        "    themeVariables:",
+        "        xyChart:",
+        f"            plotColorPalette: '{palette}'",
+        "---",
+        "xychart-beta",
+        '    title "総当たりの順位"',
+        f"    x-axis [{x_axis}]",
+        f'    y-axis "順位（{rank_out}=ランク外）" {rank_out} --> 1',
+        *line_plots,
+        "```",
         "",
     ]
     return "\n".join(lines)
