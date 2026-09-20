@@ -252,6 +252,7 @@ def _sign_test(diffs: Sequence[float]) -> dict[str, Any]:
 def _conclude(
     games: Sequence[Mapping[str, Any]],
     pairs: Sequence[Mapping[str, Any]],
+    complete: bool,
 ) -> dict[str, Any]:
     n = len(games)
     wins = sum(1 for game in games if game["result"] == "win")
@@ -270,7 +271,11 @@ def _conclude(
         and sign["p_value"] < ALPHA
         and sign["positive"] > sign["n"] / 2
     )
-    if accepted:
+    if not complete:
+        accepted = False
+        catalog_policy = "in_progress"
+        return_to = False
+    elif accepted:
         catalog_policy = "adopted_stage4_chosen"
         return_to = False
     else:
@@ -287,6 +292,7 @@ def _conclude(
         "paired": True,
         "sign_test": sign,
         "accepted": accepted,
+        "complete": complete,
         "catalog_policy": catalog_policy,
         "return_to_stage3_and_4": return_to,
     }
@@ -317,6 +323,8 @@ def _payload(
                 "勝敗は公式スコア、最終石差は盤上の石数差（候補−基準線）。",
                 "採用は、平均石差が正、勝率が基準線を下回らず、対の石差の片側符号検定が有意であること。",
                 "満たさなければカタログはコードだけの v2_jev0 を維持し、段階 3 と 4 へ戻る。",
+                "再開は seed・開始局面数・候補と基準線の selection が一致するときだけ。不一致なら別の --output を使う。",
+                "全対局が終わるまで complete は false で、accepted は出さない。",
                 "資格情報と課金が要る対局は CI に載せない。本スクリプトはホストで明示実行する。",
             ],
         },
@@ -327,6 +335,42 @@ def _payload(
         "starts": list(starts),
         "game_records": list(games),
     }
+
+
+def _same_selection(left: Mapping[str, Any], right: Mapping[str, Any]) -> bool:
+    try:
+        return (
+            int(left["shortlist_size"]) == int(right["shortlist_size"])
+            and float(left["margin"]) == float(right["margin"])
+            and float(left["confidence_threshold"]) == float(right["confidence_threshold"])
+        )
+    except (KeyError, TypeError, ValueError):
+        return False
+
+
+def _progress_matches(
+    progress: Mapping[str, Any],
+    seed: int,
+    n_starts: int,
+    candidate: Mapping[str, Any],
+    baseline: Mapping[str, Any],
+) -> bool:
+    protocol = progress.get("protocol")
+    if not isinstance(protocol, dict) or protocol.get("seed") != seed:
+        return False
+    starts = progress.get("starts")
+    if not isinstance(starts, list) or len(starts) != n_starts:
+        return False
+    prev_c = progress.get("candidate")
+    prev_b = progress.get("baseline")
+    if not isinstance(prev_c, dict) or not isinstance(prev_b, dict):
+        return False
+    if not _same_selection(prev_c, candidate):
+        return False
+    try:
+        return float(prev_b["margin"]) == float(baseline["margin"])
+    except (KeyError, TypeError, ValueError):
+        return False
 
 
 def _load_progress(path: Path) -> dict[str, Any] | None:
@@ -367,74 +411,77 @@ def main() -> int:
     stage2._ensure_output(output)
     jev._log_candidates = lambda *_a, **_k: None  # type: ignore[method-assign]
     secret = stage2._bind_secret_if_needed()
-    if not jev.SECRET_PATH.is_file():
-        raise SystemExit("OpenRouter の資格情報が無く、段階 5 の対局を計測できない")
-    spec = jev._load_spec()
-    chosen = _load_chosen(args.from_stage4)
-    baseline_spec = replace(spec, margin=0.0)
-    candidate_spec = replace(
-        spec,
-        shortlist_size=chosen["shortlist_size"],
-        margin=chosen["margin"],
-        confidence_threshold=chosen["confidence_threshold"],
-    )
-    baseline_meta = {
-        "label": "code_only",
-        "shortlist_size": baseline_spec.shortlist_size,
-        "margin": baseline_spec.margin,
-        "confidence_threshold": baseline_spec.confidence_threshold,
-    }
-    candidate_meta = {
-        "label": "stage4_chosen",
-        "source": args.from_stage4.name,
-        **chosen,
-    }
-    progress = _load_progress(output)
-    rng = Random(args.seed)
-    if (
-        progress is not None
-        and progress.get("protocol", {}).get("seed") == args.seed
-        and len(progress.get("starts", [])) == args.starts
-    ):
-        starts = list(progress["starts"])
-        games = [row for row in progress["game_records"] if isinstance(row, dict)]
-        print(f"resume starts={len(starts)} games={len(games)}", flush=True)
-    else:
-        starts = _make_starts(rng, args.starts)
-        games = []
-        print(f"starts={len(starts)} seed={args.seed}", flush=True)
-    done = {
-        _pair_key(int(row["start_index"]), row["candidate_color"] == "black")
-        for row in games
-        if "start_index" in row and "candidate_color" in row
-    }
-    asks: dict[tuple[str, ...], dict[str, Any]] = {}
-
-    def _candidate_chooser(position: Position) -> Place | None:
-        move, _asked = _choose_with_spec(position, candidate_spec, asks)
-        return move
-
-    def _baseline_chooser(position: Position) -> Place | None:
-        move, _asked = _choose_with_spec(position, baseline_spec, asks)
-        return move
-
-    def _save() -> None:
-        pairs = _pairs_from_games(starts, games)
-        conclusion = _conclude(games, pairs)
-        stage2._atomic_write(
-            output,
-            _payload(
-                starts,
-                games,
-                pairs,
-                baseline_meta,
-                candidate_meta,
-                conclusion,
-                args.seed,
-            ),
-        )
-
     try:
+        if not jev.SECRET_PATH.is_file():
+            raise SystemExit("OpenRouter の資格情報が無く、段階 5 の対局を計測できない")
+        spec = jev._load_spec()
+        chosen = _load_chosen(args.from_stage4)
+        baseline_spec = replace(spec, margin=0.0)
+        candidate_spec = replace(
+            spec,
+            shortlist_size=chosen["shortlist_size"],
+            margin=chosen["margin"],
+            confidence_threshold=chosen["confidence_threshold"],
+        )
+        baseline_meta = {
+            "label": "code_only",
+            "shortlist_size": baseline_spec.shortlist_size,
+            "margin": baseline_spec.margin,
+            "confidence_threshold": baseline_spec.confidence_threshold,
+        }
+        candidate_meta = {
+            "label": "stage4_chosen",
+            "source": args.from_stage4.name,
+            **chosen,
+        }
+        progress = _load_progress(output)
+        rng = Random(args.seed)
+        if progress is not None:
+            if not _progress_matches(
+                progress, args.seed, args.starts, candidate_meta, baseline_meta
+            ):
+                raise SystemExit(
+                    "既存の記録は別の設定です。別の --output を指定してください。"
+                )
+            starts = list(progress["starts"])
+            games = [row for row in progress["game_records"] if isinstance(row, dict)]
+            print(f"resume starts={len(starts)} games={len(games)}", flush=True)
+        else:
+            starts = _make_starts(rng, args.starts)
+            games = []
+            print(f"starts={len(starts)} seed={args.seed}", flush=True)
+        done = {
+            _pair_key(int(row["start_index"]), row["candidate_color"] == "black")
+            for row in games
+            if "start_index" in row and "candidate_color" in row
+        }
+        asks: dict[tuple[str, ...], dict[str, Any]] = {}
+
+        def _candidate_chooser(position: Position) -> Place | None:
+            move, _asked = _choose_with_spec(position, candidate_spec, asks)
+            return move
+
+        def _baseline_chooser(position: Position) -> Place | None:
+            move, _asked = _choose_with_spec(position, baseline_spec, asks)
+            return move
+
+        def _save() -> None:
+            pairs = _pairs_from_games(starts, games)
+            complete = len(games) == 2 * len(starts) and len(pairs) == len(starts)
+            conclusion = _conclude(games, pairs, complete)
+            stage2._atomic_write(
+                output,
+                _payload(
+                    starts,
+                    games,
+                    pairs,
+                    baseline_meta,
+                    candidate_meta,
+                    conclusion,
+                    args.seed,
+                ),
+            )
+
         for start in starts:
             position = _position_from_rows(start["board"], start["side_to_move"])
             for candidate_is_black in (True, False):
@@ -482,7 +529,7 @@ def main() -> int:
         f"wrote {output} games={payload['games']} "
         f"win_rate={payload['win_rate']:.4f} "
         f"mean_stone_diff={payload['mean_stone_diff']:.4f} "
-        f"accepted={payload['accepted']}",
+        f"accepted={payload['accepted']} complete={payload.get('complete')}",
         flush=True,
     )
     return 0

@@ -53,6 +53,7 @@
     "method": "sign_test_one_sided_pair_stone_diff"
   },
   "accepted": false,
+  "complete": true,
   "catalog_policy": "code_only_v2_jev0",
   "return_to_stage3_and_4": true,
   "paired_results": [
