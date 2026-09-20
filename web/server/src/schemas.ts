@@ -68,6 +68,7 @@ export const playerSpecSchema = z.discriminatedUnion("kind", [
 export const createGameRequestSchema = z.strictObject({
   black: playerSpecSchema,
   white: playerSpecSchema,
+  move_interval_seconds: z.number().nonnegative().optional(),
 });
 
 export const placeMoveSchema = z.strictObject({

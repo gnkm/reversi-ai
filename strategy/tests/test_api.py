@@ -25,7 +25,7 @@ from reversi.api.schemas import (
     MoveApplied,
     SpecimenPlayer,
 )
-from reversi.api.session import GameStore
+from reversi.api.session import GameStore, remaining_autoplay_wait
 from reversi.engine.rules import Place, initial_position, legal_places
 
 _API_DIR = Path(__file__).resolve().parents[1] / "src" / "reversi" / "api"
@@ -411,3 +411,141 @@ def test_jev_failure_after_human_move_marks_unplayable_without_adopting_model_mo
     assert body.continuation_possible is False
     assert body.game.status == "unplayable"
     assert body.game.board == payload.game.board
+
+
+class _AutoplayClock:
+    def __init__(self) -> None:
+        self.now = 0.0
+        self.sleeps: list[float] = []
+
+    def monotonic(self) -> float:
+        return self.now
+
+    def sleep(self, seconds: float) -> None:
+        self.sleeps.append(seconds)
+        self.now += seconds
+
+
+def _join_autoplay(store: GameStore) -> None:
+    thread = store._autoplay_thread
+    if thread is not None:
+        thread.join(timeout=5)
+        assert thread.is_alive() is False
+
+
+def test_autoplay_interval_remaining_is_lower_bound() -> None:
+    assert remaining_autoplay_wait(None, 0.0, 1.0) == 0.0
+    assert remaining_autoplay_wait(0.0, 0.0, 1.0) == 1.0
+    assert remaining_autoplay_wait(0.0, 0.4, 1.0) == pytest.approx(0.6)
+    assert remaining_autoplay_wait(0.0, 1.0, 1.0) == 0.0
+    assert remaining_autoplay_wait(0.0, 1.5, 1.0) == 0.0
+    assert remaining_autoplay_wait(0.0, 0.0, 0.0) == 0.0
+
+
+def test_autoplay_interval_omitted_does_not_wait(tmp_path: Path) -> None:
+    clock = _AutoplayClock()
+    store = GameStore(
+        db_path=tmp_path / "games.sqlite",
+        monotonic=clock.monotonic,
+        sleep=clock.sleep,
+    )
+    specimen = SpecimenPlayer(kind="specimen", specimen_id=SPECIMEN_ID)
+    store.start(CreateGameRequest(black=specimen, white=specimen))
+    _join_autoplay(store)
+    assert clock.sleeps == []
+    assert store._game is not None
+    assert store._game.position is not None
+    assert len(store._applied) == 1 + len(store._game.moves)
+
+
+def test_autoplay_interval_waits_between_applied_moves(tmp_path: Path) -> None:
+    clock = _AutoplayClock()
+    store = GameStore(
+        db_path=tmp_path / "games.sqlite",
+        monotonic=clock.monotonic,
+        sleep=clock.sleep,
+    )
+    specimen = SpecimenPlayer(kind="specimen", specimen_id=SPECIMEN_ID)
+    store.start(
+        CreateGameRequest(
+            black=specimen,
+            white=specimen,
+            move_interval_seconds=1.0,
+        ),
+    )
+    _join_autoplay(store)
+    game = store._game
+    assert game is not None
+    assert len(game.moves) >= 2
+    assert len(clock.sleeps) == len(game.moves) - 1
+    assert clock.sleeps == pytest.approx([1.0] * (len(game.moves) - 1))
+    applied_moves = [state.last_move for state in store._applied[1:]]
+    assert applied_moves == list(game.moves)
+
+
+def test_autoplay_interval_does_not_omit_passes(tmp_path: Path) -> None:
+    clock = _AutoplayClock()
+    store = GameStore(
+        db_path=tmp_path / "games.sqlite",
+        monotonic=clock.monotonic,
+        sleep=clock.sleep,
+    )
+    specimen = SpecimenPlayer(kind="specimen", specimen_id=SPECIMEN_ID)
+    store.start(
+        CreateGameRequest(
+            black=specimen,
+            white=specimen,
+            move_interval_seconds=0.25,
+        ),
+    )
+    _join_autoplay(store)
+    game = store._game
+    assert game is not None
+    applied_moves = [state.last_move for state in store._applied[1:]]
+    assert applied_moves == list(game.moves)
+    passes = [move for move in game.moves if move.type == "pass"]
+    assert all(move in applied_moves for move in passes)
+
+
+def test_autoplay_interval_rejects_negative(client: TestClient) -> None:
+    _problem(
+        client.post(
+            "/api/games",
+            json={
+                "black": _SPECIMEN,
+                "white": _SPECIMEN,
+                "move_interval_seconds": -1,
+            },
+        ),
+        400,
+        "validation_error",
+    )
+
+
+def test_autoplay_interval_thinking_covers_wait(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    clock = _AutoplayClock()
+
+    def slow_choose(_specimen_id, position, _rng=None):
+        clock.now += 1.5
+        places = legal_places(position)
+        return Place(places[0]) if places else None
+
+    monkeypatch.setattr("reversi.api.session.catalog.choose_move", slow_choose)
+    store = GameStore(
+        db_path=tmp_path / "games.sqlite",
+        monotonic=clock.monotonic,
+        sleep=clock.sleep,
+    )
+    specimen = SpecimenPlayer(kind="specimen", specimen_id=SPECIMEN_ID)
+    store.start(
+        CreateGameRequest(
+            black=specimen,
+            white=specimen,
+            move_interval_seconds=1.0,
+        ),
+    )
+    _join_autoplay(store)
+    assert clock.sleeps == []
