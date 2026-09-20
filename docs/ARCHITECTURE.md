@@ -1,7 +1,7 @@
 ---
 title: アーキテクチャ
 product: Reversi Agents
-version: 0.1.30
+version: 0.1.31
 status: working
 date: 2026-09-20
 source: docs/srs.md
@@ -16,7 +16,7 @@ tech_stack_version: 0.2.19
 | --- | --- |
 | 文書識別 | reversi-ai-architecture |
 | 対象ソフトウェア | Reversi Agents |
-| 版 | 0.1.30 |
+| 版 | 0.1.31 |
 | 状態 | 現行（設計。要求ではない） |
 | 日付 | 2026-09-20 |
 | 入力 | [`docs/srs.md`](srs.md) 0.1.24、[`docs/tech-stack.md`](tech-stack.md) 0.2.19 |
@@ -125,6 +125,7 @@ reversi-ai/
 │   │   ├── jev_stage4.py              # shortlist / margin / threshold を振る。CI では走らせない
 │   │   ├── jev-stage5.json            # Jev 段階 5（対局による最終確認）の記録
 │   │   ├── jev_stage5.py              # 基準線と指名設定を対で対局する。CI では走らせない
+│   │   ├── jev-experiment.md          # 段階 1–5 の知見。人手。JSON から生成しない
 │   │   └── archive/                   # 過去の総当たり正本（現行と同じ形）
 │   └── source-of-truth/
 │       ├── 01-seed.md                 # シード。AI は編集禁止
@@ -426,6 +427,7 @@ web コンテナが Pod 内で `0.0.0.0:3000` を聞くのはよい。戦略コ�
 
 | 版 | 日付 | 内容 |
 | --- | --- | --- |
+| 0.1.31 | 2026-09-20 | Jev 改善実験の知見を `docs/benchmarks/jev-experiment.md` に残す |
 | 0.1.30 | 2026-09-20 | Jev 段階 5 の対局記録を置き、カタログ既定をコード最善にする |
 | 0.1.29 | 2026-09-20 | ルールベース (αβ) の探索に Move Ordering を入れる |
 | 0.1.28 | 2026-09-20 | Jev の絞り込みパラメータをオフラインで調整する記録を置く |
