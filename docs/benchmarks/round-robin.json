@@ -1,7 +1,7 @@
 {
   "recorded_at": "2026-09-20 16:44",
   "git": {
-    "models_commit": "022746e9d5faf5fbd81ae4c3c5e15304a8b7c8fb",
+    "models_commit": "c694f324cec437e5438c6a4a23e4889f0d59b372",
     "blobs": {
       "models/ml.json": "45540cfdf7051c7d9d2f4d8da42378bfd65a7a8c",
       "models/lgbm.txt": "ee559b7126aa861dd2e16ae898216caf906257c4",
