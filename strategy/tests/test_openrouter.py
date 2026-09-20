@@ -177,6 +177,10 @@ def test_jev_decisions_call_uses_https_and_model_id(
     prompt_text = jev.PROMPT_PATH.read_text(encoding="utf-8")
     assert questions["move"]["instructions"] in prompt_text
     assert "Choose exactly one legal Reversi" in questions["move"]["instructions"]
+    instructions = questions["move"]["instructions"].lower()
+    assert "win" in instructions
+    assert "more discs" in instructions
+    assert "a1" in questions["move"]["instructions"]
     first = places[0].algebraic
     assert criteria[first] == f"Place a stone on {first}."
 
@@ -236,6 +240,18 @@ def test_jev_prompt_path_is_repo_markdown() -> None:
     assert jev.PROMPT_PATH.is_file()
     assert chat_completions.PROMPT_PATH == root / "prompts" / "chat-completions.md"
     assert chat_completions.PROMPT_PATH.is_file()
+
+
+def test_jev_prompt_states_win_by_more_discs() -> None:
+    parts = markdown_sections(jev.PROMPT_PATH.read_text(encoding="utf-8"))
+    instructions = parts["instructions"]
+    lowered = instructions.lower()
+    assert "choose exactly one legal reversi" in lowered
+    assert "a1" in lowered
+    assert "win" in lowered
+    assert "more discs" in lowered
+    assert "{square}" in parts["option"]
+    assert "Place a stone on {square}." == parts["option"]
 
 
 def test_jev_missing_prompt_file_is_unplayable_without_calling_openrouter(
