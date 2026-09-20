@@ -1,7 +1,7 @@
 ---
 title: アーキテクチャ
 product: Reversi Agents
-version: 0.1.9
+version: 0.1.10
 status: working
 date: 2026-09-20
 source: docs/srs.md
@@ -16,7 +16,7 @@ tech_stack_version: 0.2.12
 | --- | --- |
 | 文書識別 | reversi-ai-architecture |
 | 対象ソフトウェア | Reversi Agents |
-| 版 | 0.1.9 |
+| 版 | 0.1.10 |
 | 状態 | 現行（設計。要求ではない） |
 | 日付 | 2026-09-20 |
 | 入力 | [`docs/srs.md`](srs.md) 0.1.24、[`docs/tech-stack.md`](tech-stack.md) 0.2.12 |
@@ -127,12 +127,13 @@ reversi-ai/
 │   │       ├── App.tsx                # 経路: / と /game
 │   │       ├── api.ts                 # 同一オリジンの fetch / EventSource
 │   │       ├── types.ts               # 画面が扱う対局状態・カタログの型
+│   │       ├── catalog.ts             # カテゴリ併記・カード選中・対戦要約
 │   │       ├── pages/
-│   │       │   ├── CatalogPage.tsx    # モード・石色・相手の選択と開始
-│   │       │   └── GamePage.tsx       # 8×8、手番、終局、カタログへ戻る
+│   │       │   ├── CatalogPage.tsx    # セグメント・石ボタン・カード選択と開始
+│   │       │   └── GamePage.tsx       # 盤中心の横並び。手番、終局、カタログへ戻る
 │   │       └── components/
 │   │           ├── Board.tsx          # 盤・座標・合法手と直前着手の印
-│   │           └── CatalogList.tsx    # 表示名と説明文の一覧
+│   │           └── CatalogList.tsx    # 個体カード。表示名と説明文、クリックで選ぶ
 │   └── server/                        # Hono。利用者向けオリジン
 │       ├── tsconfig.json
 │       └── src/
@@ -234,13 +235,15 @@ reversi-ai/
 
 ### 4.1 `web/ui`
 
-カタログ画面（`/`）と盤面画面（`/game`）の 2 経路。状態は画面ローカル（`useState` / `useReducer`）。OpenRouter の鍵も WTHOR 原本も持たない。表示は Hono が返した対局状態と、カタログの表示名・説明文に限る。`dangerouslySetInnerHTML` を置かない。
+カタログ画面（`/`）と盤面画面（`/game`）の 2 経路。状態は画面ローカル（`useState` / `useReducer`）。OpenRouter の鍵も WTHOR 原本も持たない。表示は Hono が返した対局状態と、カタログの表示名・説明文に限る。`dangerouslySetInnerHTML` を置かない。見た目のライブラリは入れない。色・半径・余白は CSS 変数に集約する。
 
 | ファイル | 機能 |
 | --- | --- |
-| `CatalogPage.tsx` | 対局モード（利用者対エージェント / エージェント対エージェント）、石色、相手個体、エージェント対エージェントの着手間隔を選び、開始して `/game` へ移る |
-| `GamePage.tsx` | 盤と手番と終局を出す。人間手番はマス指定を POST する。エージェント対エージェントは SSE を購読する。カタログへ戻る |
-| `Board.tsx` | 8×8 を CSS Grid で描く。a1 は黒から見て左下。利用者手番に合法手の印、直前着手の印 |
+| `CatalogPage.tsx` | 対局モードはセグメント、利用者対エージェントの石色は石ボタン。個体はカードをクリックして選ぶ。エージェント対エージェントは黒スロットと白スロットを先に選びカードで埋める。対戦要約と開始はスクロールしても使える位置。`<select>` は置かない |
+| `CatalogList.tsx` | 表示名 heading と説明文のカード。カテゴリを小さく併記してグルーピングする。選中は枠とチェック。`aria-pressed` |
+| `catalog.ts` | カテゴリの日本語、グルーピング、対戦要約 |
+| `GamePage.tsx` | Chrome 前提の横並び。左に大きな盤、右に石アイコン・表示名・公式石数と手番文。人間手番はマス指定を POST する。パスは盤の近く。終局は勝敗バナーとカタログへ戻る。エージェント対エージェントは SSE を購読する |
+| `Board.tsx` | 8×8 を CSS Grid で描く。a1 は黒から見て左下。利用者手番に合法手の印、直前着手の印。石は CSS の radial-gradient と影 |
 | `moveInterval.ts` | 着手間隔（秒）の入力。未設定は 1 秒。開始 API へ渡す値に使う |
 | `api.ts` | `GET /api/catalog`、`POST /api/games`、`POST /api/games/:id/moves`、`GET /api/games/:id/events` |
 
@@ -457,6 +460,7 @@ Issue の検証欄と CI は、この節の生コマンドを使う。ラッパ�
 
 | 版 | 日付 | 内容 |
 | --- | --- | --- |
+| 0.1.10 | 2026-09-20 | カタログをカード選択にし、盤面を盤中心の横並びに揃える |
 | 0.1.9 | 2026-09-20 | 追加の生成 AI を `data/config.toml` と構造化出力に置き、自由文パースを既定にしない |
 | 0.1.8 | 2026-09-20 | エージェント対エージェントの着手間隔を戦略プロセスの適用待ちとし、開始 API へ渡す |
 | 0.1.7 | 2026-09-20 | 学習を `train` イメージに分け、対局用 strategy から torch を外す |

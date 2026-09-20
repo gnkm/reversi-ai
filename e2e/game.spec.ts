@@ -13,7 +13,11 @@ test("手番表示と合法手の印が観測できる", async ({ page }, testIn
   await expect(
     page.getByText("手番は黒です。あなたの入力待ちです。"),
   ).toBeVisible();
+  await expect(page.getByText("あなた", { exact: true })).toBeVisible();
+  await expect(page.getByText("黒（手番）")).toBeVisible();
   await expect(page.getByLabel("リバーシ盤")).toBeVisible();
+  await expect(page.locator("select")).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "カタログ" })).toHaveCount(0);
 
   for (const square of OPENING_LEGAL) {
     await expect(

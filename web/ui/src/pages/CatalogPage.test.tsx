@@ -109,6 +109,55 @@ describe("CatalogPage", () => {
     ).toBeTruthy();
     expect(screen.getByText("利用者対エージェント")).toBeTruthy();
     expect(screen.getByText("エージェント対エージェント")).toBeTruthy();
+    expect(screen.getAllByText("ランダム").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("ルールベース").length).toBeGreaterThan(0);
+    expect(screen.queryByRole("combobox")).toBeNull();
+    expect(document.querySelector("select")).toBeNull();
+    expect(
+      screen
+        .getByRole("button", { name: "ランダム (一様)" })
+        .getAttribute("aria-pressed"),
+    ).toBe("true");
+    expect(screen.getByText("あなた・黒 vs ランダム (一様)")).toBeTruthy();
+  });
+
+  it("カードをクリックするとその個体が対戦相手になる", async () => {
+    const bodies: unknown[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url.endsWith("/api/catalog")) {
+          return new Response(JSON.stringify({ items: ITEMS }), {
+            status: 200,
+          });
+        }
+        bodies.push(JSON.parse(String(init?.body)));
+        return new Response(JSON.stringify(OPENING), { status: 201 });
+      }),
+    );
+    render(<CatalogPage onStarted={() => undefined} />);
+    await screen.findByRole("heading", { name: "ランダム (一様)" });
+    fireEvent.click(
+      screen.getByRole("button", { name: "ルールベース (最多取り)" }),
+    );
+    expect(
+      screen
+        .getByRole("button", { name: "ルールベース (最多取り)" })
+        .getAttribute("aria-pressed"),
+    ).toBe("true");
+    expect(
+      screen.getByText("あなた・黒 vs ルールベース (最多取り)"),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "対局を開始" }));
+    await waitFor(() =>
+      expect(bodies).toEqual([
+        {
+          black: { kind: "human" },
+          white: { kind: "specimen", specimen_id: "most_flips" },
+        },
+      ]),
+    );
   });
 
   it("開始すると対局状態を親へ渡す", async () => {
@@ -156,6 +205,56 @@ describe("CatalogPage", () => {
     );
     const input = screen.getByLabelText(/着手間隔/);
     expect((input as HTMLInputElement).value).toBe("1");
+    expect(screen.queryByText("あなたの石色")).toBeNull();
+    expect(screen.getByRole("button", { name: /黒スロット/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /白スロット/ })).toBeTruthy();
+  });
+
+  it("エージェント対エージェントではスロットを選んでカードで埋め同一個体も許す", async () => {
+    const bodies: unknown[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url.endsWith("/api/catalog")) {
+          return new Response(JSON.stringify({ items: ITEMS }), {
+            status: 200,
+          });
+        }
+        bodies.push(JSON.parse(String(init?.body)));
+        return new Response(JSON.stringify(OPENING), { status: 201 });
+      }),
+    );
+    render(<CatalogPage onStarted={() => undefined} />);
+    await screen.findByRole("heading", { name: "ランダム (一様)" });
+    fireEvent.click(
+      screen.getByRole("radio", { name: "エージェント対エージェント" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /白スロット/ }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "ルールベース (最多取り)" }),
+    );
+    expect(screen.getByText(/黒スロット/)).toBeTruthy();
+    expect(
+      screen.getByText("ランダム (一様) vs ルールベース (最多取り)"),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /黒スロット/ }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "ルールベース (最多取り)" }),
+    );
+    expect(
+      screen.getByText("ルールベース (最多取り) vs ルールベース (最多取り)"),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "対局を開始" }));
+    await waitFor(() =>
+      expect(bodies).toEqual([
+        {
+          black: { kind: "specimen", specimen_id: "most_flips" },
+          white: { kind: "specimen", specimen_id: "most_flips" },
+          move_interval_seconds: 1,
+        },
+      ]),
+    );
   });
 
   it("着手間隔を変えるとその秒数が開始 API へ渡る", async () => {

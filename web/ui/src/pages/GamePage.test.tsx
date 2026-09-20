@@ -134,7 +134,37 @@ describe("GamePage", () => {
     expect(screen.queryByRole("heading", { name: "カタログ" })).toBeNull();
     expect(screen.queryByRole("list")).toBeNull();
     expect(screen.queryByLabelText("対戦相手")).toBeNull();
+    expect(screen.queryByRole("combobox")).toBeNull();
     expect(screen.getByText(/あなたの入力待ちです/)).toBeTruthy();
+    expect(screen.getByText("あなた")).toBeTruthy();
+    expect(screen.getByText("ランダム (一様)")).toBeTruthy();
+    expect(screen.getAllByText("2 石")).toHaveLength(2);
+    expect(screen.getByText("黒（手番）")).toBeTruthy();
+  });
+
+  it("利用者手番かつパス合法のときだけパスが出る", () => {
+    const { rerender } = render(
+      <GamePage
+        game={game({ pass_is_legal: true, legal_moves: [] })}
+        specimenNames={names}
+        onGame={() => undefined}
+        onBack={() => undefined}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "パス" })).toBeTruthy();
+    rerender(
+      <GamePage
+        game={game({
+          side_to_move: "white",
+          pass_is_legal: true,
+          legal_moves: [],
+        })}
+        specimenNames={names}
+        onGame={() => undefined}
+        onBack={() => undefined}
+      />,
+    );
+    expect(screen.queryByRole("button", { name: "パス" })).toBeNull();
   });
 
   it("終局後にカタログ画面へ戻れる", () => {

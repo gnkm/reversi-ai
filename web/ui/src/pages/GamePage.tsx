@@ -6,7 +6,7 @@ import {
   subscribeGameEvents,
 } from "../api.ts";
 import { Board } from "../components/Board.tsx";
-import type { GameState, PlayerSpec } from "../types.ts";
+import type { Color, GameState, PlayerSpec } from "../types.ts";
 
 type GamePageProps = {
   game: GameState;
@@ -142,43 +142,87 @@ export function GamePage({
     (streamError !== null ? streamFailureMessage(streamError) : null);
 
   return (
-    <main className="page">
+    <main className="page page-game">
       <h1>盤面</h1>
-      <p className="players">
-        黒: {playerLabel(game.black, specimenNames)} / 白:{" "}
-        {playerLabel(game.white, specimenNames)}
-      </p>
-      <p className="turn">{turnMessage(game)}</p>
-      <p className="score">
-        黒 {game.official_score.black} 石 / 白 {game.official_score.white} 石
-      </p>
-      <Board
-        board={game.board}
-        legalMoves={game.legal_moves}
-        lastMove={game.last_move}
-        showLegal={humanTurn}
-        onPlace={(square) => {
-          void submitMove({ type: "place", square });
-        }}
-      />
-      {humanTurn && game.pass_is_legal ? (
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => {
-            void submitMove({ type: "pass" });
-          }}
-        >
-          パス
-        </button>
-      ) : null}
-      {alert !== null ? <p className="error">{alert}</p> : null}
-      {outcome !== null ? <p className="result">{outcome}</p> : null}
-      {finished || streamError !== null ? (
-        <button type="button" onClick={onBack}>
-          カタログへ戻る
-        </button>
-      ) : null}
+      <div className="game-layout">
+        <div className="board-pane">
+          <Board
+            board={game.board}
+            legalMoves={game.legal_moves}
+            lastMove={game.last_move}
+            showLegal={humanTurn}
+            onPlace={(square) => {
+              void submitMove({ type: "place", square });
+            }}
+          />
+          {humanTurn && game.pass_is_legal ? (
+            <button
+              type="button"
+              className="btn-quiet"
+              disabled={busy}
+              onClick={() => {
+                void submitMove({ type: "pass" });
+              }}
+            >
+              パス
+            </button>
+          ) : null}
+        </div>
+        <aside className="game-sidebar">
+          <PlayerCard
+            color="black"
+            name={playerLabel(game.black, specimenNames)}
+            stones={game.official_score.black}
+            toMove={!finished && game.side_to_move === "black"}
+          />
+          <PlayerCard
+            color="white"
+            name={playerLabel(game.white, specimenNames)}
+            stones={game.official_score.white}
+            toMove={!finished && game.side_to_move === "white"}
+          />
+          <p className="turn">{turnMessage(game)}</p>
+          {alert !== null ? <p className="error">{alert}</p> : null}
+          {outcome !== null ? (
+            <p className="result-banner" role="status">
+              {outcome}
+            </p>
+          ) : null}
+          {finished || streamError !== null ? (
+            <button type="button" className="btn-primary" onClick={onBack}>
+              カタログへ戻る
+            </button>
+          ) : null}
+        </aside>
+      </div>
     </main>
+  );
+}
+
+function PlayerCard({
+  color,
+  name,
+  stones,
+  toMove,
+}: {
+  color: Color;
+  name: string;
+  stones: number;
+  toMove: boolean;
+}) {
+  const colorName = color === "black" ? "黒" : "白";
+  const className = toMove ? "player-card is-to-move" : "player-card";
+  return (
+    <div className={className}>
+      <span className={`stone stone-${color}`} aria-hidden="true" />
+      <div className="player-copy">
+        <p className="player-color">
+          {colorName}
+          {toMove ? "（手番）" : ""}
+        </p>
+        <p className="player-name">{name}</p>
+      </div>
+      <p className="player-stones">{stones} 石</p>
+    </div>
   );
 }
