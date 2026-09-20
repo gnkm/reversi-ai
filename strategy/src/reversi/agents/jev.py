@@ -1,4 +1,4 @@
-"""OpenRouter の Jev で合法手を選ぶ個体。言葉の事実の Choice と着手後評価を合成する。"""
+"""OpenRouter の Jev で合法手を選ぶ個体。コードが絞った候補を Choice で選ぶ。"""
 
 from __future__ import annotations
 
@@ -25,9 +25,9 @@ SPECIMEN_ID = "jev"
 CATEGORY = "generative_ai"
 DISPLAY_NAME = "生成 AI (Jev)"
 DESCRIPTION = (
-    "OpenRouter 上の Jev を Decisions API で呼び、コードが言葉にした合法手を"
-    "Choice で比べさせ、着手後の盤の点数と合成する。"
-    "対局中に WTHOR は参照しない。"
+    "OpenRouter 上の Jev を Decisions API で呼び、コードがほぼ互角とみなした"
+    "候補を Choice で選ぶ。着手後の盤の点数で絞り込み、confidence が足りなければ"
+    "コードの最善手を指す。対局中に WTHOR は参照しない。"
 )
 DECISIONS_SERVER = "https://openrouter.ai"
 SECRET_PATH = Path("/run/secrets/openrouter-api-key")
@@ -142,9 +142,9 @@ class _Spec:
     empty_buckets: dict[str, tuple[int, int]]
     opponent_buckets: dict[str, tuple[int, int]]
     flip_buckets: dict[str, tuple[int, int]]
-    w_jev: float
-    w_code: float
-    w_confidence: float
+    shortlist_size: int
+    margin: float
+    confidence_threshold: float
     metric_weights: dict[str, float]
     scales: dict[str, float]
     stage_weights: dict[str, dict[str, float]]
@@ -154,6 +154,7 @@ class _Spec:
 class _Parsed:
     probabilities: dict[str, float]
     confidence: float
+    choice: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -293,17 +294,11 @@ def _load_question(raw: Mapping[str, Any]) -> tuple[str, str]:
 
 
 def _load_weights(raw: Mapping[str, Any]) -> tuple[
-    float,
-    float,
-    float,
     dict[str, float],
     dict[str, float],
     dict[str, dict[str, float]],
 ]:
-    w_jev = _finite_float(raw.get("jev"))
-    w_code = _finite_float(raw.get("code"))
-    w_confidence = _finite_float(raw.get("confidence"))
-    if w_jev < 0.0 or w_code < 0.0 or w_confidence < 0.0:
+    if set(raw) != {"metrics", "scales", "stage"}:
         raise _fail_spec()
     metrics = _float_map(_mapping_field(raw, "metrics"), _METRIC_KEYS)
     scales = _float_map(_mapping_field(raw, "scales"), _METRIC_KEYS)
@@ -316,7 +311,26 @@ def _load_weights(raw: Mapping[str, Any]) -> tuple[
         name: _float_map(_mapping_field(stage_raw, name), _METRIC_KEYS)
         for name in _STAGE_KEYS
     }
-    return w_jev, w_code, w_confidence, metrics, scales, stage
+    return metrics, scales, stage
+
+
+def _positive_int(value: object) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise _fail_spec()
+    if value < 1:
+        raise _fail_spec()
+    return value
+
+
+def _load_selection(raw: Mapping[str, Any]) -> tuple[int, float, float]:
+    if set(raw) != {"shortlist_size", "margin", "confidence_threshold"}:
+        raise _fail_spec()
+    shortlist_size = _positive_int(raw.get("shortlist_size"))
+    margin = _finite_float(raw.get("margin"))
+    threshold = _finite_float(raw.get("confidence_threshold"))
+    if margin < 0.0 or threshold < 0.0 or threshold > 1.0:
+        raise _fail_spec()
+    return shortlist_size, margin, threshold
 
 
 def _place_line_fields(template: str) -> set[str]:
@@ -356,7 +370,10 @@ def _load_spec(path: Path | None = None) -> _Spec:
     _require_cover(opponent_buckets, 0, 64)
     _require_cover(flip_buckets, 1, 64)
     weights = _mapping_field(loaded, "weights")
-    w_jev, w_code, w_confidence, metrics, scales, stage = _load_weights(weights)
+    metrics, scales, stage = _load_weights(weights)
+    shortlist_size, margin, threshold = _load_selection(
+        _mapping_field(loaded, "selection")
+    )
     return _Spec(
         objective=_text_field(loaded, "objective"),
         question_id=question_id,
@@ -371,9 +388,9 @@ def _load_spec(path: Path | None = None) -> _Spec:
         empty_buckets=empty_buckets,
         opponent_buckets=opponent_buckets,
         flip_buckets=flip_buckets,
-        w_jev=w_jev,
-        w_code=w_code,
-        w_confidence=w_confidence,
+        shortlist_size=shortlist_size,
+        margin=margin,
+        confidence_threshold=threshold,
         metric_weights=metrics,
         scales=scales,
         stage_weights=stage,
@@ -516,16 +533,23 @@ def _parse_choice(
         raise ExternalModelError("合成できません")
     keys = {square.algebraic for square in places}
     choice = _attr(answer, "choice")
-    if isinstance(choice, str) and choice not in keys:
-        raise ExternalModelError("合法手の外です")
+    choice_key: str | None = None
+    if isinstance(choice, str):
+        if choice not in keys:
+            raise ExternalModelError("合法手の外です")
+        choice_key = choice
     probabilities = _parse_probabilities(_attr(answer, "probabilities"), places)
     if probabilities is None:
-        if not isinstance(choice, str):
+        if choice_key is None:
             raise ExternalModelError("合成できません")
-        probabilities = {key: 1.0 if key == choice else 0.0 for key in keys}
+        probabilities = {key: 1.0 if key == choice_key else 0.0 for key in keys}
     confidence_raw = _attr(answer, "confidence")
     confidence = 1.0 if confidence_raw is None else _unit_answer(confidence_raw)
-    return _Parsed(probabilities=probabilities, confidence=confidence)
+    return _Parsed(
+        probabilities=probabilities,
+        confidence=confidence,
+        choice=choice_key,
+    )
 
 
 def _answers_from_response(
@@ -590,16 +614,57 @@ def _code_score(metrics: _Metrics, spec: _Spec, stage: str) -> float:
     return total
 
 
-def _combined_score(
-    square: Square,
-    metrics: _Metrics,
-    parsed: _Parsed,
+def _code_scores(
+    places: Sequence[Square],
+    metrics: Mapping[Square, _Metrics],
     spec: _Spec,
     stage: str,
-) -> float:
-    code = _code_score(metrics, spec, stage)
-    jev = parsed.probabilities.get(square.algebraic, 0.0) * parsed.confidence
-    return spec.w_code * code + spec.w_jev * spec.w_confidence * jev
+) -> dict[Square, float]:
+    return {square: _code_score(metrics[square], spec, stage) for square in places}
+
+
+def _best_square(places: Sequence[Square], scores: Mapping[Square, float]) -> Square:
+    best_square = places[0]
+    best_score = scores[best_square]
+    for square in places[1:]:
+        score = scores[square]
+        if score > best_score:
+            best_score = score
+            best_square = square
+    return best_square
+
+
+def _shortlist(
+    places: Sequence[Square],
+    scores: Mapping[Square, float],
+    spec: _Spec,
+) -> tuple[Square, list[Square]]:
+    best = _best_square(places, scores)
+    best_score = scores[best]
+    order = {square: index for index, square in enumerate(places)}
+    ranked = sorted(places, key=lambda square: (-scores[square], order[square]))
+    chosen = [
+        square
+        for square in ranked[: spec.shortlist_size]
+        if best_score - scores[square] <= spec.margin
+    ]
+    return best, chosen
+
+
+def _pick_choice(parsed: _Parsed, shortlist: Sequence[Square]) -> Square:
+    keys = {square.algebraic: square for square in shortlist}
+    if parsed.choice is not None:
+        if parsed.choice not in keys:
+            raise ExternalModelError("合法手の外です")
+        return keys[parsed.choice]
+    best_square = shortlist[0]
+    best_prob = parsed.probabilities.get(best_square.algebraic, 0.0)
+    for square in shortlist[1:]:
+        prob = parsed.probabilities.get(square.algebraic, 0.0)
+        if prob > best_prob:
+            best_prob = prob
+            best_square = square
+    return best_square
 
 
 def _format_number(value: float) -> str:
@@ -613,6 +678,7 @@ def _candidate_log_line(
     spec: _Spec,
     stage: str,
     selected: bool,
+    in_shortlist: bool,
     code: float | None = None,
 ) -> str:
     probability = parsed.probabilities.get(square.algebraic, 0.0)
@@ -626,6 +692,7 @@ def _candidate_log_line(
         f"corners={_format_number(metrics.corners)}",
         f"probability={_format_number(probability)}",
         f"confidence={_format_number(parsed.confidence)}",
+        f"shortlist={'true' if in_shortlist else 'false'}",
         f"selected={'true' if selected else 'false'}",
     )
     return "jev candidate " + " ".join(fields)
@@ -639,7 +706,9 @@ def _log_candidates(
     stage: str,
     selected: Square,
     code_scores: Mapping[Square, float] | None = None,
+    shortlist: frozenset[Square] | None = None,
 ) -> None:
+    marked = frozenset(places) if shortlist is None else shortlist
     for square in places:
         code = None if code_scores is None else code_scores[square]
         print(
@@ -650,6 +719,7 @@ def _log_candidates(
                 spec,
                 stage,
                 square == selected,
+                square in marked,
                 code,
             ),
             file=sys.stderr,
@@ -665,15 +735,47 @@ def _select_square(
 ) -> Square:
     stage = _stage_of(position.board, spec)
     metrics = _after_metrics(position, places, spec)
-    best_square = places[0]
-    best_score = _combined_score(best_square, metrics[best_square], parsed, spec, stage)
-    for square in places[1:]:
-        score = _combined_score(square, metrics[square], parsed, spec, stage)
-        if score > best_score:
-            best_score = score
-            best_square = square
-    _log_candidates(places, metrics, parsed, spec, stage, best_square)
-    return best_square
+    scores = _code_scores(places, metrics, spec, stage)
+    best, shortlist = _shortlist(places, scores, spec)
+    if spec.margin == 0.0 or len(shortlist) == 1:
+        selected = best if spec.margin == 0.0 else shortlist[0]
+    elif parsed.confidence < spec.confidence_threshold:
+        selected = best
+    else:
+        selected = _pick_choice(parsed, shortlist)
+    _log_candidates(
+        places,
+        metrics,
+        parsed,
+        spec,
+        stage,
+        selected,
+        scores,
+        frozenset(shortlist),
+    )
+    return selected
+
+
+def _select_code_best(
+    position: Position,
+    places: Sequence[Square],
+    spec: _Spec,
+) -> Square:
+    stage = _stage_of(position.board, spec)
+    metrics = _after_metrics(position, places, spec)
+    scores = _code_scores(places, metrics, spec, stage)
+    selected = _best_square(places, scores)
+    _log_candidates(
+        places,
+        metrics,
+        _dummy_parsed(places),
+        spec,
+        stage,
+        selected,
+        scores,
+        frozenset((selected,)),
+    )
+    return selected
 
 
 def _legal_square(square: Square, places: Sequence[Square]) -> Square:
@@ -756,15 +858,21 @@ def _select_square_v1(
 
 
 def _spec_for_config(spec: _Spec, config: str) -> _Spec:
-    if config == "v2_jev0":
-        return replace(spec, w_jev=0.0)
     if config == "v2_code0":
-        return replace(spec, w_code=0.0)
+        return replace(
+            spec,
+            shortlist_size=64,
+            margin=1_000.0,
+            confidence_threshold=0.0,
+        )
     return spec
 
 
-def _call_openrouter(position: Position, places: Sequence[Square]) -> Square:
-    spec = _spec_for_config(_load_spec(), _active_stage1_config)
+def _ask_jev(
+    position: Position,
+    places: Sequence[Square],
+    spec: _Spec,
+) -> _Parsed:
     key = read_secret()
     lines = _place_lines(position, places, spec)
     state = _decision_state(position, spec, lines)
@@ -786,7 +894,19 @@ def _call_openrouter(position: Position, places: Sequence[Square]) -> Square:
         raise
     except Exception:  # noqa: BLE001 - SDK の 4xx/5xx/timeout を継続不能に畳む
         raise ExternalModelError("OpenRouter の呼出しに失敗しました") from None
-    parsed = _answers_from_response(response, spec, places)
+    return _answers_from_response(response, spec, places)
+
+
+def _call_openrouter(position: Position, places: Sequence[Square]) -> Square:
+    spec = _spec_for_config(_load_spec(), _active_stage1_config)
+    stage = _stage_of(position.board, spec)
+    metrics = _after_metrics(position, places, spec)
+    scores = _code_scores(places, metrics, spec, stage)
+    _, shortlist = _shortlist(places, scores, spec)
+    if spec.margin == 0.0 or len(shortlist) == 1:
+        parsed = _dummy_parsed(places)
+    else:
+        parsed = _ask_jev(position, shortlist, spec)
     return _legal_square(_select_square(position, places, parsed, spec), places)
 
 
@@ -796,9 +916,7 @@ def _resolve_square(position: Position, places: Sequence[Square]) -> Square:
     if config == "v1_constant":
         return _legal_square(_select_square_v1(position, places, spec), places)
     if config == "v2_jev0":
-        zero_jev = _spec_for_config(spec, config)
-        parsed = _dummy_parsed(places)
-        return _legal_square(_select_square(position, places, parsed, zero_jev), places)
+        return _legal_square(_select_code_best(position, places, spec), places)
     return _call_openrouter(position, places)
 
 
