@@ -1,7 +1,7 @@
 ---
 title: 技術スタック
 product: Reversi Agents
-version: 0.2.17
+version: 0.2.18
 status: working
 date: 2026-09-20
 source: docs/srs.md
@@ -14,7 +14,7 @@ srs_version: 0.1.24
 | --- | --- |
 | 文書識別 | reversi-ai-tech-stack |
 | 対象ソフトウェア | Reversi Agents |
-| 版 | 0.2.17 |
+| 版 | 0.2.18 |
 | 状態 | 現行（設計。要求ではない） |
 | 日付 | 2026-09-20 |
 | 入力 | [`docs/srs.md`](srs.md) 0.1.24 |
@@ -216,7 +216,7 @@ WTHOR 原本（`.wtb` 等）は学習の入力として `data/` に置き、読�
 
 公式 Python SDK `openrouter` を戦略コンテナだけで使う。認証は Bearer 相当を SDK に渡す。鍵は Podman secret としてホストに作り、戦略コンテナの `/run/secrets/openrouter-api-key` から読む。環境変数へコピーして `podman inspect` に出さない。Hono のコンテナには secret を渡さない。レスポンスにも UI にもバンドルにも出さない。
 
-Jev はテキスト生成モデルではない。呼出しは Decisions API（`POST /api/alpha/decisions`、モデル ID `typesafe/jev-1.13`）。公式 Python SDK は `OpenRouter(server_url="https://openrouter.ai")` の `alpha.decisions.create` を使う（既定の `/api/v1` ベースではこの経路は 404 になる）。Choice 質問の `criteria` は選択肢 ID → 説明のオブジェクトであり、Score の段階配列と混ぜない。答えは当該 `answers` エントリの `choice` / `probabilities` / `confidence` である。`confidence` はレスポンス全体ではなく、その Choice 答えの上にある。入力は局面要約と質問、出力は構造化決定である。失敗時は部分適用せず、利用者に継続不能を提示する（SRS-FUN-020）。合法手集合の外を採用しない。フィールドの置き場と合成は [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) 4.4。プロンプトの書き方は [`docs/source-of-truth/jev-prompt-guide.md`](source-of-truth/jev-prompt-guide.md)（AI は編集しない）。
+Jev はテキスト生成モデルではない。呼出しは Decisions API（`POST /api/alpha/decisions`、モデル ID `typesafe/jev-1.13`）。入力は局面要約と質問、出力は構造化決定である。失敗時は部分適用せず、利用者に継続不能を提示する（SRS-FUN-020）。合法手集合の外を採用しない。Choice のフィールドの形は [`docs/jev-decisions.md`](jev-decisions.md)。
 
 追加の生成 AI 個体（SRS-FUN-023）の既定経路は Chat Completions（`POST https://openrouter.ai/api/v1/chat/completions`）とする。OpenRouter 公式 Quickstart / API Reference は、テキスト生成の入口をこのエンドポイントとし、プロバイダ差を正規化している。Claude・GPT・Gemini など新しいテキスト生成モデルは、カタログに載っている slug を `model` に入れるだけで足りる。Chat Completions を legacy とする公式記述は、調査日 2026-09-19 時点ではない。応答は `response_format` の JSON Schema とし、Pydantic で検証する。自由文の先頭トークン抽出を既定にしない。
 
@@ -463,6 +463,7 @@ OpenRouter の API キーは `podman secret create` でホストに置く。名�
 
 | 版 | 日付 | 内容 |
 | --- | --- | --- |
+| 0.2.18 | 2026-09-20 | Decisions Choice の形は `docs/jev-decisions.md` を正とする |
 | 0.2.17 | 2026-09-20 | Decisions Choice の criteria map と answers の probabilities / confidence を 3.7 に書く |
 | 0.2.16 | 2026-09-20 | 対局の `up` は `web` と `strategy` を明示する |
 | 0.2.15 | 2026-09-20 | 運用コマンド列は README、試験コマンドは CONTRIBUTING を正とする |
