@@ -20,6 +20,7 @@
 
 - 個人用のパソコン（目安としてメモリ 16 GiB まで）
 - [Podman](https://podman.io/)
+- [podman-compose](https://github.com/containers/podman-compose)（Python。起動の正はこちら。プラグインの `podman compose` は本リポジトリの external secret を扱えない）
 - [mkcert](https://github.com/FiloSottile/mkcert)（ブラウザ向けの証明書）
 - Google Chrome
 - （「生成 AI (Jev)」と対局する場合）[OpenRouter](https://openrouter.ai/) の API キー
@@ -37,7 +38,13 @@ mkcert -cert-file data/certs/cert.pem -key-file data/certs/key.pem 127.0.0.1
 続けて Podman secret を作ります。起動に必要です。生成 AI を使うときは OpenRouter の API キーを、使わないときは空でない適当な文字列を、標準入力から渡します。
 
 ```bash
-podman secret create openrouter-api-key -
+podman secret create openrouter-api-key-reversi -
+```
+
+1Password CLI を使う場合は以下のとおりです。
+
+```bash
+op item get 'OpenRouter API Key - reversi' --field '認証情報' --reveal | podman secret create openrouter-api-key-reversi -
 ```
 
 入力したあと、改行して Ctrl+D で確定します。API キーをリポジトリや `.env` に置かないでください。
@@ -45,7 +52,7 @@ podman secret create openrouter-api-key -
 ## 起動する
 
 ```bash
-podman compose up --build
+podman-compose up --build
 ```
 
 Google Chrome で次を開きます。
@@ -59,7 +66,7 @@ https://127.0.0.1:3000/
 止めるときは次を実行します。
 
 ```bash
-podman compose down
+podman-compose down
 ```
 
 ## 対局する
@@ -83,6 +90,51 @@ podman compose down
 
 「生成 AI (Jev)」は、有効な OpenRouter の API キーが無いと対局を続けられません。その場合は画面にその旨が出ます。
 
+## API だけで対局する
+
+画面を使わず、起動済みのサービスへ HTTPS で問い合わせても対局できます。入口は `https://127.0.0.1:3000` です。戦略プロセスのポートへはつながません。証明書は mkcert なので、curl では `-k` を付けます。
+
+対局の作成と着手は POST です。ヘッダ `Origin: https://127.0.0.1:3000` が無いと 403 になります。カタログと盤面の GET には Origin は不要です。同時に進行できる対局は 1 局で、新しく始めると進行中の局は置き換わります。
+
+カタログ（個体 ID は `specimen_id`）:
+
+```bash
+curl -sk https://127.0.0.1:3000/api/catalog
+```
+
+利用者対エージェント（自分が黒、相手はランダム）:
+
+```bash
+curl -sk https://127.0.0.1:3000/api/games \
+  -H 'Origin: https://127.0.0.1:3000' \
+  -H 'Content-Type: application/json' \
+  -d '{"black":{"kind":"human"},"white":{"kind":"specimen","specimen_id":"random_uniform"}}'
+```
+
+応答の `id` が対局 ID です。着手と盤面の確認:
+
+```bash
+curl -sk https://127.0.0.1:3000/api/games/<対局ID>
+
+curl -sk https://127.0.0.1:3000/api/games/<対局ID>/moves \
+  -H 'Origin: https://127.0.0.1:3000' \
+  -H 'Content-Type: application/json' \
+  -d '{"type":"place","square":"f5"}'
+```
+
+パスするときは `{"type":"pass"}` を送ります。違法な手は盤に載らず、409 でその旨が返ります。
+
+エージェント対エージェント（開始後は終局まで自動で進みます。盤面は GET で確認します）:
+
+```bash
+curl -sk https://127.0.0.1:3000/api/games \
+  -H 'Origin: https://127.0.0.1:3000' \
+  -H 'Content-Type: application/json' \
+  -d '{"black":{"kind":"specimen","specimen_id":"minimax"},"white":{"kind":"specimen","specimen_id":"rl"}}'
+```
+
+自分が白のときは `black` に個体、`white` に `{"kind":"human"}` を置きます。
+
 ## カタログのエージェント
 
 初版で選べる相手は次のとおりです。方針の詳細は、カタログ画面の説明文を見てください。
@@ -99,7 +151,35 @@ podman compose down
 | ニューラルネットワーク (棋譜) | 対局前に学習したネットワークで着手する |
 | 生成 AI (Jev) | OpenRouter 上の Jev が合法手から選ぶ |
 
-学習し直さなくても、これらの相手とは対局できます。
+学習し直さなくても、これらの相手とは対局できます。自分で学習し直す手順は次節です。基準の総当たり結果は [docs/benchmarks/round-robin.md](docs/benchmarks/round-robin.md) です（数値の正本は JSON）。その成績は JSON の `git.blobs` が指す学習成果物に対する記録であり、いまの `models/` と blob が異なれば一致しません。
+
+## 学習し直す（任意）
+
+対局と同じ strategy の入れ物を、待ち受けせず一発起動します。専用 GPU は不要です。
+
+**機械学習 (棋譜)** と **ニューラルネットワーク (棋譜)** は、[WTHOR](https://www.ffothello.org/informatique/la-base-wthor) の 8×8 棋譜（`.wtb`）と、終局して残った自対局（`data/games.sqlite`）を使います。WTHOR の ZIP を手元で展開し、拡張子が `.wtb` のファイルを `data/wthor/` の直下に置いてください。ファイル名は問いません（例: `2024.wtb`、`2025.wtb`）。置いた `.wtb` をすべて読みます。このリポジトリから原本は配りません。再配布しないでください。
+
+**強化学習 (自己対局)** は自己対局だけで学びます。WTHOR は使いません。
+
+```bash
+mkdir -p data/wthor
+
+podman-compose run --rm strategy python -m reversi.train.ml \
+  --wthor /data/wthor --games /data/games.sqlite --out /models/ml.json
+
+podman-compose run --rm strategy python -m reversi.train.rl \
+  --out /models/rl.json
+
+podman-compose run --rm strategy python -m reversi.train.nn \
+  --wthor /data/wthor --games /data/games.sqlite --out /models/nn.onnx
+```
+
+書き出したファイルを、すでに動いている対局が読むなら、サービスを起動し直してください。
+
+```bash
+podman-compose down
+podman-compose up --build
+```
 
 ## 他の生成 AI を足す（任意）
 

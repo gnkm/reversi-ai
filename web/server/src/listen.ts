@@ -1,6 +1,7 @@
-/** 利用者向け待ち受け。既定はループバック HTTPS。0.0.0.0 は置かない。 */
+/** 利用者向け待ち受け。コンテナ内は 0.0.0.0。ホストへ出す口は compose の 127.0.0.1 だけ。 */
 
-export const LISTEN_HOST = "127.0.0.1";
+export const LISTEN_HOST = "0.0.0.0";
+export const PUBLIC_HOST = "127.0.0.1";
 export const DEFAULT_PORT = 3000;
 export const DEFAULT_STRATEGY_BASE_URL = "http://127.0.0.1:8000";
 export const DEFAULT_STRATEGY_TIMEOUT_MS = 60_000;
@@ -24,7 +25,7 @@ export function publicOrigin(
   env: NodeJS.ProcessEnv = process.env,
   port = listenPort(env),
 ): string {
-  return env.PUBLIC_ORIGIN ?? `https://${LISTEN_HOST}:${port}`;
+  return env.PUBLIC_ORIGIN ?? `https://${PUBLIC_HOST}:${port}`;
 }
 
 export function strategyBaseUrl(env: NodeJS.ProcessEnv = process.env): string {
