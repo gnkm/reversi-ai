@@ -1649,7 +1649,9 @@ def test_alphabeta_leaf_score_matches_minimax_table() -> None:
     assert alphabeta.leaf_score(board, Color.WHITE) == minimax.leaf_score(
         board, Color.WHITE
     )
-    assert alphabeta.leaf_score(board, Color.BLACK) == _spec_leaf_score(board, Color.BLACK)
+    assert alphabeta.leaf_score(board, Color.BLACK) == _spec_leaf_score(
+        board, Color.BLACK
+    )
 
 
 def test_alphabeta_depth_four_matches_minimax_squares() -> None:
@@ -1700,6 +1702,12 @@ def test_alphabeta_game_path_keeps_depth_six() -> None:
     at_four = alphabeta.choose_at_depth(position, 4)
     assert at_four == minimax.choose_move(position)
     assert alphabeta.choose_move(position) == alphabeta.choose_at_depth(position, 6)
+    after_d3 = play(position, Place(Square.parse("d3")))
+    depth_four = alphabeta.choose_at_depth(after_d3, 4)
+    depth_six = alphabeta.choose_move(after_d3)
+    assert depth_four == minimax.choose_move(after_d3) == Place(Square.parse("e3"))
+    assert depth_six == Place(Square.parse("c5"))
+    assert depth_six != depth_four
 
 
 def test_alphabeta_does_not_move_when_no_legal_places() -> None:
