@@ -1,0 +1,1504 @@
+{
+  "recorded_at": "2026-09-20 21:00",
+  "protocol": {
+    "starts": 24,
+    "games_per_start": 2,
+    "opening_plies": [
+      4,
+      6,
+      8
+    ],
+    "seed": 20260920,
+    "paired": true,
+    "alpha": 0.05,
+    "significance": "sign_test_one_sided_pair_stone_diff",
+    "notes": [
+      "開始局面は初形から 4/6/8 手を一様乱択で進めた組。各局面で先後を入れ替える。",
+      "基準線はコード最善（margin = 0）。候補は段階 4 が指名した絞り込み設定。",
+      "勝敗は公式スコア、最終石差は盤上の石数差（候補−基準線）。",
+      "採用は、平均石差が正、勝率が基準線を下回らず、対の石差の片側符号検定が有意であること。",
+      "満たさなければカタログはコードだけの v2_jev0 を維持し、段階 3 と 4 へ戻る。",
+      "資格情報と課金が要る対局は CI に載せない。本スクリプトはホストで明示実行する。"
+    ]
+  },
+  "baseline": {
+    "label": "code_only",
+    "shortlist_size": 3,
+    "margin": 0.0,
+    "confidence_threshold": 0.3
+  },
+  "candidate": {
+    "label": "stage4_chosen",
+    "source": "jev-stage4.json",
+    "shortlist_size": 4,
+    "margin": 2.0,
+    "confidence_threshold": 0.5,
+    "mean_loss": 19.444444444444443
+  },
+  "games": 48,
+  "wins": 9,
+  "draws": 1,
+  "losses": 38,
+  "win_rate": 0.19791666666666666,
+  "baseline_win_rate": 0.8020833333333334,
+  "mean_stone_diff": -13.979166666666666,
+  "paired": true,
+  "sign_test": {
+    "n": 24,
+    "positive": 4,
+    "negative": 20,
+    "ties": 0,
+    "p_value": 0.9998614192008972,
+    "alpha": 0.05,
+    "method": "sign_test_one_sided_pair_stone_diff"
+  },
+  "accepted": false,
+  "catalog_policy": "code_only_v2_jev0",
+  "return_to_stage3_and_4": true,
+  "paired_results": [
+    {
+      "start_index": 0,
+      "black": {
+        "start_index": 0,
+        "candidate_color": "black",
+        "result": "loss",
+        "stone_diff": -20,
+        "official_black": 22,
+        "official_white": 42,
+        "stones_black": 22,
+        "stones_white": 42
+      },
+      "white": {
+        "start_index": 0,
+        "candidate_color": "white",
+        "result": "loss",
+        "stone_diff": -10,
+        "official_black": 37,
+        "official_white": 27,
+        "stones_black": 37,
+        "stones_white": 27
+      },
+      "pair_stone_diff": -15.0,
+      "candidate_better": false
+    },
+    {
+      "start_index": 1,
+      "black": {
+        "start_index": 1,
+        "candidate_color": "black",
+        "result": "loss",
+        "stone_diff": -8,
+        "official_black": 28,
+        "official_white": 36,
+        "stones_black": 28,
+        "stones_white": 36
+      },
+      "white": {
+        "start_index": 1,
+        "candidate_color": "white",
+        "result": "win",
+        "stone_diff": 14,
+        "official_black": 25,
+        "official_white": 39,
+        "stones_black": 25,
+        "stones_white": 39
+      },
+      "pair_stone_diff": 3.0,
+      "candidate_better": true
+    },
+    {
+      "start_index": 2,
+      "black": {
+        "start_index": 2,
+        "candidate_color": "black",
+        "result": "loss",
+        "stone_diff": -32,
+        "official_black": 16,
+        "official_white": 48,
+        "stones_black": 16,
+        "stones_white": 48
+      },
+      "white": {
+        "start_index": 2,
+        "candidate_color": "white",
+        "result": "loss",
+        "stone_diff": -30,
+        "official_black": 47,
+        "official_white": 17,
+        "stones_black": 47,
+        "stones_white": 17
+      },
+      "pair_stone_diff": -31.0,
+      "candidate_better": false
+    },
+    {
+      "start_index": 3,
+      "black": {
+        "start_index": 3,
+        "candidate_color": "black",
+        "result": "win",
+        "stone_diff": 5,
+        "official_black": 35,
+        "official_white": 29,
+        "stones_black": 34,
+        "stones_white": 29
+      },
+      "white": {
+        "start_index": 3,
+        "candidate_color": "white",
+        "result": "loss",
+        "stone_diff": -20,
+        "official_black": 42,
+        "official_white": 22,
+        "stones_black": 42,
+        "stones_white": 22
+      },
+      "pair_stone_diff": -7.5,
+      "candidate_better": false
+    },
+    {
+      "start_index": 4,
+      "black": {
+        "start_index": 4,
+        "candidate_color": "black",
+        "result": "loss",
+        "stone_diff": -2,
+        "official_black": 31,
+        "official_white": 33,
+        "stones_black": 31,
+        "stones_white": 33
+      },
+      "white": {
+        "start_index": 4,
+        "candidate_color": "white",
+        "result": "loss",
+        "stone_diff": -16,
+        "official_black": 40,
+        "official_white": 24,
+        "stones_black": 40,
+        "stones_white": 24
+      },
+      "pair_stone_diff": -9.0,
+      "candidate_better": false
+    },
+    {
+      "start_index": 5,
+      "black": {
+        "start_index": 5,
+        "candidate_color": "black",
+        "result": "win",
+        "stone_diff": 14,
+        "official_black": 39,
+        "official_white": 25,
+        "stones_black": 39,
+        "stones_white": 25
+      },
+      "white": {
+        "start_index": 5,
+        "candidate_color": "white",
+        "result": "loss",
+        "stone_diff": -30,
+        "official_black": 47,
+        "official_white": 17,
+        "stones_black": 47,
+        "stones_white": 17
+      },
+      "pair_stone_diff": -8.0,
+      "candidate_better": false
+    },
+    {
+      "start_index": 6,
+      "black": {
+        "start_index": 6,
+        "candidate_color": "black",
+        "result": "loss",
+        "stone_diff": -42,
+        "official_black": 11,
+        "official_white": 53,
+        "stones_black": 11,
+        "stones_white": 53
+      },
+      "white": {
+        "start_index": 6,
+        "candidate_color": "white",
+        "result": "loss",
+        "stone_diff": -24,
+        "official_black": 44,
+        "official_white": 20,
+        "stones_black": 44,
+        "stones_white": 20
+      },
+      "pair_stone_diff": -33.0,
+      "candidate_better": false
+    },
+    {
+      "start_index": 7,
+      "black": {
+        "start_index": 7,
+        "candidate_color": "black",
+        "result": "loss",
+        "stone_diff": -44,
+        "official_black": 10,
+        "official_white": 54,
+        "stones_black": 10,
+        "stones_white": 54
+      },
+      "white": {
+        "start_index": 7,
+        "candidate_color": "white",
+        "result": "loss",
+        "stone_diff": -8,
+        "official_black": 36,
+        "official_white": 28,
+        "stones_black": 36,
+        "stones_white": 28
+      },
+      "pair_stone_diff": -26.0,
+      "candidate_better": false
+    },
+    {
+      "start_index": 8,
+      "black": {
+        "start_index": 8,
+        "candidate_color": "black",
+        "result": "loss",
+        "stone_diff": -16,
+        "official_black": 24,
+        "official_white": 40,
+        "stones_black": 24,
+        "stones_white": 40
+      },
+      "white": {
+        "start_index": 8,
+        "candidate_color": "white",
+        "result": "draw",
+        "stone_diff": 0,
+        "official_black": 32,
+        "official_white": 32,
+        "stones_black": 32,
+        "stones_white": 32
+      },
+      "pair_stone_diff": -8.0,
+      "candidate_better": false
+    },
+    {
+      "start_index": 9,
+      "black": {
+        "start_index": 9,
+        "candidate_color": "black",
+        "result": "loss",
+        "stone_diff": -30,
+        "official_black": 17,
+        "official_white": 47,
+        "stones_black": 17,
+        "stones_white": 47
+      },
+      "white": {
+        "start_index": 9,
+        "candidate_color": "white",
+        "result": "loss",
+        "stone_diff": -6,
+        "official_black": 35,
+        "official_white": 29,
+        "stones_black": 35,
+        "stones_white": 29
+      },
+      "pair_stone_diff": -18.0,
+      "candidate_better": false
+    },
+    {
+      "start_index": 10,
+      "black": {
+        "start_index": 10,
+        "candidate_color": "black",
+        "result": "loss",
+        "stone_diff": -6,
+        "official_black": 29,
+        "official_white": 35,
+        "stones_black": 29,
+        "stones_white": 35
+      },
+      "white": {
+        "start_index": 10,
+        "candidate_color": "white",
+        "result": "win",
+        "stone_diff": 8,
+        "official_black": 28,
+        "official_white": 36,
+        "stones_black": 28,
+        "stones_white": 36
+      },
+      "pair_stone_diff": 1.0,
+      "candidate_better": true
+    },
+    {
+      "start_index": 11,
+      "black": {
+        "start_index": 11,
+        "candidate_color": "black",
+        "result": "loss",
+        "stone_diff": -2,
+        "official_black": 31,
+        "official_white": 33,
+        "stones_black": 31,
+        "stones_white": 33
+      },
+      "white": {
+        "start_index": 11,
+        "candidate_color": "white",
+        "result": "loss",
+        "stone_diff": -20,
+        "official_black": 42,
+        "official_white": 22,
+        "stones_black": 42,
+        "stones_white": 22
+      },
+      "pair_stone_diff": -11.0,
+      "candidate_better": false
+    },
+    {
+      "start_index": 12,
+      "black": {
+        "start_index": 12,
+        "candidate_color": "black",
+        "result": "loss",
+        "stone_diff": -32,
+        "official_black": 16,
+        "official_white": 48,
+        "stones_black": 16,
+        "stones_white": 48
+      },
+      "white": {
+        "start_index": 12,
+        "candidate_color": "white",
+        "result": "loss",
+        "stone_diff": -12,
+        "official_black": 38,
+        "official_white": 26,
+        "stones_black": 38,
+        "stones_white": 26
+      },
+      "pair_stone_diff": -22.0,
+      "candidate_better": false
+    },
+    {
+      "start_index": 13,
+      "black": {
+        "start_index": 13,
+        "candidate_color": "black",
+        "result": "loss",
+        "stone_diff": -20,
+        "official_black": 22,
+        "official_white": 42,
+        "stones_black": 22,
+        "stones_white": 42
+      },
+      "white": {
+        "start_index": 13,
+        "candidate_color": "white",
+        "result": "loss",
+        "stone_diff": -12,
+        "official_black": 38,
+        "official_white": 26,
+        "stones_black": 38,
+        "stones_white": 26
+      },
+      "pair_stone_diff": -16.0,
+      "candidate_better": false
+    },
+    {
+      "start_index": 14,
+      "black": {
+        "start_index": 14,
+        "candidate_color": "black",
+        "result": "loss",
+        "stone_diff": -32,
+        "official_black": 16,
+        "official_white": 48,
+        "stones_black": 16,
+        "stones_white": 48
+      },
+      "white": {
+        "start_index": 14,
+        "candidate_color": "white",
+        "result": "win",
+        "stone_diff": 22,
+        "official_black": 21,
+        "official_white": 43,
+        "stones_black": 21,
+        "stones_white": 43
+      },
+      "pair_stone_diff": -5.0,
+      "candidate_better": false
+    },
+    {
+      "start_index": 15,
+      "black": {
+        "start_index": 15,
+        "candidate_color": "black",
+        "result": "loss",
+        "stone_diff": -34,
+        "official_black": 15,
+        "official_white": 49,
+        "stones_black": 15,
+        "stones_white": 49
+      },
+      "white": {
+        "start_index": 15,
+        "candidate_color": "white",
+        "result": "loss",
+        "stone_diff": -14,
+        "official_black": 39,
+        "official_white": 25,
+        "stones_black": 39,
+        "stones_white": 25
+      },
+      "pair_stone_diff": -24.0,
+      "candidate_better": false
+    },
+    {
+      "start_index": 16,
+      "black": {
+        "start_index": 16,
+        "candidate_color": "black",
+        "result": "loss",
+        "stone_diff": -12,
+        "official_black": 26,
+        "official_white": 38,
+        "stones_black": 26,
+        "stones_white": 38
+      },
+      "white": {
+        "start_index": 16,
+        "candidate_color": "white",
+        "result": "win",
+        "stone_diff": 6,
+        "official_black": 29,
+        "official_white": 35,
+        "stones_black": 29,
+        "stones_white": 35
+      },
+      "pair_stone_diff": -3.0,
+      "candidate_better": false
+    },
+    {
+      "start_index": 17,
+      "black": {
+        "start_index": 17,
+        "candidate_color": "black",
+        "result": "loss",
+        "stone_diff": -18,
+        "official_black": 23,
+        "official_white": 41,
+        "stones_black": 23,
+        "stones_white": 41
+      },
+      "white": {
+        "start_index": 17,
+        "candidate_color": "white",
+        "result": "loss",
+        "stone_diff": -20,
+        "official_black": 42,
+        "official_white": 22,
+        "stones_black": 42,
+        "stones_white": 22
+      },
+      "pair_stone_diff": -19.0,
+      "candidate_better": false
+    },
+    {
+      "start_index": 18,
+      "black": {
+        "start_index": 18,
+        "candidate_color": "black",
+        "result": "loss",
+        "stone_diff": -34,
+        "official_black": 15,
+        "official_white": 49,
+        "stones_black": 15,
+        "stones_white": 49
+      },
+      "white": {
+        "start_index": 18,
+        "candidate_color": "white",
+        "result": "loss",
+        "stone_diff": -14,
+        "official_black": 39,
+        "official_white": 25,
+        "stones_black": 39,
+        "stones_white": 25
+      },
+      "pair_stone_diff": -24.0,
+      "candidate_better": false
+    },
+    {
+      "start_index": 19,
+      "black": {
+        "start_index": 19,
+        "candidate_color": "black",
+        "result": "win",
+        "stone_diff": 22,
+        "official_black": 43,
+        "official_white": 21,
+        "stones_black": 43,
+        "stones_white": 21
+      },
+      "white": {
+        "start_index": 19,
+        "candidate_color": "white",
+        "result": "loss",
+        "stone_diff": -8,
+        "official_black": 36,
+        "official_white": 28,
+        "stones_black": 36,
+        "stones_white": 28
+      },
+      "pair_stone_diff": 7.0,
+      "candidate_better": true
+    },
+    {
+      "start_index": 20,
+      "black": {
+        "start_index": 20,
+        "candidate_color": "black",
+        "result": "win",
+        "stone_diff": 22,
+        "official_black": 43,
+        "official_white": 21,
+        "stones_black": 43,
+        "stones_white": 21
+      },
+      "white": {
+        "start_index": 20,
+        "candidate_color": "white",
+        "result": "loss",
+        "stone_diff": -38,
+        "official_black": 51,
+        "official_white": 13,
+        "stones_black": 51,
+        "stones_white": 13
+      },
+      "pair_stone_diff": -8.0,
+      "candidate_better": false
+    },
+    {
+      "start_index": 21,
+      "black": {
+        "start_index": 21,
+        "candidate_color": "black",
+        "result": "loss",
+        "stone_diff": -26,
+        "official_black": 19,
+        "official_white": 45,
+        "stones_black": 19,
+        "stones_white": 45
+      },
+      "white": {
+        "start_index": 21,
+        "candidate_color": "white",
+        "result": "loss",
+        "stone_diff": -40,
+        "official_black": 52,
+        "official_white": 12,
+        "stones_black": 52,
+        "stones_white": 12
+      },
+      "pair_stone_diff": -33.0,
+      "candidate_better": false
+    },
+    {
+      "start_index": 22,
+      "black": {
+        "start_index": 22,
+        "candidate_color": "black",
+        "result": "loss",
+        "stone_diff": -12,
+        "official_black": 26,
+        "official_white": 38,
+        "stones_black": 26,
+        "stones_white": 38
+      },
+      "white": {
+        "start_index": 22,
+        "candidate_color": "white",
+        "result": "win",
+        "stone_diff": 22,
+        "official_black": 21,
+        "official_white": 43,
+        "stones_black": 21,
+        "stones_white": 43
+      },
+      "pair_stone_diff": 5.0,
+      "candidate_better": true
+    },
+    {
+      "start_index": 23,
+      "black": {
+        "start_index": 23,
+        "candidate_color": "black",
+        "result": "loss",
+        "stone_diff": -14,
+        "official_black": 25,
+        "official_white": 39,
+        "stones_black": 25,
+        "stones_white": 39
+      },
+      "white": {
+        "start_index": 23,
+        "candidate_color": "white",
+        "result": "loss",
+        "stone_diff": -48,
+        "official_black": 56,
+        "official_white": 8,
+        "stones_black": 56,
+        "stones_white": 8
+      },
+      "pair_stone_diff": -31.0,
+      "candidate_better": false
+    }
+  ],
+  "starts": [
+    {
+      "index": 0,
+      "opening_plies": 4,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "........",
+        "...W....",
+        "...WBB..",
+        "...WBB..",
+        ".....B..",
+        "........",
+        "........"
+      ]
+    },
+    {
+      "index": 1,
+      "opening_plies": 6,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "........",
+        "...W....",
+        "...WBB..",
+        "...WBB..",
+        "..BW.B..",
+        "........",
+        "........"
+      ]
+    },
+    {
+      "index": 2,
+      "opening_plies": 8,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        ".....B..",
+        ".....B..",
+        "..WWWWW.",
+        "...BB...",
+        "...W.B..",
+        "..W.....",
+        "........"
+      ]
+    },
+    {
+      "index": 3,
+      "opening_plies": 4,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "........",
+        "...WB...",
+        "...WW...",
+        "...WBW..",
+        ".....B..",
+        "........",
+        "........"
+      ]
+    },
+    {
+      "index": 4,
+      "opening_plies": 6,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        ".....WB.",
+        "....WB..",
+        "..WWB...",
+        "..BBB...",
+        "........",
+        "........",
+        "........"
+      ]
+    },
+    {
+      "index": 5,
+      "opening_plies": 8,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "...W....",
+        "..BWB...",
+        "...BW...",
+        "..BBBW..",
+        "......W.",
+        ".......W",
+        "........"
+      ]
+    },
+    {
+      "index": 6,
+      "opening_plies": 4,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "........",
+        "......W.",
+        "...BBW..",
+        "..BBW...",
+        "....W...",
+        "........",
+        "........"
+      ]
+    },
+    {
+      "index": 7,
+      "opening_plies": 6,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "..W.....",
+        "...W....",
+        "..WBBB..",
+        "...WB...",
+        "...BW...",
+        "........",
+        "........"
+      ]
+    },
+    {
+      "index": 8,
+      "opening_plies": 8,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "........",
+        "....B...",
+        "..WBW...",
+        "..WWW...",
+        "..WWWB..",
+        "....W...",
+        "........"
+      ]
+    },
+    {
+      "index": 9,
+      "opening_plies": 4,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "........",
+        "....W...",
+        "...BWB..",
+        "...BWW..",
+        "..B.....",
+        "........",
+        "........"
+      ]
+    },
+    {
+      "index": 10,
+      "opening_plies": 6,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "........",
+        "........",
+        "..WWW.W.",
+        "...WBBB.",
+        "...BW...",
+        "........",
+        "........"
+      ]
+    },
+    {
+      "index": 11,
+      "opening_plies": 8,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "...W.W..",
+        "...WW.B.",
+        "..WWWB..",
+        "...BB...",
+        "...B....",
+        "........",
+        "........"
+      ]
+    },
+    {
+      "index": 12,
+      "opening_plies": 4,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "........",
+        "........",
+        "...BW...",
+        ".WWWW...",
+        "....B...",
+        ".....B..",
+        "........"
+      ]
+    },
+    {
+      "index": 13,
+      "opening_plies": 6,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "........",
+        "....B...",
+        "...BB...",
+        "...WB...",
+        "..WWWW..",
+        "....B...",
+        "........"
+      ]
+    },
+    {
+      "index": 14,
+      "opening_plies": 8,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "....B...",
+        "..WBB...",
+        "..BWW...",
+        "...WWW..",
+        "......W.",
+        ".......W",
+        "........"
+      ]
+    },
+    {
+      "index": 15,
+      "opening_plies": 4,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "........",
+        "...B....",
+        "..WBW...",
+        "..WWB...",
+        "..W.....",
+        "........",
+        "........"
+      ]
+    },
+    {
+      "index": 16,
+      "opening_plies": 6,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "........",
+        "........",
+        "..WWW...",
+        "..BWBB..",
+        "...WW...",
+        "...W....",
+        "........"
+      ]
+    },
+    {
+      "index": 17,
+      "opening_plies": 8,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "........",
+        "......W.",
+        "..WWWW..",
+        "...WW...",
+        ".BBBB...",
+        "....B...",
+        "........"
+      ]
+    },
+    {
+      "index": 18,
+      "opening_plies": 4,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "........",
+        "....B...",
+        "...BB...",
+        "..BWWW..",
+        "..W.....",
+        "........",
+        "........"
+      ]
+    },
+    {
+      "index": 19,
+      "opening_plies": 6,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "........",
+        "...W.B..",
+        "...WBWW.",
+        "...WW...",
+        "..BW....",
+        "........",
+        "........"
+      ]
+    },
+    {
+      "index": 20,
+      "opening_plies": 8,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "........",
+        "....W.W.",
+        "...BWW..",
+        "...WBB..",
+        "..W..BB.",
+        ".W......",
+        "........"
+      ]
+    },
+    {
+      "index": 21,
+      "opening_plies": 4,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "........",
+        ".B......",
+        ".WWWW...",
+        "...BB...",
+        "...B....",
+        "........",
+        "........"
+      ]
+    },
+    {
+      "index": 22,
+      "opening_plies": 6,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "........",
+        "..BW....",
+        "..WWWB..",
+        "...WBW..",
+        "....B...",
+        "........",
+        "........"
+      ]
+    },
+    {
+      "index": 23,
+      "opening_plies": 8,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        ".....B..",
+        ".....B..",
+        "...BWB..",
+        "..BWW...",
+        "..WWW...",
+        "...W....",
+        "........"
+      ]
+    }
+  ],
+  "game_records": [
+    {
+      "start_index": 0,
+      "candidate_color": "black",
+      "result": "loss",
+      "stone_diff": -20,
+      "official_black": 22,
+      "official_white": 42,
+      "stones_black": 22,
+      "stones_white": 42
+    },
+    {
+      "start_index": 0,
+      "candidate_color": "white",
+      "result": "loss",
+      "stone_diff": -10,
+      "official_black": 37,
+      "official_white": 27,
+      "stones_black": 37,
+      "stones_white": 27
+    },
+    {
+      "start_index": 1,
+      "candidate_color": "black",
+      "result": "loss",
+      "stone_diff": -8,
+      "official_black": 28,
+      "official_white": 36,
+      "stones_black": 28,
+      "stones_white": 36
+    },
+    {
+      "start_index": 1,
+      "candidate_color": "white",
+      "result": "win",
+      "stone_diff": 14,
+      "official_black": 25,
+      "official_white": 39,
+      "stones_black": 25,
+      "stones_white": 39
+    },
+    {
+      "start_index": 2,
+      "candidate_color": "black",
+      "result": "loss",
+      "stone_diff": -32,
+      "official_black": 16,
+      "official_white": 48,
+      "stones_black": 16,
+      "stones_white": 48
+    },
+    {
+      "start_index": 2,
+      "candidate_color": "white",
+      "result": "loss",
+      "stone_diff": -30,
+      "official_black": 47,
+      "official_white": 17,
+      "stones_black": 47,
+      "stones_white": 17
+    },
+    {
+      "start_index": 3,
+      "candidate_color": "black",
+      "result": "win",
+      "stone_diff": 5,
+      "official_black": 35,
+      "official_white": 29,
+      "stones_black": 34,
+      "stones_white": 29
+    },
+    {
+      "start_index": 3,
+      "candidate_color": "white",
+      "result": "loss",
+      "stone_diff": -20,
+      "official_black": 42,
+      "official_white": 22,
+      "stones_black": 42,
+      "stones_white": 22
+    },
+    {
+      "start_index": 4,
+      "candidate_color": "black",
+      "result": "loss",
+      "stone_diff": -2,
+      "official_black": 31,
+      "official_white": 33,
+      "stones_black": 31,
+      "stones_white": 33
+    },
+    {
+      "start_index": 4,
+      "candidate_color": "white",
+      "result": "loss",
+      "stone_diff": -16,
+      "official_black": 40,
+      "official_white": 24,
+      "stones_black": 40,
+      "stones_white": 24
+    },
+    {
+      "start_index": 5,
+      "candidate_color": "black",
+      "result": "win",
+      "stone_diff": 14,
+      "official_black": 39,
+      "official_white": 25,
+      "stones_black": 39,
+      "stones_white": 25
+    },
+    {
+      "start_index": 5,
+      "candidate_color": "white",
+      "result": "loss",
+      "stone_diff": -30,
+      "official_black": 47,
+      "official_white": 17,
+      "stones_black": 47,
+      "stones_white": 17
+    },
+    {
+      "start_index": 6,
+      "candidate_color": "black",
+      "result": "loss",
+      "stone_diff": -42,
+      "official_black": 11,
+      "official_white": 53,
+      "stones_black": 11,
+      "stones_white": 53
+    },
+    {
+      "start_index": 6,
+      "candidate_color": "white",
+      "result": "loss",
+      "stone_diff": -24,
+      "official_black": 44,
+      "official_white": 20,
+      "stones_black": 44,
+      "stones_white": 20
+    },
+    {
+      "start_index": 7,
+      "candidate_color": "black",
+      "result": "loss",
+      "stone_diff": -44,
+      "official_black": 10,
+      "official_white": 54,
+      "stones_black": 10,
+      "stones_white": 54
+    },
+    {
+      "start_index": 7,
+      "candidate_color": "white",
+      "result": "loss",
+      "stone_diff": -8,
+      "official_black": 36,
+      "official_white": 28,
+      "stones_black": 36,
+      "stones_white": 28
+    },
+    {
+      "start_index": 8,
+      "candidate_color": "black",
+      "result": "loss",
+      "stone_diff": -16,
+      "official_black": 24,
+      "official_white": 40,
+      "stones_black": 24,
+      "stones_white": 40
+    },
+    {
+      "start_index": 8,
+      "candidate_color": "white",
+      "result": "draw",
+      "stone_diff": 0,
+      "official_black": 32,
+      "official_white": 32,
+      "stones_black": 32,
+      "stones_white": 32
+    },
+    {
+      "start_index": 9,
+      "candidate_color": "black",
+      "result": "loss",
+      "stone_diff": -30,
+      "official_black": 17,
+      "official_white": 47,
+      "stones_black": 17,
+      "stones_white": 47
+    },
+    {
+      "start_index": 9,
+      "candidate_color": "white",
+      "result": "loss",
+      "stone_diff": -6,
+      "official_black": 35,
+      "official_white": 29,
+      "stones_black": 35,
+      "stones_white": 29
+    },
+    {
+      "start_index": 10,
+      "candidate_color": "black",
+      "result": "loss",
+      "stone_diff": -6,
+      "official_black": 29,
+      "official_white": 35,
+      "stones_black": 29,
+      "stones_white": 35
+    },
+    {
+      "start_index": 10,
+      "candidate_color": "white",
+      "result": "win",
+      "stone_diff": 8,
+      "official_black": 28,
+      "official_white": 36,
+      "stones_black": 28,
+      "stones_white": 36
+    },
+    {
+      "start_index": 11,
+      "candidate_color": "black",
+      "result": "loss",
+      "stone_diff": -2,
+      "official_black": 31,
+      "official_white": 33,
+      "stones_black": 31,
+      "stones_white": 33
+    },
+    {
+      "start_index": 11,
+      "candidate_color": "white",
+      "result": "loss",
+      "stone_diff": -20,
+      "official_black": 42,
+      "official_white": 22,
+      "stones_black": 42,
+      "stones_white": 22
+    },
+    {
+      "start_index": 12,
+      "candidate_color": "black",
+      "result": "loss",
+      "stone_diff": -32,
+      "official_black": 16,
+      "official_white": 48,
+      "stones_black": 16,
+      "stones_white": 48
+    },
+    {
+      "start_index": 12,
+      "candidate_color": "white",
+      "result": "loss",
+      "stone_diff": -12,
+      "official_black": 38,
+      "official_white": 26,
+      "stones_black": 38,
+      "stones_white": 26
+    },
+    {
+      "start_index": 13,
+      "candidate_color": "black",
+      "result": "loss",
+      "stone_diff": -20,
+      "official_black": 22,
+      "official_white": 42,
+      "stones_black": 22,
+      "stones_white": 42
+    },
+    {
+      "start_index": 13,
+      "candidate_color": "white",
+      "result": "loss",
+      "stone_diff": -12,
+      "official_black": 38,
+      "official_white": 26,
+      "stones_black": 38,
+      "stones_white": 26
+    },
+    {
+      "start_index": 14,
+      "candidate_color": "black",
+      "result": "loss",
+      "stone_diff": -32,
+      "official_black": 16,
+      "official_white": 48,
+      "stones_black": 16,
+      "stones_white": 48
+    },
+    {
+      "start_index": 14,
+      "candidate_color": "white",
+      "result": "win",
+      "stone_diff": 22,
+      "official_black": 21,
+      "official_white": 43,
+      "stones_black": 21,
+      "stones_white": 43
+    },
+    {
+      "start_index": 15,
+      "candidate_color": "black",
+      "result": "loss",
+      "stone_diff": -34,
+      "official_black": 15,
+      "official_white": 49,
+      "stones_black": 15,
+      "stones_white": 49
+    },
+    {
+      "start_index": 15,
+      "candidate_color": "white",
+      "result": "loss",
+      "stone_diff": -14,
+      "official_black": 39,
+      "official_white": 25,
+      "stones_black": 39,
+      "stones_white": 25
+    },
+    {
+      "start_index": 16,
+      "candidate_color": "black",
+      "result": "loss",
+      "stone_diff": -12,
+      "official_black": 26,
+      "official_white": 38,
+      "stones_black": 26,
+      "stones_white": 38
+    },
+    {
+      "start_index": 16,
+      "candidate_color": "white",
+      "result": "win",
+      "stone_diff": 6,
+      "official_black": 29,
+      "official_white": 35,
+      "stones_black": 29,
+      "stones_white": 35
+    },
+    {
+      "start_index": 17,
+      "candidate_color": "black",
+      "result": "loss",
+      "stone_diff": -18,
+      "official_black": 23,
+      "official_white": 41,
+      "stones_black": 23,
+      "stones_white": 41
+    },
+    {
+      "start_index": 17,
+      "candidate_color": "white",
+      "result": "loss",
+      "stone_diff": -20,
+      "official_black": 42,
+      "official_white": 22,
+      "stones_black": 42,
+      "stones_white": 22
+    },
+    {
+      "start_index": 18,
+      "candidate_color": "black",
+      "result": "loss",
+      "stone_diff": -34,
+      "official_black": 15,
+      "official_white": 49,
+      "stones_black": 15,
+      "stones_white": 49
+    },
+    {
+      "start_index": 18,
+      "candidate_color": "white",
+      "result": "loss",
+      "stone_diff": -14,
+      "official_black": 39,
+      "official_white": 25,
+      "stones_black": 39,
+      "stones_white": 25
+    },
+    {
+      "start_index": 19,
+      "candidate_color": "black",
+      "result": "win",
+      "stone_diff": 22,
+      "official_black": 43,
+      "official_white": 21,
+      "stones_black": 43,
+      "stones_white": 21
+    },
+    {
+      "start_index": 19,
+      "candidate_color": "white",
+      "result": "loss",
+      "stone_diff": -8,
+      "official_black": 36,
+      "official_white": 28,
+      "stones_black": 36,
+      "stones_white": 28
+    },
+    {
+      "start_index": 20,
+      "candidate_color": "black",
+      "result": "win",
+      "stone_diff": 22,
+      "official_black": 43,
+      "official_white": 21,
+      "stones_black": 43,
+      "stones_white": 21
+    },
+    {
+      "start_index": 20,
+      "candidate_color": "white",
+      "result": "loss",
+      "stone_diff": -38,
+      "official_black": 51,
+      "official_white": 13,
+      "stones_black": 51,
+      "stones_white": 13
+    },
+    {
+      "start_index": 21,
+      "candidate_color": "black",
+      "result": "loss",
+      "stone_diff": -26,
+      "official_black": 19,
+      "official_white": 45,
+      "stones_black": 19,
+      "stones_white": 45
+    },
+    {
+      "start_index": 21,
+      "candidate_color": "white",
+      "result": "loss",
+      "stone_diff": -40,
+      "official_black": 52,
+      "official_white": 12,
+      "stones_black": 52,
+      "stones_white": 12
+    },
+    {
+      "start_index": 22,
+      "candidate_color": "black",
+      "result": "loss",
+      "stone_diff": -12,
+      "official_black": 26,
+      "official_white": 38,
+      "stones_black": 26,
+      "stones_white": 38
+    },
+    {
+      "start_index": 22,
+      "candidate_color": "white",
+      "result": "win",
+      "stone_diff": 22,
+      "official_black": 21,
+      "official_white": 43,
+      "stones_black": 21,
+      "stones_white": 43
+    },
+    {
+      "start_index": 23,
+      "candidate_color": "black",
+      "result": "loss",
+      "stone_diff": -14,
+      "official_black": 25,
+      "official_white": 39,
+      "stones_black": 25,
+      "stones_white": 39
+    },
+    {
+      "start_index": 23,
+      "candidate_color": "white",
+      "result": "loss",
+      "stone_diff": -48,
+      "official_black": 56,
+      "official_white": 8,
+      "stones_black": 56,
+      "stones_white": 8
+    }
+  ]
+}
