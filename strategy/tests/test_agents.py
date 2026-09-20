@@ -436,11 +436,12 @@ def test_jev_picks_legal_place_from_decisions_double(
         return legal[1]
 
     monkeypatch.setattr(jev, "_call_openrouter", pick_second)
-    move = jev.choose_move(position)
-    assert move == Place(places[1])
-    assert move.square in places
-    via_catalog = catalog_choose(jev.SPECIMEN_ID, position)
-    assert via_catalog == move
+    with jev.stage1_config("v2_as_is"):
+        move = jev.choose_move(position)
+        assert move == Place(places[1])
+        assert move.square in places
+        via_catalog = catalog_choose(jev.SPECIMEN_ID, position)
+        assert via_catalog == move
 
 
 def test_jev_does_not_adopt_place_outside_legal_set(
@@ -455,10 +456,11 @@ def test_jev_does_not_adopt_place_outside_legal_set(
         return illegal
 
     monkeypatch.setattr(jev, "_call_openrouter", pick_illegal)
-    with pytest.raises(jev.ExternalModelError, match="合法手"):
-        jev.choose_move(position)
-    with pytest.raises(jev.ExternalModelError):
-        catalog_choose(jev.SPECIMEN_ID, position)
+    with jev.stage1_config("v2_as_is"):
+        with pytest.raises(jev.ExternalModelError, match="合法手"):
+            jev.choose_move(position)
+        with pytest.raises(jev.ExternalModelError):
+            catalog_choose(jev.SPECIMEN_ID, position)
 
 
 def test_jev_call_failure_is_unplayable_not_a_legal_fallback(
@@ -470,7 +472,9 @@ def test_jev_call_failure_is_unplayable_not_a_legal_fallback(
         raise jev.ExternalModelError("試験用の失敗")
 
     monkeypatch.setattr(jev, "_call_openrouter", boom)
-    with pytest.raises(jev.ExternalModelError, match="失敗"):
+    with jev.stage1_config("v2_as_is"), pytest.raises(
+        jev.ExternalModelError, match="失敗"
+    ):
         jev.choose_move(position)
 
 
@@ -756,7 +760,8 @@ def test_jev_does_not_delegate_to_minimax_choose_move(
     monkeypatch.setattr(jev, "_call_openrouter", lambda _position, legal: legal[0])
     position = initial_position()
     places = legal_places(position)
-    move = jev.choose_move(position)
+    with jev.stage1_config("v2_as_is"):
+        move = jev.choose_move(position)
     assert move == Place(places[0])
     assert called["n"] == 0
 
@@ -1150,6 +1155,67 @@ def test_jev_stage4_margin_zero_matches_code_best_on_recorded_positions() -> Non
         assert chosen.algebraic == row["code_best"]
         losses.append(row["best_value"] - row["values"][chosen.algebraic])
     assert sum(losses) / len(losses) == data["baseline_mean_loss"]
+
+
+def test_jev_stage5_record_has_paired_acceptance() -> None:
+    root = Path(__file__).resolve().parents[2] / "docs" / "benchmarks"
+    records = sorted(root.glob("jev-stage5*.json"))
+    assert records, "段階 5 の対局記録 JSON が docs/benchmarks/ に無い"
+    data = json.loads(records[-1].read_text(encoding="utf-8"))
+    for key in ("games", "win_rate", "mean_stone_diff", "paired", "accepted"):
+        assert key in data, key
+    assert data["paired"] is True
+    assert data.get("complete") is True
+    assert isinstance(data["accepted"], bool)
+    assert data["games"] == len(data["game_records"])
+    assert data["games"] == 2 * len(data["starts"])
+    assert data["games"] >= 2
+    pairs = data["paired_results"]
+    assert len(pairs) == len(data["starts"])
+    for row in pairs:
+        assert row["black"]["candidate_color"] == "black"
+        assert row["white"]["candidate_color"] == "white"
+        assert row["black"]["start_index"] == row["white"]["start_index"]
+    if data["accepted"]:
+        assert data["mean_stone_diff"] > 0
+        assert data["win_rate"] >= data.get("baseline_win_rate", 0)
+        spec = json.loads(jev.PROMPT_PATH.read_text(encoding="utf-8"))
+        chosen = data["candidate"]
+        assert spec["selection"]["shortlist_size"] == chosen["shortlist_size"]
+        assert spec["selection"]["margin"] == chosen["margin"]
+        assert spec["selection"]["confidence_threshold"] == chosen["confidence_threshold"]
+        assert jev.DEFAULT_STAGE1_CONFIG == "v2_as_is"
+    else:
+        assert data.get("return_to_stage3_and_4") is True
+        assert data.get("catalog_policy") == "code_only_v2_jev0"
+        assert jev.DEFAULT_STAGE1_CONFIG == "v2_jev0"
+    assert [item.display_name for item in items()].count("生成 AI (Jev)") == 1
+
+
+def test_jev_catalog_default_follows_stage5_acceptance(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = Path(__file__).resolve().parents[2] / "docs" / "benchmarks"
+    records = sorted(root.glob("jev-stage5*.json"))
+    assert records, "段階 5 の対局記録 JSON が docs/benchmarks/ に無い"
+    data = json.loads(records[-1].read_text(encoding="utf-8"))
+    called = {"n": 0}
+
+    def spy(_position, legal):
+        called["n"] += 1
+        return legal[0]
+
+    monkeypatch.setattr(jev, "_call_openrouter", spy)
+    position = initial_position()
+    move = jev.choose_move(position)
+    via_catalog = catalog_choose(jev.SPECIMEN_ID, position)
+    assert move is not None
+    assert via_catalog == move
+    if data["accepted"]:
+        assert called["n"] >= 1
+    else:
+        assert called["n"] == 0
+        assert jev.DEFAULT_STAGE1_CONFIG in jev.STAGE1_CODE_ONLY
 
 
 def test_jev_gives_corner_newly_does_not_mark_all_when_opponent_already_has_corner() -> None:

@@ -6,7 +6,7 @@ import ast
 import json
 import os
 import re
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -20,6 +20,12 @@ from reversi.engine.rules import Position, apply_place, initial_position, legal_
 
 _API_KEY = "sk-test-not-a-real-key"
 _ENV_KEY = "sk-env-must-not-be-used"
+
+
+@pytest.fixture(autouse=True)
+def _jev_shortlist_config() -> Iterator[None]:
+    with jev.stage1_config("v2_as_is"):
+        yield
 
 
 def _fake_openrouter(
