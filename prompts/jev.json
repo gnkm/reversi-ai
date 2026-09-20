@@ -1,0 +1,70 @@
+{
+  "objective": "Win by having more discs than the opponent at the end of the game.",
+  "origin": "board[0][0] is a1 (Black's lower left). Rows are ranks 1-8 toward White, columns are files a-h.",
+  "questions": {
+    "corner_priority": {
+      "type": "noul",
+      "instructions": "Should the side to move prioritize occupying a corner this turn?",
+      "criteria": {
+        "true": "A corner is available, or taking a corner is the right strategic priority now.",
+        "false": "Corners are not the right priority this turn."
+      }
+    },
+    "mobility_priority": {
+      "type": "noul",
+      "instructions": "Should the side to move prioritize keeping more options than the opponent, rather than grabbing discs?",
+      "criteria": {
+        "true": "Keeping options open matters more than grabbing discs this turn.",
+        "false": "Occupying strong squares or taking discs matters more than options this turn."
+      }
+    },
+    "corner_danger": {
+      "type": "noul",
+      "instructions": "Is there a serious risk of giving the opponent a corner this turn?",
+      "criteria": {
+        "true": "A careless move would likely hand the opponent a corner.",
+        "false": "The opponent is unlikely to take a corner after this move."
+      }
+    },
+    "material_importance": {
+      "type": "score",
+      "instructions": "How important is taking discs this turn for the side to move?",
+      "criteria": [
+        "Taking discs this turn barely matters.",
+        "Taking some discs is useful but not decisive.",
+        "Taking discs this turn is important."
+      ]
+    },
+    "stage": {
+      "type": "choice",
+      "instructions": "Which phase best describes this position for the side to move?",
+      "criteria": {
+        "opening": "The opening fight for the center is still going.",
+        "midgame": "The fight is about edges, corners, and options.",
+        "endgame": "The game is close to finishing and remaining empty squares will soon be filled."
+      }
+    }
+  },
+  "weights": {
+    "answers": {
+      "corner_priority": 2.0,
+      "mobility_priority": 1.5,
+      "corner_danger": 2.0,
+      "material_importance": 1.0
+    },
+    "features": {
+      "corner": 4.0,
+      "x_square": -3.0,
+      "c_square": -1.0,
+      "edge": 0.4,
+      "flips": 0.8,
+      "mobility": 1.5,
+      "gives_corner": -4.0
+    },
+    "stage": {
+      "opening": { "mobility": 1.4, "flips": 0.4, "corner": 1.0 },
+      "midgame": { "mobility": 1.0, "flips": 0.8, "corner": 1.3 },
+      "endgame": { "mobility": 0.4, "flips": 1.5, "corner": 1.0 }
+    }
+  }
+}

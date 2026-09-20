@@ -1,13 +1,13 @@
 ---
 title: アーキテクチャ
 product: Reversi Agents
-version: 0.1.11
+version: 0.1.12
 status: working
 date: 2026-09-20
 source: docs/srs.md
 srs_version: 0.1.24
 tech_stack: docs/tech-stack.md
-tech_stack_version: 0.2.13
+tech_stack_version: 0.2.14
 ---
 
 # アーキテクチャ
@@ -16,10 +16,10 @@ tech_stack_version: 0.2.13
 | --- | --- |
 | 文書識別 | reversi-ai-architecture |
 | 対象ソフトウェア | Reversi Agents |
-| 版 | 0.1.11 |
+| 版 | 0.1.12 |
 | 状態 | 現行（設計。要求ではない） |
 | 日付 | 2026-09-20 |
-| 入力 | [`docs/srs.md`](srs.md) 0.1.24、[`docs/tech-stack.md`](tech-stack.md) 0.2.13 |
+| 入力 | [`docs/srs.md`](srs.md) 0.1.24、[`docs/tech-stack.md`](tech-stack.md) 0.2.14 |
 
 本文書は**配置と層**の設計正本である。ソフトウェア要求の正本は [`docs/srs.md`](srs.md) であり、本文書は shall を追加・変更・撤回しない。言語・ライブラリ・コンテナの選定は [`docs/tech-stack.md`](tech-stack.md) を正とする。ディレクトリ名は tech-stack 2.3 と一致させ、ファイル単位の置き場と目的は本文書を正とする。
 
@@ -170,8 +170,8 @@ reversi-ai/
 │   │   │   ├── lgbm.py                # 機械学習 (LightGBM)。ネイティブテキストを読む
 │   │   │   ├── rl.py                  # 強化学習 (自己対局)。線形重み。NN も OpenRouter も使わない
 │   │   │   ├── nn.py                  # ニューラルネットワーク (棋譜)。ONNX CPU
-│   │   │   ├── prompt.py              # prompts/ の Markdown を読む
-│   │   │   ├── jev.py                 # 生成 AI (Jev)。Decisions API
+│   │   │   ├── prompt.py              # prompts/ の Markdown と JSON を読む
+│   │   │   ├── jev.py                 # 生成 AI (Jev)。Decisions の原子質問を合成
 │   │   │   └── chat_completions.py    # 追加の生成 AI。Chat Completions の構造化出力
 │   │   ├── api/                       # 内部 FastAPI。ブラウザからは到達させない
 │   │   │   ├── __init__.py
@@ -206,7 +206,7 @@ reversi-ai/
 │   └── nn.onnx                        # NN 対局時の順伝播
 │
 ├── prompts/                           # 生成 AI の固定指示。戦略プロセスが対局時に読む
-│   ├── jev.md                         # 生成 AI (Jev) の Decisions 指示
+│   ├── jev.json                       # 生成 AI (Jev) の原子質問と合成の重み
 │   └── chat-completions.md            # 追加の生成 AI の Chat Completions 指示（構造化出力）
 │
 ├── e2e/                               # Playwright。対象はマシン上の Google Chrome
@@ -305,11 +305,11 @@ reversi-ai/
 | `lgbm.py` | 機械学習 (LightGBM) | `models/lgbm.txt` を LightGBM ネイティブ形式で読む。onnxruntime / PyTorch / joblib / pickle を import しない |
 | `rl.py` | 強化学習 (自己対局) | `models/rl.json`。NN 推論も OpenRouter も使わない |
 | `nn.py` | ニューラルネットワーク (棋譜) | `models/nn.onnx` を onnxruntime CPU で順伝播し、合法手へマスク |
-| `prompt.py` | （指示ファイル） | `prompts/` の Markdown を対局時に読む。欠落は継続不能 |
-| `jev.py` | 生成 AI (Jev) | `typesafe/jev-1.13` の Decisions API。指示は `prompts/jev.md`。合法手の外を採用しない |
+| `prompt.py` | （指示ファイル） | `prompts/` の Markdown と JSON を対局時に読む。欠落は継続不能 |
+| `jev.py` | 生成 AI (Jev) | `typesafe/jev-1.13` の Decisions API。1 着手 1 呼出しで 2 問以上の原子質問を送り、typed answers とコード特徴を合成する。指示は `prompts/jev.json`。合法手の外を採用しない |
 | `chat_completions.py` | 生成 AI (〈呼称〉) | 運用者が与えたテキスト生成モデル ID。固定の system は `prompts/chat-completions.md`。応答は JSON Schema を Pydantic で検証する |
 
-カテゴリ `random` は「ランダム」である。`position_table.py` は FUN-025 の点数表だけを持つ。`extra_genai.py` は `data/config.toml` を読む（対局者向けウィザードは置かない）。Jev の固定指示は `prompts/jev.md` に置き、`strategy/src` には埋め込まない。Markdown を変えてイメージを作り直すか、開発時の bind（`./prompts:/prompts`）を更新すると、次の着手呼出しからその指示を使う。
+カテゴリ `random` は「ランダム」である。`position_table.py` は FUN-025 の点数表だけを持つ。`extra_genai.py` は `data/config.toml` を読む（対局者向けウィザードは置かない）。Jev は同一 `state` に対する 2 問以上の原子質問（Noul / Score / Choice）を 1 HTTP 呼出しで送り、`jev.py` がモデルの typed answers（noul 確率・score・choice の probabilities）と、コードが計算した特徴（角・X・C・辺、反転数、相手の着手可能数、角を渡すか）を `prompts/jev.json` の重みで合成して、合法手からちょうど 1 つ選ぶ。同点は a1…h8。反転数やリスト長は Jev に数えさせない。盤の読み方（`board[0][0]` が a1）は質問文ではなく `state` に置く。固定の質問文と重みは `prompts/jev.json` に置き、`strategy/src` には埋め込まない。JSON を変えてイメージを作り直すか、開発時の bind（`./prompts:/prompts`）を更新すると、次の着手呼出しからその指示を使う。Chat Completions の指示は散文なので `prompts/chat-completions.md` のままである。`prompts/` に JSON と Markdown が混在してよい。日本語の注釈は本節に置き、質問ファイルは JSONC にしない。
 
 ### 4.5 `strategy` — `reversi.api`
 
@@ -361,7 +361,7 @@ TypeScript 側は Zod（`web/server/src/schemas.ts`）、Python 側は Pydantic�
 | 置き場 | 中身 | Git |
 | --- | --- | --- |
 | `models/*.json`, `models/lgbm.txt`, `models/nn.onnx` | 対局時に読む学習成果物 | 含める |
-| `prompts/*.md` | 生成 AI の固定指示。戦略イメージへ COPY し、Compose では bind | 含める |
+| `prompts/*.md`, `prompts/*.json` | 生成 AI の固定指示。戦略イメージへ COPY し、Compose では bind | 含める |
 | `data/games.sqlite` | 終局棋譜。`.wtb` ではない | 含めない |
 | `data/wthor/` | WTHOR 原本 | 含めない。再配布しない |
 | `data/config.toml` | 追加生成 AI のモデル名・呼称・パラメータ | 含めない |
@@ -470,6 +470,7 @@ Issue の検証欄と CI は、この節の生コマンドを使う。ラッパ�
 
 | 版 | 日付 | 内容 |
 | --- | --- | --- |
+| 0.1.12 | 2026-09-20 | Jev は原子質問を 1 呼出しで送り、`jev.py` が typed answers とコード特徴を合成する |
 | 0.1.11 | 2026-09-20 | カタログをカード選択にし、盤面を盤中心の横並びに揃える |
 | 0.1.10 | 2026-09-20 | 機械学習 (LightGBM) をカタログに載せ、ネイティブテキスト成果物を `models/lgbm.txt` とする |
 | 0.1.9 | 2026-09-20 | 追加の生成 AI を `data/config.toml` と構造化出力に置き、自由文パースを既定にしない |

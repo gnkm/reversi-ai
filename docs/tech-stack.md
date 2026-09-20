@@ -1,7 +1,7 @@
 ---
 title: 技術スタック
 product: Reversi Agents
-version: 0.2.13
+version: 0.2.14
 status: working
 date: 2026-09-20
 source: docs/srs.md
@@ -14,7 +14,7 @@ srs_version: 0.1.24
 | --- | --- |
 | 文書識別 | reversi-ai-tech-stack |
 | 対象ソフトウェア | Reversi Agents |
-| 版 | 0.2.13 |
+| 版 | 0.2.14 |
 | 状態 | 現行（設計。要求ではない） |
 | 日付 | 2026-09-20 |
 | 入力 | [`docs/srs.md`](srs.md) 0.1.24 |
@@ -127,7 +127,7 @@ strategy/            戦略プロセス（着手と学習）
 compose.yaml         Podman Compose。secret の中身は書かない
 compose.dev.yaml     開発用オーバーレイ。bind mount と reload だけ
 models/              学習成果物（小さい JSON / LightGBM テキスト / ONNX。原本棋譜は置かない）
-prompts/             生成 AI の固定指示（Markdown。戦略プロセスが対局時に読む）
+prompts/             生成 AI の固定指示（JSON / Markdown。戦略プロセスが対局時に読む）
 data/                運用者ローカル。WTHOR 原本と SQLite、追加生成 AI の config.toml。Git 管理外
 ```
 
@@ -463,6 +463,7 @@ OpenRouter の API キーは `podman secret create` でホストに置く。名�
 
 | 版 | 日付 | 内容 |
 | --- | --- | --- |
+| 0.2.14 | 2026-09-20 | `prompts/` は JSON と Markdown を置いてよい（Jev は JSON、Chat Completions は Markdown） |
 | 0.2.13 | 2026-09-20 | 機械学習 (LightGBM) を対局時ネイティブテキストで載せる（ONNX / pickle は使わない） |
 | 0.2.12 | 2026-09-20 | 追加の生成 AI を `config.toml` と Chat Completions の構造化出力（Pydantic）とする |
 | 0.2.11 | 2026-09-20 | 学習を `train` イメージに分け、対局用 strategy から torch を外す |

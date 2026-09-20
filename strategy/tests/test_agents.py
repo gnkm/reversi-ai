@@ -7,6 +7,7 @@ import json
 import re
 from pathlib import Path
 from random import Random
+from types import SimpleNamespace
 
 import pytest
 
@@ -505,6 +506,95 @@ def test_jev_source_uses_jev_model_and_skips_wthor() -> None:
             assert "ffothello.org" not in lowered
             assert ".wtb" not in lowered
             assert "openrouter_api_key" not in lowered
+
+
+def test_jev_combines_typed_answers_into_legal_place() -> None:
+    position = initial_position()
+    places = legal_places(position)
+    spec = jev._load_spec()
+    assert len(spec.questions) >= 2
+    parsed = jev._Parsed(
+        noul={
+            "corner_priority": 0.2,
+            "mobility_priority": 0.5,
+            "corner_danger": 0.1,
+        },
+        material=0.4,
+        stage={"opening": 1.0, "midgame": 0.0, "endgame": 0.0},
+    )
+    square = jev._select_square(position, places, parsed, spec)
+    assert square in places
+    assert square == places[0]
+    assert square == Square.parse("d3")
+
+
+def test_jev_composite_prefers_corner_when_priority_is_high() -> None:
+    position = _position_from_rank8_rows(_CORNER_VS_TWO_FLIPS, Color.BLACK)
+    places = legal_places(position)
+    assert Square.parse("a1") in places
+    spec = jev._load_spec()
+    parsed = jev._Parsed(
+        noul={
+            "corner_priority": 1.0,
+            "mobility_priority": 0.0,
+            "corner_danger": 0.0,
+        },
+        material=0.0,
+        stage={"opening": 0.0, "midgame": 1.0, "endgame": 0.0},
+    )
+    square = jev._select_square(position, places, parsed, spec)
+    assert square == Square.parse("a1")
+    assert square in places
+
+
+def test_jev_questions_do_not_scale_with_legal_places() -> None:
+    spec = jev._load_spec()
+    opening = legal_places(initial_position())
+    white_only = Position(_almost_full_white_with_black_on_b1().board, Color.WHITE)
+    one = legal_places(white_only)
+    assert len(opening) >= 2
+    assert len(one) == 1
+    assert len(spec.questions) >= 2
+    names = set(spec.questions)
+    assert names.isdisjoint(square.algebraic for square in opening)
+    assert names.isdisjoint(square.algebraic for square in one)
+    assert "move" not in names
+
+
+def test_jev_does_not_penalize_x_or_c_when_corner_is_taken() -> None:
+    empty = empty_board()
+    assert jev._danger_flag(Square.parse("b2"), jev._X_SQUARES, empty) == 1.0
+    assert jev._danger_flag(Square.parse("a2"), jev._C_SQUARES, empty) == 1.0
+    own_corner = empty.replacing({Square.parse("a1"): Stone.BLACK})
+    assert jev._danger_flag(Square.parse("b2"), jev._X_SQUARES, own_corner) == 0.0
+    opp_corner = empty.replacing({Square.parse("a1"): Stone.WHITE})
+    assert jev._danger_flag(Square.parse("b2"), jev._X_SQUARES, opp_corner) == 0.0
+    assert jev._danger_flag(Square.parse("b1"), jev._C_SQUARES, opp_corner) == 0.0
+    assert jev._danger_flag(Square.parse("d3"), jev._X_SQUARES, empty) == 0.0
+
+
+def test_jev_rejects_out_of_range_stage_probabilities() -> None:
+    spec = jev._load_spec()
+    answers = {
+        "corner_priority": {"noul": 0.2},
+        "mobility_priority": {"noul": 0.4},
+        "corner_danger": {"noul": 0.1},
+        "material_importance": {"score": 1.0},
+        "stage": {
+            "type": "choice",
+            "choice": "opening",
+            "probabilities": {"opening": -0.5, "midgame": 0.5, "endgame": 1.0},
+        },
+    }
+    with pytest.raises(jev.ExternalModelError, match="合成できません"):
+        jev._answers_from_response(SimpleNamespace(answers=answers), spec)
+    answers["stage"] = {
+        "type": "choice",
+        "choice": "opening",
+        "probabilities": {"opening": 1.5, "midgame": 0.0, "endgame": 0.0},
+    }
+    with pytest.raises(jev.ExternalModelError, match="合成できません"):
+        jev._answers_from_response(SimpleNamespace(answers=answers), spec)
 
 
 def _black_feature_index(square: Square) -> int:
