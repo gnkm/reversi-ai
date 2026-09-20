@@ -148,6 +148,8 @@ class _Spec:
     metric_weights: dict[str, float]
     scales: dict[str, float]
     stage_weights: dict[str, dict[str, float]]
+    places_in_state: bool
+    gives_corner_newly: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -359,6 +361,7 @@ def _load_spec(path: Path | None = None) -> _Spec:
     if not isinstance(loaded, dict):
         raise _fail_spec()
     question_id, instructions = _load_question(_mapping_field(loaded, "questions"))
+    objective = _text_field(loaded, "objective")
     vocab = _mapping_field(loaded, "vocabulary")
     buckets = _mapping_field(loaded, "buckets")
     empty_buckets = _bucket_map(_mapping_field(buckets, "empty"), _STAGE_KEYS)
@@ -375,7 +378,7 @@ def _load_spec(path: Path | None = None) -> _Spec:
         _mapping_field(loaded, "selection")
     )
     return _Spec(
-        objective=_text_field(loaded, "objective"),
+        objective=objective,
         question_id=question_id,
         instructions=instructions,
         place_line=_require_place_line(_text_field(loaded, "place_line")),
@@ -394,6 +397,8 @@ def _load_spec(path: Path | None = None) -> _Spec:
         metric_weights=metrics,
         scales=scales,
         stage_weights=stage,
+        places_in_state=True,
+        gives_corner_newly=False,
     )
 
 
@@ -428,10 +433,23 @@ def _amount_word(value: int, buckets: Mapping[str, tuple[int, int]], spec: _Spec
     return spec.amounts[_bucket_label(value, buckets)]
 
 
+def _opponent_has_corner(position: Position, spec: _Spec) -> bool:
+    return any(
+        place.algebraic in spec.kinds["corner"] for place in legal_places(position)
+    )
+
+
 def _gives_corner(position: Position, square: Square, spec: _Spec) -> bool:
     after = apply_place(position.board, square, position.side_to_move)
-    replies = legal_places(Position(after, position.side_to_move.opponent))
-    return any(place.algebraic in spec.kinds["corner"] for place in replies)
+    after_can = _opponent_has_corner(
+        Position(after, position.side_to_move.opponent), spec
+    )
+    if not spec.gives_corner_newly:
+        return after_can
+    before_can = _opponent_has_corner(
+        Position(position.board, position.side_to_move.opponent), spec
+    )
+    return after_can and not before_can
 
 
 def _place_line(position: Position, square: Square, spec: _Spec) -> str:
@@ -469,12 +487,15 @@ def _decision_state(
     position: Position, spec: _Spec, lines: Mapping[str, str]
 ) -> dict[str, Any]:
     stage = _stage_of(position.board, spec)
-    return {
-        "objective": spec.objective,
+    state: dict[str, Any] = {
         "side_to_move": spec.sides[position.side_to_move.value],
         "stage": spec.stages[stage],
-        "places": dict(lines),
     }
+    if spec.objective:
+        state["objective"] = spec.objective
+    if spec.places_in_state:
+        state["places"] = dict(lines)
+    return state
 
 
 def _decision_questions(spec: _Spec, lines: Mapping[str, str]) -> dict[str, Any]:
