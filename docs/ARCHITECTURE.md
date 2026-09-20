@@ -1,7 +1,7 @@
 ---
 title: アーキテクチャ
 product: Reversi Agents
-version: 0.1.21
+version: 0.1.22
 status: working
 date: 2026-09-20
 source: docs/srs.md
@@ -16,7 +16,7 @@ tech_stack_version: 0.2.18
 | --- | --- |
 | 文書識別 | reversi-ai-architecture |
 | 対象ソフトウェア | Reversi Agents |
-| 版 | 0.1.21 |
+| 版 | 0.1.22 |
 | 状態 | 現行（設計。要求ではない） |
 | 日付 | 2026-09-20 |
 | 入力 | [`docs/srs.md`](srs.md) 0.1.24、[`docs/tech-stack.md`](tech-stack.md) 0.2.18 |
@@ -164,11 +164,12 @@ reversi-ai/
 │   │   │   ├── __init__.py
 │   │   │   ├── catalog.py             # 個体 ID・表示名・説明・カテゴリの登録
 │   │   │   ├── extra_genai.py         # data/config.toml から生成 AI 個体を足す
-│   │   │   ├── position_table.py      # FUN-025 の点数表。ミニマックス・定石外れ・Jev の着手後葉が共有
+│   │   │   ├── position_table.py      # FUN-025 の点数表。ミニマックス・αβ・定石外れ・Jev の着手後葉が共有
 │   │   │   ├── random_uniform.py      # ランダム (一様)
 │   │   │   ├── most_flips.py          # ルールベース (最多取り)
 │   │   │   ├── positional.py          # ルールベース (位置評価)
 │   │   │   ├── minimax.py             # ルールベース (ミニマックス) 深さ 4
+│   │   │   ├── alphabeta.py           # ルールベース (αβ) 深さ 6 の Negamax
 │   │   │   ├── opening.py             # ルールベース (定石) 虎・牛・鼠
 │   │   │   ├── ml.py                  # 機械学習 (棋譜)。係数 JSON の積和のみ
 │   │   │   ├── lgbm.py                # 機械学習 (LightGBM)。ネイティブテキストを読む
@@ -304,6 +305,7 @@ reversi-ai/
 | `most_flips.py` | ルールベース (最多取り) | 裏返す相手石が最大の手 |
 | `positional.py` | ルールベース (位置評価) | 着手直後の自石点数合計が最大の手 |
 | `minimax.py` | ルールベース (ミニマックス) | 深さ 4。葉は位置評価表の差。アルファベータは同一の葉評価になる範囲で可 |
+| `alphabeta.py` | ルールベース (αβ) | 深さ 6 の Negamax 形式の αβ。葉は位置評価表の差（ミニマックスと同一）。対局中に深さを変えない |
 | `opening.py` | ルールベース (定石) | 虎・牛・鼠の 3 列と 8 対称。外れは位置評価 |
 | `ml.py` | 機械学習 (棋譜) | `models/ml.json` の積和。onnxruntime / PyTorch を import しない |
 | `lgbm.py` | 機械学習 (LightGBM) | `models/lgbm.txt` を LightGBM ネイティブ形式で読む。onnxruntime / PyTorch / joblib / pickle を import しない |
@@ -414,6 +416,7 @@ web コンテナが Pod 内で `0.0.0.0:3000` を聞くのはよい。戦略コ�
 
 | 版 | 日付 | 内容 |
 | --- | --- | --- |
+| 0.1.22 | 2026-09-20 | ルールベース (αβ) をカタログに載せ、深さ 6 の Negamax で着手する |
 | 0.1.21 | 2026-09-20 | Jev の候補手ログを戦略プロセスの標準エラーへ出す |
 | 0.1.20 | 2026-09-20 | Decisions Choice の形を `docs/jev-decisions.md` へ委譲する |
 | 0.1.19 | 2026-09-20 | OpenRouter Decisions の Choice の形（criteria map、答えの probabilities / confidence）を第 4.4 節に書く |
