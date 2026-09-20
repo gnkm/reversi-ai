@@ -296,16 +296,25 @@ def _parse_material(answers: Mapping[str, Any], span: float) -> float:
     return _clamp_unit(_finite_answer(_attr(answer, "score")) / span)
 
 
+def _normalized_stage_probs(probs: Mapping[object, object]) -> dict[str, float] | None:
+    values = {key: _finite_answer(probs.get(key, 0.0)) for key in _STAGE_KEYS}
+    if any(value < 0.0 or value > 1.0 for value in values.values()):
+        raise ExternalModelError("合成できません")
+    total = sum(values.values())
+    if total <= 0.0:
+        return None
+    return {key: value / total for key, value in values.items()}
+
+
 def _parse_stage(answers: Mapping[str, Any]) -> dict[str, float]:
     answer = answers.get(_STAGE_ID)
     if answer is None:
         raise ExternalModelError("合成できません")
     probs = _attr(answer, "probabilities")
     if isinstance(probs, Mapping):
-        values = {key: _finite_answer(probs.get(key, 0.0)) for key in _STAGE_KEYS}
-        total = sum(values.values())
-        if total > 0.0:
-            return {key: value / total for key, value in values.items()}
+        mixed = _normalized_stage_probs(probs)
+        if mixed is not None:
+            return mixed
     choice = _attr(answer, "choice")
     if not isinstance(choice, str) or choice not in _STAGE_KEYS:
         raise ExternalModelError("合成できません")
@@ -333,19 +342,18 @@ def _normalize(raw: Mapping[Square, float]) -> dict[Square, float]:
 
 
 def _danger_flag(
-    square: Square, table: Mapping[Square, Square], own: Stone, board: Board
+    square: Square, table: Mapping[Square, Square], board: Board
 ) -> float:
     corner = table.get(square)
     if corner is None:
         return 0.0
-    if board.stone_at(corner) is own:
+    if board.stone_at(corner) is not Stone.EMPTY:
         return 0.0
     return 1.0
 
 
 def _place_features(position: Position, places: Sequence[Square]) -> dict[Square, _Features]:
     color = position.side_to_move
-    own = color.stone
     flips: dict[Square, float] = {}
     mobility: dict[Square, float] = {}
     extras: dict[Square, tuple[float, float, float, float, float]] = {}
@@ -360,8 +368,8 @@ def _place_features(position: Position, places: Sequence[Square]) -> dict[Square
         is_edge = 1.0 if (square.file in (0, 7) or square.rank in (0, 7)) and not is_corner else 0.0
         extras[square] = (
             is_corner,
-            _danger_flag(square, _X_SQUARES, own, position.board),
-            _danger_flag(square, _C_SQUARES, own, position.board),
+            _danger_flag(square, _X_SQUARES, position.board),
+            _danger_flag(square, _C_SQUARES, position.board),
             is_edge,
             gives,
         )

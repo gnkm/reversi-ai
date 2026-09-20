@@ -7,6 +7,7 @@ import json
 import re
 from pathlib import Path
 from random import Random
+from types import SimpleNamespace
 
 import pytest
 
@@ -558,6 +559,42 @@ def test_jev_questions_do_not_scale_with_legal_places() -> None:
     assert names.isdisjoint(square.algebraic for square in opening)
     assert names.isdisjoint(square.algebraic for square in one)
     assert "move" not in names
+
+
+def test_jev_does_not_penalize_x_or_c_when_corner_is_taken() -> None:
+    empty = empty_board()
+    assert jev._danger_flag(Square.parse("b2"), jev._X_SQUARES, empty) == 1.0
+    assert jev._danger_flag(Square.parse("a2"), jev._C_SQUARES, empty) == 1.0
+    own_corner = empty.replacing({Square.parse("a1"): Stone.BLACK})
+    assert jev._danger_flag(Square.parse("b2"), jev._X_SQUARES, own_corner) == 0.0
+    opp_corner = empty.replacing({Square.parse("a1"): Stone.WHITE})
+    assert jev._danger_flag(Square.parse("b2"), jev._X_SQUARES, opp_corner) == 0.0
+    assert jev._danger_flag(Square.parse("b1"), jev._C_SQUARES, opp_corner) == 0.0
+    assert jev._danger_flag(Square.parse("d3"), jev._X_SQUARES, empty) == 0.0
+
+
+def test_jev_rejects_out_of_range_stage_probabilities() -> None:
+    spec = jev._load_spec()
+    answers = {
+        "corner_priority": {"noul": 0.2},
+        "mobility_priority": {"noul": 0.4},
+        "corner_danger": {"noul": 0.1},
+        "material_importance": {"score": 1.0},
+        "stage": {
+            "type": "choice",
+            "choice": "opening",
+            "probabilities": {"opening": -0.5, "midgame": 0.5, "endgame": 1.0},
+        },
+    }
+    with pytest.raises(jev.ExternalModelError, match="合成できません"):
+        jev._answers_from_response(SimpleNamespace(answers=answers), spec)
+    answers["stage"] = {
+        "type": "choice",
+        "choice": "opening",
+        "probabilities": {"opening": 1.5, "midgame": 0.0, "endgame": 0.0},
+    }
+    with pytest.raises(jev.ExternalModelError, match="合成できません"):
+        jev._answers_from_response(SimpleNamespace(answers=answers), spec)
 
 
 def _black_feature_index(square: Square) -> int:
