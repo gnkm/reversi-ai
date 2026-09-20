@@ -11,7 +11,7 @@ import json
 import os
 import sys
 import tempfile
-from collections.abc import Callable
+from collections.abc import Callable, Mapping, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -105,6 +105,95 @@ def _result_from_jev_side(game: dict[str, Any], jev_is_black: bool) -> str:
     return "draw"
 
 
+def _game_key(game: Mapping[str, Any]) -> tuple[str, str, str]:
+    return (str(game["config"]), str(game["opponent"]), str(game["jev_color"]))
+
+
+def _ensure_output(path: Path) -> None:
+    parent = path.parent
+    try:
+        parent.mkdir(parents=True, exist_ok=True)
+        probe = parent / f".{path.name}.write-probe"
+        probe.write_text("", encoding="utf-8")
+        probe.unlink(missing_ok=True)
+    except OSError as exc:
+        raise SystemExit(f"出力先を書けません: {path}") from exc
+
+
+def _load_games(path: Path) -> list[dict[str, Any]]:
+    if not path.is_file():
+        return []
+    try:
+        loaded = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    if not isinstance(loaded, dict):
+        return []
+    games = loaded.get("games")
+    if not isinstance(games, list):
+        return []
+    restored: list[dict[str, Any]] = []
+    for item in games:
+        if isinstance(item, dict) and {"config", "opponent", "jev_color"} <= set(item):
+            restored.append(item)
+    return restored
+
+
+def _atomic_write(path: Path, payload: Mapping[str, Any]) -> None:
+    serialized = json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
+    handle = tempfile.NamedTemporaryFile(  # noqa: SIM115 - replace で原子的に置く
+        prefix=f".{path.name}.",
+        suffix=".tmp",
+        dir=path.parent,
+        delete=False,
+    )
+    tmp = Path(handle.name)
+    try:
+        handle.write(serialized.encode("utf-8"))
+        handle.close()
+        tmp.replace(path)
+    except Exception:
+        handle.close()
+        tmp.unlink(missing_ok=True)
+        raise
+
+
+def _payload(
+    rows: Sequence[Mapping[str, Any]],
+    games: Sequence[Mapping[str, Any]],
+    opponents: Sequence[str],
+) -> dict[str, Any]:
+    names = {row["name"] for row in rows}
+    if names >= jev.STAGE1_CODE_ONLY:
+        baseline = jev.select_stage1_baseline(rows)
+    elif rows:
+        baseline = str(rows[0]["name"])
+    else:
+        baseline = ""
+    return {
+        "recorded_at": datetime.now(UTC).strftime("%Y-%m-%d %H:%M"),
+        "baseline": baseline,
+        "v1_constant_answer": jev._V1_CONSTANT_ANSWER,
+        "protocol": {
+            "opponents": list(opponents),
+            "both_colors": True,
+            "include_self_play": False,
+            "scoring": {"win": 1.0, "draw": 0.5, "loss": 0.0},
+            "notes": [
+                "カタログに 4 体は置かず、検証用の切替で 4 構成を同じ相手・同じ条件で対局した。",
+                "v1_constant は第 1 版の min-max 正規化と優先係数で、Jev の答えを 0.5 に固定した。",
+                "v2_jev0 は現行の固定 scales 評価だけで、Jev 項は 0。",
+                "v2_code0 は現行合成のコード項を 0 にし、Jev の Choice だけ。",
+                "v2_as_is は prompts/jev.json の現行合成。",
+                "基準線はコードだけの構成のうち勝ち点（同点なら石差・勝数）が最も高いもの。",
+                "資格情報と課金が要る対局は CI に載せない。本スクリプトはホストで明示実行する。",
+            ],
+        },
+        "configs": list(rows),
+        "games": list(games),
+    }
+
+
 def _summarize(name: str, games: list[dict[str, Any]]) -> dict[str, Any]:
     wins = sum(1 for game in games if game["result"] == "win")
     draws = sum(1 for game in games if game["result"] == "draw")
@@ -130,24 +219,36 @@ def _run_config(
     name: str,
     opponents: tuple[str, ...],
     both_colors: bool,
+    existing: Sequence[Mapping[str, Any]],
+    on_game: Callable[[dict[str, Any]], None],
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     jev_side = _jev_chooser()
-    games: list[dict[str, Any]] = []
+    games = [dict(game) for game in existing if game.get("config") == name]
+    done = {_game_key(game) for game in games}
     colors = (True, False) if both_colors else (True,)
     with jev.stage1_config(name):
         for opponent_id in opponents:
             other = _opponent_chooser(opponent_id)
             for jev_is_black in colors:
+                color = "black" if jev_is_black else "white"
+                if (name, opponent_id, color) in done:
+                    print(
+                        f"{name} vs {opponent_id} "
+                        f"({'黒' if jev_is_black else '白'}) skip",
+                        flush=True,
+                    )
+                    continue
                 black, white = (jev_side, other) if jev_is_black else (other, jev_side)
                 raw = _play(black, white)
                 record = {
                     "config": name,
                     "opponent": opponent_id,
-                    "jev_color": "black" if jev_is_black else "white",
+                    "jev_color": color,
                     "result": _result_from_jev_side(raw, jev_is_black),
                     **raw,
                 }
                 games.append(record)
+                on_game(record)
                 print(
                     f"{name} vs {opponent_id} "
                     f"({'黒' if jev_is_black else '白'}) {record['result']} "
@@ -177,6 +278,8 @@ def main() -> int:
         help="カタログ個体 ID",
     )
     args = parser.parse_args()
+    output = args.output
+    _ensure_output(output)
     jev._log_candidates = lambda *_args, **_kwargs: None  # type: ignore[method-assign]
     secret = _bind_secret_if_needed()
     configs = list(jev.STAGE1_CONFIG_NAMES)
@@ -186,47 +289,35 @@ def main() -> int:
     if needs_model and not jev.SECRET_PATH.is_file():
         raise SystemExit("OpenRouter の資格情報が無く、jev: 0 以外の構成を対局できない")
     opponents = tuple(args.opponents)
-    rows: list[dict[str, Any]] = []
-    games: list[dict[str, Any]] = []
+    games = _load_games(output)
+
+    def _save() -> None:
+        rows = []
+        for name in configs:
+            played = [game for game in games if game.get("config") == name]
+            if played:
+                rows.append(_summarize(name, played))
+        _atomic_write(output, _payload(rows, games, opponents))
+
+    def _on_game(record: dict[str, Any]) -> None:
+        games.append(record)
+        _save()
+
     try:
         for name in configs:
-            summary, played = _run_config(name, opponents, both_colors=True)
-            rows.append(summary)
-            games.extend(played)
+            _run_config(
+                name,
+                opponents,
+                both_colors=True,
+                existing=games,
+                on_game=_on_game,
+            )
+        _save()
     finally:
         if secret is not None:
             secret.unlink(missing_ok=True)
-    if {row["name"] for row in rows} >= jev.STAGE1_CODE_ONLY:
-        baseline = jev.select_stage1_baseline(rows)
-    else:
-        baseline = rows[0]["name"]
-    payload = {
-        "recorded_at": datetime.now(UTC).strftime("%Y-%m-%d %H:%M"),
-        "baseline": baseline,
-        "v1_constant_answer": jev._V1_CONSTANT_ANSWER,
-        "protocol": {
-            "opponents": list(opponents),
-            "both_colors": True,
-            "include_self_play": False,
-            "scoring": {"win": 1.0, "draw": 0.5, "loss": 0.0},
-            "notes": [
-                "カタログに 4 体は置かず、検証用の切替で 4 構成を同じ相手・同じ条件で対局した。",
-                "v1_constant は第 1 版の min-max 正規化と優先係数で、Jev の答えを 0.5 に固定した。",
-                "v2_jev0 は現行の固定 scales 評価だけで、Jev 項は 0。",
-                "v2_code0 は現行合成のコード項を 0 にし、Jev の Choice だけ。",
-                "v2_as_is は prompts/jev.json の現行合成。",
-                "基準線はコードだけの構成のうち勝ち点（同点なら石差・勝数）が最も高いもの。",
-                "資格情報と課金が要る対局は CI に載せない。本スクリプトはホストで明示実行する。",
-            ],
-        },
-        "configs": rows,
-        "games": games,
-    }
-    args.output.write_text(
-        json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
-    )
-    print(f"wrote {args.output} baseline={baseline}", flush=True)
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    print(f"wrote {output} baseline={payload.get('baseline', '')}", flush=True)
     return 0
 
 
