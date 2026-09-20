@@ -1,7 +1,7 @@
 ---
 title: アーキテクチャ
 product: Reversi Agents
-version: 0.1.16
+version: 0.1.17
 status: working
 date: 2026-09-20
 source: docs/srs.md
@@ -16,7 +16,7 @@ tech_stack_version: 0.2.16
 | --- | --- |
 | 文書識別 | reversi-ai-architecture |
 | 対象ソフトウェア | Reversi Agents |
-| 版 | 0.1.16 |
+| 版 | 0.1.17 |
 | 状態 | 現行（設計。要求ではない） |
 | 日付 | 2026-09-20 |
 | 入力 | [`docs/srs.md`](srs.md) 0.1.24、[`docs/tech-stack.md`](tech-stack.md) 0.2.16 |
@@ -162,7 +162,7 @@ reversi-ai/
 │   │   │   ├── __init__.py
 │   │   │   ├── catalog.py             # 個体 ID・表示名・説明・カテゴリの登録
 │   │   │   ├── extra_genai.py         # data/config.toml から生成 AI 個体を足す
-│   │   │   ├── position_table.py      # FUN-025 の点数表。ミニマックスと定石外れが共有
+│   │   │   ├── position_table.py      # FUN-025 の点数表。ミニマックス・定石外れ・Jev の着手後葉が共有
 │   │   │   ├── random_uniform.py      # ランダム (一様)
 │   │   │   ├── most_flips.py          # ルールベース (最多取り)
 │   │   │   ├── positional.py          # ルールベース (位置評価)
@@ -173,7 +173,7 @@ reversi-ai/
 │   │   │   ├── rl.py                  # 強化学習 (自己対局)。線形重み。NN も OpenRouter も使わない
 │   │   │   ├── nn.py                  # ニューラルネットワーク (棋譜)。ONNX CPU
 │   │   │   ├── prompt.py              # prompts/ の Markdown と JSON を読む
-│   │   │   ├── jev.py                 # 生成 AI (Jev)。Decisions の原子質問を合成
+│   │   │   ├── jev.py                 # 生成 AI (Jev)。優先の答えと着手後評価を合成
 │   │   │   └── chat_completions.py    # 追加の生成 AI。Chat Completions の構造化出力
 │   │   ├── api/                       # 内部 FastAPI。ブラウザからは到達させない
 │   │   │   ├── __init__.py
@@ -208,7 +208,7 @@ reversi-ai/
 │   └── nn.onnx                        # NN 対局時の順伝播
 │
 ├── prompts/                           # 生成 AI の固定指示。戦略プロセスが対局時に読む
-│   ├── jev.json                       # 生成 AI (Jev) の原子質問と合成の重み
+│   ├── jev.json                       # 生成 AI (Jev) の優先質問と着手後評価の重み
 │   └── chat-completions.md            # 追加の生成 AI の Chat Completions 指示（構造化出力）
 │
 ├── e2e/                               # Playwright。対象はマシン上の Google Chrome
@@ -308,10 +308,10 @@ reversi-ai/
 | `rl.py` | 強化学習 (自己対局) | `models/rl.json`。NN 推論も OpenRouter も使わない |
 | `nn.py` | ニューラルネットワーク (棋譜) | `models/nn.onnx` を onnxruntime CPU で順伝播し、合法手へマスク |
 | `prompt.py` | （指示ファイル） | `prompts/` の Markdown と JSON を対局時に読む。欠落は継続不能 |
-| `jev.py` | 生成 AI (Jev) | `typesafe/jev-1.13` の Decisions API。1 着手 1 呼出しで 2 問以上の原子質問を送り、typed answers とコード特徴を合成する。指示は `prompts/jev.json`。合法手の外を採用しない |
+| `jev.py` | 生成 AI (Jev) | `typesafe/jev-1.13` の Decisions API。1 着手 1 呼出しで優先の原子質問を送り、typed answers とコードの着手後評価を合成する。指示は `prompts/jev.json`。合法手の外を採用しない |
 | `chat_completions.py` | 生成 AI (〈呼称〉) | 運用者が与えたテキスト生成モデル ID。固定の system は `prompts/chat-completions.md`。応答は JSON Schema を Pydantic で検証する |
 
-カテゴリ `random` は「ランダム」である。`position_table.py` は FUN-025 の点数表だけを持つ。`extra_genai.py` は `data/config.toml` を読む（対局者向けウィザードは置かない）。Jev は同一 `state` に対する 2 問以上の原子質問（Noul / Score / Choice）を 1 HTTP 呼出しで送り、`jev.py` がモデルの typed answers（noul 確率・score・choice の probabilities）と、コードが計算した特徴（角・X・C・辺、反転数、相手の着手可能数、角を渡すか）を `prompts/jev.json` の重みで合成して、合法手からちょうど 1 つ選ぶ。同点は a1…h8。反転数やリスト長は Jev に数えさせない。盤の読み方（`board[0][0]` が a1）は質問文ではなく `state` に置く。固定の質問文と重みは `prompts/jev.json` に置き、`strategy/src` には埋め込まない。JSON を変えてイメージを作り直すか、開発時の bind（`./prompts:/prompts`）を更新すると、次の着手呼出しからその指示を使う。Chat Completions の指示は散文なので `prompts/chat-completions.md` のままである。`prompts/` に JSON と Markdown が混在してよい。日本語の注釈は本節に置き、質問ファイルは JSONC にしない。
+カテゴリ `random` は「ランダム」である。`position_table.py` は FUN-025 の点数表だけを持つ。`extra_genai.py` は `data/config.toml` を読む（対局者向けウィザードは置かない）。Jev は同一 `state` に対する 2 問以上の原子質問（Noul / Score / Choice）を 1 HTTP 呼出しで送り、どの目標を優先するか（角・モビリティ・位置・石取り・段階）だけを答える。合法手の点数は `jev.py` が着手を適用したあとの盤から付ける（位置評価表の差、モビリティ、石差、角の差。切片は着手後 1 手であり、相手の応手は探索しない）。カタログのミニマックス個体の `choose_move` には委譲しない。`jev.py` が typed answers とこの着手後評価を `prompts/jev.json` の重みで合成して、合法手からちょうど 1 つ選ぶ。同点は a1…h8。打つマスの 1 手特徴（そのマスが角か、裏返し枚数か、直後に角を渡すか）だけを既定の点数にしない。着手後に何が起きるか・何枚裏返るか・どのマスが最善かをモデルに問わない。1 本の「最善手はどれ」Choice を既定にしない。反転数やリスト長は Jev に数えさせない。盤の読み方（`board[0][0]` が a1）は質問文ではなく `state` に置く。固定の質問文と重みは `prompts/jev.json` に置き、`strategy/src` には埋め込まない。JSON を変えてイメージを作り直すか、開発時の bind（`./prompts:/prompts`）を更新すると、次の着手呼出しからその指示を使う。Chat Completions の指示は散文なので `prompts/chat-completions.md` のままである。`prompts/` に JSON と Markdown が混在してよい。日本語の注釈は本節に置き、質問ファイルは JSONC にしない。
 
 ### 4.5 `strategy` — `reversi.api`
 
@@ -412,7 +412,8 @@ web コンテナが Pod 内で `0.0.0.0:3000` を聞くのはよい。戦略コ�
 
 | 版 | 日付 | 内容 |
 | --- | --- | --- |
-| 0.1.16 | 2026-09-20 | `history.md` に世代の変更点と順位推移を書く |
+| 0.1.17 | 2026-09-20 | `history.md` に世代の変更点と順位推移を書く |
+| 0.1.16 | 2026-09-20 | Jev は優先を答え、着手後の盤の点数はコードが付けて合成する |
 | 0.1.15 | 2026-09-20 | 総当たりの過去正本を `benchmarks/archive/` に残し、勝ち点推移を `history.md` とする |
 | 0.1.14 | 2026-09-20 | 対局の `up` は `web` と `strategy` を明示し、`train` を載せない |
 | 0.1.13 | 2026-09-20 | 運用コマンド列の正を README へ委譲し、第 8 節は待ち受けと `CMD` と `train` を `up` に載せないことに限る |

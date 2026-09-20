@@ -4,9 +4,9 @@
   "questions": {
     "corner_priority": {
       "type": "noul",
-      "instructions": "Should the side to move prioritize occupying a corner this turn?",
+      "instructions": "Should the side to move prioritize occupying corners as a goal this turn?",
       "criteria": {
-        "true": "A corner is available, or taking a corner is the right strategic priority now.",
+        "true": "Corners are the right strategic priority now.",
         "false": "Corners are not the right priority this turn."
       }
     },
@@ -18,12 +18,12 @@
         "false": "Occupying strong squares or taking discs matters more than options this turn."
       }
     },
-    "corner_danger": {
+    "position_priority": {
       "type": "noul",
-      "instructions": "Is there a serious risk of giving the opponent a corner this turn?",
+      "instructions": "Should the side to move prioritize valuable square control this turn?",
       "criteria": {
-        "true": "A careless move would likely hand the opponent a corner.",
-        "false": "The opponent is unlikely to take a corner after this move."
+        "true": "Occupying valuable squares is the right priority now.",
+        "false": "Square control is not the main priority this turn."
       }
     },
     "material_importance": {
@@ -49,22 +49,34 @@
     "answers": {
       "corner_priority": 2.0,
       "mobility_priority": 1.5,
-      "corner_danger": 2.0,
-      "material_importance": 1.0
+      "position_priority": 1.5,
+      "material_importance": 1.2
     },
-    "features": {
-      "corner": 4.0,
-      "x_square": -3.0,
-      "c_square": -1.0,
-      "edge": 0.4,
-      "flips": 0.8,
+    "metrics": {
+      "position": 2.0,
       "mobility": 1.5,
-      "gives_corner": -4.0
+      "material": 1.0,
+      "corners": 2.5
     },
     "stage": {
-      "opening": { "mobility": 1.4, "flips": 0.4, "corner": 1.0 },
-      "midgame": { "mobility": 1.0, "flips": 0.8, "corner": 1.3 },
-      "endgame": { "mobility": 0.4, "flips": 1.5, "corner": 1.0 }
+      "opening": {
+        "position": 1.0,
+        "mobility": 1.4,
+        "material": 0.3,
+        "corners": 0.8
+      },
+      "midgame": {
+        "position": 1.2,
+        "mobility": 1.0,
+        "material": 0.6,
+        "corners": 1.4
+      },
+      "endgame": {
+        "position": 0.6,
+        "mobility": 0.3,
+        "material": 1.8,
+        "corners": 0.5
+      }
     }
   }
 }

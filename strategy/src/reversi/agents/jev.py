@@ -1,4 +1,4 @@
-"""OpenRouter の Jev で合法手を選ぶ個体。Decisions API の原子質問を合成する。"""
+"""OpenRouter の Jev で合法手を選ぶ個体。優先の答えと着手後評価を合成する。"""
 
 from __future__ import annotations
 
@@ -12,17 +12,19 @@ from typing import Any
 from openrouter import OpenRouter
 from openrouter.utils.retries import BackoffStrategy, RetryConfig
 
+from reversi.agents.position_table import score_at
 from reversi.agents.prompt import PROMPTS_DIR, PromptFileError, load_json
-from reversi.engine.board import BOARD_SIZE, Board, Square, Stone
-from reversi.engine.rules import Place, Position, apply_place, flips_for, legal_places
+from reversi.engine.board import BOARD_SIZE, Board, Color, Square, all_squares
+from reversi.engine.rules import Place, Position, apply_place, legal_places
 
 MODEL_ID = "typesafe/jev-1.13"
 SPECIMEN_ID = "jev"
 CATEGORY = "generative_ai"
 DISPLAY_NAME = "生成 AI (Jev)"
 DESCRIPTION = (
-    "OpenRouter 上の Jev を Decisions API で呼び、原子質問と盤の特徴を合成して"
-    "合法手から着手を選ぶ。対局中に WTHOR は参照しない。"
+    "OpenRouter 上の Jev を Decisions API で呼び、どの目標を優先するかを"
+    "原子質問で答えさせ、着手後の盤の点数はコードが付けて合成する。"
+    "対局中に WTHOR は参照しない。"
 )
 DECISIONS_SERVER = "https://openrouter.ai"
 SECRET_PATH = Path("/run/secrets/openrouter-api-key")
@@ -30,39 +32,20 @@ PROMPT_PATH = PROMPTS_DIR / "jev.json"
 # Hono の戦略中継は 60 秒。それより先に失敗させ、ロックを返す。
 DECISIONS_TIMEOUT_MS = 55_000
 _NO_RETRY = RetryConfig("none", BackoffStrategy(0, 0, 1.0, 0), False)
-_NOUL_IDS = ("corner_priority", "mobility_priority", "corner_danger")
+_NOUL_IDS = ("corner_priority", "mobility_priority", "position_priority")
 _SCORE_ID = "material_importance"
 _STAGE_ID = "stage"
 _STAGE_KEYS = ("opening", "midgame", "endgame")
-_STAGE_FEATURES = ("corner", "flips", "mobility")
-_FEATURE_KEYS = (
-    "corner",
-    "x_square",
-    "c_square",
-    "edge",
-    "flips",
-    "mobility",
-    "gives_corner",
-)
+_METRIC_KEYS = ("position", "mobility", "material", "corners")
+_METRIC_ANSWERS = {
+    "position": "position_priority",
+    "mobility": "mobility_priority",
+    "material": _SCORE_ID,
+    "corners": "corner_priority",
+}
 _CORNERS = frozenset(
     {Square.parse(name) for name in ("a1", "h1", "a8", "h8")}
 )
-_X_SQUARES = {
-    Square.parse("b2"): Square.parse("a1"),
-    Square.parse("g2"): Square.parse("h1"),
-    Square.parse("b7"): Square.parse("a8"),
-    Square.parse("g7"): Square.parse("h8"),
-}
-_C_SQUARES = {
-    Square.parse("a2"): Square.parse("a1"),
-    Square.parse("b1"): Square.parse("a1"),
-    Square.parse("g1"): Square.parse("h1"),
-    Square.parse("h2"): Square.parse("h1"),
-    Square.parse("a7"): Square.parse("a8"),
-    Square.parse("b8"): Square.parse("a8"),
-    Square.parse("g8"): Square.parse("h8"),
-    Square.parse("h7"): Square.parse("h8"),
-}
 
 __all__ = [
     "CATEGORY",
@@ -90,7 +73,7 @@ class _Spec:
     origin: str
     questions: dict[str, Any]
     answer_weights: dict[str, float]
-    feature_weights: dict[str, float]
+    metric_weights: dict[str, float]
     stage_weights: dict[str, dict[str, float]]
     score_span: float
 
@@ -103,14 +86,11 @@ class _Parsed:
 
 
 @dataclass(frozen=True, slots=True)
-class _Features:
-    corner: float
-    x_square: float
-    c_square: float
-    edge: float
-    flips: float
+class _Metrics:
+    position: float
     mobility: float
-    gives_corner: float
+    material: float
+    corners: float
 
 
 def read_secret(path: Path | None = None) -> str:
@@ -208,7 +188,7 @@ def _load_spec(path: Path | None = None) -> _Spec:
     expected = {
         "corner_priority": "noul",
         "mobility_priority": "noul",
-        "corner_danger": "noul",
+        "position_priority": "noul",
         _SCORE_ID: "score",
         _STAGE_ID: "choice",
     }
@@ -220,12 +200,12 @@ def _load_spec(path: Path | None = None) -> _Spec:
     }
     weights = _mapping_field(loaded, "weights")
     answers = _float_map(_mapping_field(weights, "answers"), _NOUL_IDS + (_SCORE_ID,))
-    features = _float_map(_mapping_field(weights, "features"), _FEATURE_KEYS)
+    metrics = _float_map(_mapping_field(weights, "metrics"), _METRIC_KEYS)
     stage_raw = _mapping_field(weights, "stage")
     if set(stage_raw) != set(_STAGE_KEYS):
         raise _fail_spec()
     stage = {
-        name: _float_map(_mapping_field(stage_raw, name), _STAGE_FEATURES)
+        name: _float_map(_mapping_field(stage_raw, name), _METRIC_KEYS)
         for name in _STAGE_KEYS
     }
     criteria = questions[_SCORE_ID]["criteria"]
@@ -234,7 +214,7 @@ def _load_spec(path: Path | None = None) -> _Spec:
         origin=_text_field(loaded, "origin"),
         questions=questions,
         answer_weights=answers,
-        feature_weights=features,
+        metric_weights=metrics,
         stage_weights=stage,
         score_span=float(len(criteria) - 1),
     )
@@ -341,90 +321,87 @@ def _normalize(raw: Mapping[Square, float]) -> dict[Square, float]:
     return {square: (value - lo) / span for square, value in raw.items()}
 
 
-def _danger_flag(
-    square: Square, table: Mapping[Square, Square], board: Board
-) -> float:
-    corner = table.get(square)
-    if corner is None:
-        return 0.0
-    if board.stone_at(corner) is not Stone.EMPTY:
-        return 0.0
-    return 1.0
+def _board_totals(board: Board, color: Color) -> tuple[float, float, float]:
+    own = color.stone
+    opponent = color.opponent.stone
+    position = 0.0
+    material = 0.0
+    corners = 0.0
+    for square in all_squares():
+        stone = board.stone_at(square)
+        if stone is own:
+            sign = 1.0
+        elif stone is opponent:
+            sign = -1.0
+        else:
+            continue
+        position += sign * float(score_at(square))
+        material += sign
+        if square in _CORNERS:
+            corners += sign
+    return position, material, corners
 
 
-def _place_features(position: Position, places: Sequence[Square]) -> dict[Square, _Features]:
+def _after_metrics(position: Position, places: Sequence[Square]) -> dict[Square, _Metrics]:
     color = position.side_to_move
-    flips: dict[Square, float] = {}
-    mobility: dict[Square, float] = {}
-    extras: dict[Square, tuple[float, float, float, float, float]] = {}
+    position_raw: dict[Square, float] = {}
+    mobility_raw: dict[Square, float] = {}
+    material_raw: dict[Square, float] = {}
+    corners_raw: dict[Square, float] = {}
     for square in places:
-        flipped = flips_for(position.board, square, color)
-        flips[square] = float(len(flipped))
         after = apply_place(position.board, square, color)
+        own_places = legal_places(Position(after, color))
         opp_places = legal_places(Position(after, color.opponent))
-        mobility[square] = float(len(opp_places))
-        gives = 1.0 if any(item in _CORNERS for item in opp_places) else 0.0
-        is_corner = 1.0 if square in _CORNERS else 0.0
-        is_edge = 1.0 if (square.file in (0, 7) or square.rank in (0, 7)) and not is_corner else 0.0
-        extras[square] = (
-            is_corner,
-            _danger_flag(square, _X_SQUARES, position.board),
-            _danger_flag(square, _C_SQUARES, position.board),
-            is_edge,
-            gives,
+        pos, material, corners = _board_totals(after, color)
+        position_raw[square] = pos
+        mobility_raw[square] = float(len(own_places) - len(opp_places))
+        material_raw[square] = material
+        corners_raw[square] = corners
+    position_n = _normalize(position_raw)
+    mobility_n = _normalize(mobility_raw)
+    material_n = _normalize(material_raw)
+    corners_n = _normalize(corners_raw)
+    return {
+        square: _Metrics(
+            position=position_n[square],
+            mobility=mobility_n[square],
+            material=material_n[square],
+            corners=corners_n[square],
         )
-    flips_n = _normalize(flips)
-    mobility_n = _normalize(mobility)
-    scored: dict[Square, _Features] = {}
-    for square in places:
-        corner, x_square, c_square, edge, gives = extras[square]
-        scored[square] = _Features(
-            corner=corner,
-            x_square=x_square,
-            c_square=c_square,
-            edge=edge,
-            flips=flips_n[square],
-            mobility=1.0 - mobility_n[square],
-            gives_corner=gives,
-        )
-    return scored
+        for square in places
+    }
 
 
 def _stage_mix(parsed: _Parsed, spec: _Spec) -> dict[str, float]:
-    mixed = dict.fromkeys(_STAGE_FEATURES, 0.0)
+    mixed = dict.fromkeys(_METRIC_KEYS, 0.0)
     for name, share in parsed.stage.items():
         row = spec.stage_weights[name]
-        for key in _STAGE_FEATURES:
+        for key in _METRIC_KEYS:
             mixed[key] += share * row[key]
     return mixed
 
 
-def _score_square(
-    features: _Features, parsed: _Parsed, spec: _Spec, stage: Mapping[str, float]
+def _answer_factor(parsed: _Parsed, spec: _Spec, metric: str) -> float:
+    qid = _METRIC_ANSWERS[metric]
+    if qid == _SCORE_ID:
+        value = parsed.material
+    else:
+        value = parsed.noul[qid]
+    return 1.0 + spec.answer_weights[qid] * value
+
+
+def _score_metrics(
+    metrics: _Metrics, parsed: _Parsed, spec: _Spec, stage: Mapping[str, float]
 ) -> float:
-    ans = spec.answer_weights
-    feat = spec.feature_weights
-    noul = parsed.noul
-    return (
-        feat["corner"]
-        * features.corner
-        * stage["corner"]
-        * (1.0 + ans["corner_priority"] * noul["corner_priority"])
-        + feat["x_square"] * features.x_square
-        + feat["c_square"] * features.c_square
-        + feat["edge"] * features.edge
-        + feat["flips"]
-        * features.flips
-        * stage["flips"]
-        * (1.0 + ans["material_importance"] * parsed.material)
-        + feat["mobility"]
-        * features.mobility
-        * stage["mobility"]
-        * (1.0 + ans["mobility_priority"] * noul["mobility_priority"])
-        + feat["gives_corner"]
-        * features.gives_corner
-        * (1.0 + ans["corner_danger"] * noul["corner_danger"])
-    )
+    total = 0.0
+    for key in _METRIC_KEYS:
+        total += (
+            spec.metric_weights[key]
+            * getattr(metrics, key)
+            * stage[key]
+            * _answer_factor(parsed, spec, key)
+        )
+    return total
 
 
 def _select_square(
@@ -433,12 +410,12 @@ def _select_square(
     parsed: _Parsed,
     spec: _Spec,
 ) -> Square:
-    features = _place_features(position, places)
+    metrics = _after_metrics(position, places)
     stage = _stage_mix(parsed, spec)
     best_square = places[0]
-    best_score = _score_square(features[best_square], parsed, spec, stage)
+    best_score = _score_metrics(metrics[best_square], parsed, spec, stage)
     for square in places[1:]:
-        score = _score_square(features[square], parsed, spec, stage)
+        score = _score_metrics(metrics[square], parsed, spec, stage)
         if score > best_score:
             best_score = score
             best_square = square
