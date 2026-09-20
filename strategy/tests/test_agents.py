@@ -436,12 +436,11 @@ def test_jev_picks_legal_place_from_decisions_double(
         return legal[1]
 
     monkeypatch.setattr(jev, "_call_openrouter", pick_second)
-    with jev.stage1_config("v2_as_is"):
-        move = jev.choose_move(position)
-        assert move == Place(places[1])
-        assert move.square in places
-        via_catalog = catalog_choose(jev.SPECIMEN_ID, position)
-        assert via_catalog == move
+    move = jev.choose_move(position)
+    assert move == Place(places[1])
+    assert move.square in places
+    via_catalog = catalog_choose(jev.SPECIMEN_ID, position)
+    assert via_catalog == move
 
 
 def test_jev_does_not_adopt_place_outside_legal_set(
@@ -456,11 +455,10 @@ def test_jev_does_not_adopt_place_outside_legal_set(
         return illegal
 
     monkeypatch.setattr(jev, "_call_openrouter", pick_illegal)
-    with jev.stage1_config("v2_as_is"):
-        with pytest.raises(jev.ExternalModelError, match="合法手"):
-            jev.choose_move(position)
-        with pytest.raises(jev.ExternalModelError):
-            catalog_choose(jev.SPECIMEN_ID, position)
+    with pytest.raises(jev.ExternalModelError, match="合法手"):
+        jev.choose_move(position)
+    with pytest.raises(jev.ExternalModelError):
+        catalog_choose(jev.SPECIMEN_ID, position)
 
 
 def test_jev_call_failure_is_unplayable_not_a_legal_fallback(
@@ -472,9 +470,7 @@ def test_jev_call_failure_is_unplayable_not_a_legal_fallback(
         raise jev.ExternalModelError("試験用の失敗")
 
     monkeypatch.setattr(jev, "_call_openrouter", boom)
-    with jev.stage1_config("v2_as_is"), pytest.raises(
-        jev.ExternalModelError, match="失敗"
-    ):
+    with pytest.raises(jev.ExternalModelError, match="失敗"):
         jev.choose_move(position)
 
 
@@ -537,18 +533,164 @@ def test_jev_source_uses_jev_model_and_skips_wthor() -> None:
 
 
 def _jev_parsed(
+    *,
+    corner: float = 0.0,
+    mobility: float = 0.0,
+    position: float = 0.0,
+    material: float = 0.0,
+    stage: str = "midgame",
+) -> jev._Parsed:
+    return jev._Parsed(
+        noul={
+            "corner_priority": corner,
+            "mobility_priority": mobility,
+            "position_priority": position,
+        },
+        material=material,
+        stage={
+            key: 1.0 if key == stage else 0.0
+            for key in ("opening", "midgame", "endgame")
+        },
+    )
+
+
+def _jev_choice_parsed(
     places: Sequence[Square],
     *,
     focused: str | None = None,
     confidence: float = 1.0,
-) -> jev._Parsed:
+) -> jev._ChoiceParsed:
     keys = [square.algebraic for square in places]
     if focused is None:
         each = 1.0 / float(len(keys))
         probabilities = dict.fromkeys(keys, each)
     else:
         probabilities = {key: 1.0 if key == focused else 0.0 for key in keys}
-    return jev._Parsed(probabilities=probabilities, confidence=confidence)
+    return jev._ChoiceParsed(probabilities=probabilities, confidence=confidence)
+
+
+def _disc_diff_after(position: Position, square: Square) -> int:
+    after = apply_place(position.board, square, position.side_to_move)
+    own = position.side_to_move.stone
+    opp = position.side_to_move.opponent.stone
+    total = 0
+    for cell in all_squares():
+        stone = after.stone_at(cell)
+        if stone is own:
+            total += 1
+        elif stone is opp:
+            total -= 1
+    return total
+
+
+def test_jev_combines_typed_answers_into_legal_place() -> None:
+    position = initial_position()
+    places = legal_places(position)
+    spec = jev._load_spec()
+    assert len(spec.questions) >= 2
+    parsed = _jev_parsed(
+        corner=0.2, mobility=0.5, position=0.1, material=0.4, stage="opening"
+    )
+    square = jev._select_square(position, places, parsed, spec)
+    assert square in places
+    assert square == places[0]
+    assert square == Square.parse("d3")
+
+
+def test_jev_composite_prefers_corner_when_priority_is_high() -> None:
+    position = _position_from_rank8_rows(_CORNER_VS_TWO_FLIPS, Color.BLACK)
+    places = legal_places(position)
+    assert Square.parse("a1") in places
+    spec = jev._load_spec()
+    parsed = _jev_parsed(corner=1.0, stage="midgame")
+    square = jev._select_square(position, places, parsed, spec)
+    assert square == Square.parse("a1")
+    assert square in places
+    after_a1 = apply_place(position.board, Square.parse("a1"), Color.BLACK)
+    after_d2 = apply_place(position.board, Square.parse("d2"), Color.BLACK)
+    assert after_a1.stone_at(Square.parse("a1")) is Stone.BLACK
+    assert after_d2.stone_at(Square.parse("a1")) is Stone.EMPTY
+
+
+def test_jev_material_priority_picks_post_move_disc_lead() -> None:
+    position = _position_from_rank8_rows(_CORNER_VS_TWO_FLIPS, Color.BLACK)
+    places = legal_places(position)
+    a1 = Square.parse("a1")
+    d2 = Square.parse("d2")
+    assert a1 in places and d2 in places
+    assert _disc_diff_after(position, d2) > _disc_diff_after(position, a1)
+    spec = jev._load_spec()
+    square = jev._select_square(
+        position, places, _jev_parsed(material=1.0, stage="endgame"), spec
+    )
+    assert square == d2
+    assert square in places
+
+
+def test_jev_selection_depends_on_post_move_evaluation() -> None:
+    position = _position_from_rank8_rows(_CORNER_VS_TWO_FLIPS, Color.BLACK)
+    places = legal_places(position)
+    spec = jev._load_spec()
+    corner = jev._select_square(position, places, _jev_parsed(corner=1.0), spec)
+    material = jev._select_square(
+        position, places, _jev_parsed(material=1.0, stage="endgame"), spec
+    )
+    assert corner == Square.parse("a1")
+    assert material == Square.parse("d2")
+    assert corner != material
+    metrics = jev._after_metrics(position, places)
+    assert metrics[corner].corners > metrics[material].corners
+    assert metrics[material].material > metrics[corner].material
+    one_ply = {
+        square: (
+            1.0 if square in jev._CORNERS else 0.0,
+            float(len(flips_for(position.board, square, Color.BLACK))),
+        )
+        for square in places
+    }
+    assert one_ply[corner][0] == 1.0
+    assert one_ply[material][1] > one_ply[corner][1]
+
+
+def test_jev_questions_do_not_scale_with_legal_places() -> None:
+    spec = jev._load_spec()
+    opening = legal_places(initial_position())
+    white_only = Position(_almost_full_white_with_black_on_b1().board, Color.WHITE)
+    one = legal_places(white_only)
+    assert len(opening) >= 2
+    assert len(one) == 1
+    assert len(spec.questions) >= 2
+    names = set(spec.questions)
+    assert names.isdisjoint(square.algebraic for square in opening)
+    assert names.isdisjoint(square.algebraic for square in one)
+    assert "move" not in names
+    opening_state = jev._board_state(initial_position(), opening, spec)
+    one_state = jev._board_state(white_only, one, spec)
+    assert set(opening_state.keys()) == set(one_state.keys())
+
+
+def test_jev_rejects_out_of_range_stage_probabilities() -> None:
+    spec = jev._load_spec()
+    answers = {
+        "corner_priority": {"noul": 0.2},
+        "mobility_priority": {"noul": 0.4},
+        "position_priority": {"noul": 0.1},
+        "material_importance": {"score": 1.0},
+        "stage": {
+            "type": "choice",
+            "choice": "opening",
+            "probabilities": {"opening": -0.5, "midgame": 0.5, "endgame": 1.0},
+        },
+    }
+    with pytest.raises(jev.ExternalModelError, match="合成できません"):
+        jev._answers_from_response(SimpleNamespace(answers=answers), spec)
+    answers["stage"] = {
+        "type": "choice",
+        "choice": "opening",
+        "probabilities": {"opening": 1.5, "midgame": 0.0, "endgame": 0.0},
+    }
+    with pytest.raises(jev.ExternalModelError, match="合成できません"):
+        jev._answers_from_response(SimpleNamespace(answers=answers), spec)
 
 
 def test_jev_combines_choice_and_code_into_legal_place() -> None:
@@ -556,7 +698,7 @@ def test_jev_combines_choice_and_code_into_legal_place() -> None:
     places = legal_places(position)
     spec = jev._load_spec()
     assert spec.question_id
-    parsed = _jev_parsed(places)
+    parsed = _jev_choice_parsed(places)
     square = jev._select_square(position, places, parsed, spec)
     assert square in places
     assert square == places[0]
@@ -574,10 +716,10 @@ def test_jev_margin_zero_matches_code_best_despite_fake_choice() -> None:
     focused = places[1].algebraic
     assert focused != code_best.algebraic
     square = jev._select_square(
-        position, places, _jev_parsed(places, focused=focused), spec
+        position, places, _jev_choice_parsed(places, focused=focused), spec
     )
     assert square == code_best
-    again = jev._select_square(position, places, _jev_parsed(places), spec)
+    again = jev._select_square(position, places, _jev_choice_parsed(places), spec)
     assert again == code_best == Square.parse("d3")
 
 
@@ -611,12 +753,12 @@ def test_jev_low_confidence_returns_code_best() -> None:
     _best, shortlist = jev._shortlist(places, scores, spec)
     other = next(square for square in shortlist if square != code_best)
     high = jev._select_square(
-        position, places, _jev_parsed(places, focused=other.algebraic), spec
+        position, places, _jev_choice_parsed(places, focused=other.algebraic), spec
     )
     low = jev._select_square(
         position,
         places,
-        _jev_parsed(places, focused=other.algebraic, confidence=0.0),
+        _jev_choice_parsed(places, focused=other.algebraic, confidence=0.0),
         spec,
     )
     assert high == other
@@ -646,7 +788,7 @@ def test_jev_choice_probability_on_corner_picks_that_square() -> None:
     places = legal_places(position)
     assert Square.parse("a1") in places
     spec = jev._load_spec()
-    parsed = _jev_parsed(places, focused="a1")
+    parsed = _jev_choice_parsed(places, focused="a1")
     square = jev._select_square(position, places, parsed, spec)
     assert square == Square.parse("a1")
     assert square in places
@@ -669,9 +811,9 @@ def test_jev_choice_outside_shortlist_does_not_override_code_best() -> None:
     _best, shortlist = jev._shortlist(places, scores, spec)
     assert a1 in shortlist
     assert d2 not in shortlist
-    even = jev._select_square(position, places, _jev_parsed(places), spec)
+    even = jev._select_square(position, places, _jev_choice_parsed(places), spec)
     focused = jev._select_square(
-        position, places, _jev_parsed(places, focused="d2"), spec
+        position, places, _jev_choice_parsed(places, focused="d2"), spec
     )
     assert even == a1
     assert focused == a1
@@ -760,8 +902,7 @@ def test_jev_does_not_delegate_to_minimax_choose_move(
     monkeypatch.setattr(jev, "_call_openrouter", lambda _position, legal: legal[0])
     position = initial_position()
     places = legal_places(position)
-    with jev.stage1_config("v2_as_is"):
-        move = jev.choose_move(position)
+    move = jev.choose_move(position)
     assert move == Place(places[0])
     assert called["n"] == 0
 
@@ -852,7 +993,7 @@ def test_jev_same_position_and_parsed_answers_repeat_the_square() -> None:
     position = initial_position()
     places = legal_places(position)
     spec = jev._load_spec()
-    parsed = _jev_parsed(places, focused=places[1].algebraic)
+    parsed = _jev_choice_parsed(places, focused=places[1].algebraic)
     first = jev._select_square(position, places, parsed, spec)
     second = jev._select_square(position, places, parsed, spec)
     assert first == second
@@ -871,7 +1012,7 @@ def test_jev_logs_candidate_code_probability_and_selection(
     position = initial_position()
     places = legal_places(position)
     spec = jev._load_spec()
-    parsed = _jev_parsed(places, focused=places[1].algebraic)
+    parsed = _jev_choice_parsed(places, focused=places[1].algebraic)
     square = jev._select_square(position, places, parsed, spec)
     err = capsys.readouterr().err
     lines = [line for line in err.splitlines() if line.startswith("jev candidate ")]
@@ -913,10 +1054,10 @@ def test_jev_stage1_configs_switch_without_adding_catalog_names(
         even = jev.choose_move(position)
         focused_spec = jev._spec_for_config(jev._load_spec(), "v2_jev0")
         even_sel = jev._select_square(
-            position, places, _jev_parsed(places), focused_spec
+            position, places, _jev_choice_parsed(places), focused_spec
         )
         d2_sel = jev._select_square(
-            position, places, _jev_parsed(places, focused="d2"), focused_spec
+            position, places, _jev_choice_parsed(places, focused="d2"), focused_spec
         )
     assert even is not None
     assert even.square == even_sel == d2_sel == a1
@@ -939,14 +1080,18 @@ def test_jev_stage1_configs_switch_without_adding_catalog_names(
     assert as_is.shortlist_size == spec.shortlist_size
     assert as_is.margin == spec.margin
     assert (
-        jev._select_square(position, places, _jev_parsed(places, focused="d2"), code0)
+        jev._select_square(
+            position, places, _jev_choice_parsed(places, focused="d2"), code0
+        )
         == d2
     )
     assert (
-        jev._select_square(position, places, _jev_parsed(places, focused="d2"), as_is)
+        jev._select_square(
+            position, places, _jev_choice_parsed(places, focused="d2"), as_is
+        )
         == a1
     )
-    assert jev._select_square(position, places, _jev_parsed(places), as_is) == a1
+    assert jev._select_square(position, places, _jev_choice_parsed(places), as_is) == a1
 
     names = [item.display_name for item in items()]
     assert names.count("生成 AI (Jev)") == 1
@@ -1145,7 +1290,7 @@ def test_jev_stage4_margin_zero_matches_code_best_on_recorded_positions() -> Non
         places = legal_places(position)
         focused = places[-1].algebraic
         chosen = jev._select_square(
-            position, places, _jev_parsed(places, focused=focused), spec
+            position, places, _jev_choice_parsed(places, focused=focused), spec
         )
         stage = jev._stage_of(position.board, spec)
         metrics = jev._after_metrics(position, places, spec)
@@ -1184,21 +1329,17 @@ def test_jev_stage5_record_has_paired_acceptance() -> None:
         assert spec["selection"]["shortlist_size"] == chosen["shortlist_size"]
         assert spec["selection"]["margin"] == chosen["margin"]
         assert spec["selection"]["confidence_threshold"] == chosen["confidence_threshold"]
-        assert jev.DEFAULT_STAGE1_CONFIG == "v2_as_is"
     else:
         assert data.get("return_to_stage3_and_4") is True
         assert data.get("catalog_policy") == "code_only_v2_jev0"
-        assert jev.DEFAULT_STAGE1_CONFIG == "v2_jev0"
+    assert jev.DEFAULT_STAGE1_CONFIG not in jev.STAGE1_CODE_ONLY
+    assert jev.DEFAULT_STAGE1_CONFIG == "v1_priority"
     assert [item.display_name for item in items()].count("生成 AI (Jev)") == 1
 
 
-def test_jev_catalog_default_follows_stage5_acceptance(
+def test_jev_catalog_default_calls_openrouter(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    root = Path(__file__).resolve().parents[2] / "docs" / "benchmarks"
-    records = sorted(root.glob("jev-stage5*.json"))
-    assert records, "段階 5 の対局記録 JSON が docs/benchmarks/ に無い"
-    data = json.loads(records[-1].read_text(encoding="utf-8"))
     called = {"n": 0}
 
     def spy(_position, legal):
@@ -1211,11 +1352,8 @@ def test_jev_catalog_default_follows_stage5_acceptance(
     via_catalog = catalog_choose(jev.SPECIMEN_ID, position)
     assert move is not None
     assert via_catalog == move
-    if data["accepted"]:
-        assert called["n"] >= 1
-    else:
-        assert called["n"] == 0
-        assert jev.DEFAULT_STAGE1_CONFIG in jev.STAGE1_CODE_ONLY
+    assert called["n"] >= 1
+    assert jev.DEFAULT_STAGE1_CONFIG not in jev.STAGE1_CODE_ONLY
 
 
 def test_jev_gives_corner_newly_does_not_mark_all_when_opponent_already_has_corner() -> None:
