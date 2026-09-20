@@ -112,7 +112,7 @@
 
 オフライン 18 局面で見えた微小な平均損失差（19.44 対 20.06）は対局に一般化しなかった。段階 5 は不採用であり、カタログ既定をコード最善（`v2_jev0`）にした。
 
-この既定は、カテゴリが生成 AI である個体は OpenRouter への呼出しによって合法手を選ばなければならない [SRS-FUN-021](../srs.md#srs-fun-021) と、カタログの「生成 AI (Jev)」が `typesafe/jev-1.13` を呼び出さなければならない [SRS-FUN-022](../srs.md#srs-fun-022) と衝突する。shall の変更は本レポートの範囲外である。戻す作業は [#107](https://github.com/gnkm/reversi-ai/issues/107)。
+この既定は、カテゴリが生成 AI である個体は OpenRouter への呼出しによって合法手を選ばなければならない [SRS-FUN-021](../srs.md#srs-fun-021-生成-ai-カテゴリ) と、カタログの「生成 AI (Jev)」が `typesafe/jev-1.13` を呼び出さなければならない [SRS-FUN-022](../srs.md#srs-fun-022-生成-ai-jev) と衝突する。shall の変更は本レポートの範囲外である。戻す作業は [#107](https://github.com/gnkm/reversi-ai/issues/107)。
 
 ## 横断の知見
 
