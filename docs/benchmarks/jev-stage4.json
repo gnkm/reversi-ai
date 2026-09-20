@@ -1,0 +1,2364 @@
+{
+  "recorded_at": "2026-09-20 14:56",
+  "protocol": {
+    "positions": 18,
+    "search_depth": 4,
+    "exact_empty": 8,
+    "blunder_loss": 50,
+    "label": "alphabeta",
+    "wthor": false,
+    "source": "jev-stage2.json",
+    "grid": {
+      "shortlist_size": [
+        2,
+        3,
+        4,
+        5
+      ],
+      "margin": [
+        0.0,
+        0.25,
+        0.5,
+        1.0,
+        2.0
+      ],
+      "confidence_threshold": [
+        0.0,
+        0.3,
+        0.5,
+        0.8,
+        1.0
+      ]
+    },
+    "notes": [
+      "局面集合は段階 2 の 18 局面。正解は手元の αβ（深さ 4。空きマスが 8 以下なら終局まで）。",
+      "margin = 0 はコード最善と同じ手を選ぶ基準線。ここから shortlist_size / margin / confidence_threshold を振る。",
+      "平均損失が基準線より小さい格子点があれば 1 組を指名する。無ければ段階 3 へ戻る。",
+      "オフラインの差は探索損失であり、対局の勝率の有意差ではない。",
+      "プロンプト文言は変えていない。資格情報と課金が要る呼出しは CI に載せない。"
+    ]
+  },
+  "baseline_mean_loss": 20.055555555555557,
+  "margin_zero_mean_loss": 20.055555555555557,
+  "grid": [
+    {
+      "shortlist_size": 2,
+      "margin": 0.0,
+      "confidence_threshold": 0.0,
+      "n": 18,
+      "asked": 0,
+      "match_rate": 0.5,
+      "mean_loss": 20.055555555555557,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 2,
+      "margin": 0.0,
+      "confidence_threshold": 0.3,
+      "n": 18,
+      "asked": 0,
+      "match_rate": 0.5,
+      "mean_loss": 20.055555555555557,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 2,
+      "margin": 0.0,
+      "confidence_threshold": 0.5,
+      "n": 18,
+      "asked": 0,
+      "match_rate": 0.5,
+      "mean_loss": 20.055555555555557,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 2,
+      "margin": 0.0,
+      "confidence_threshold": 0.8,
+      "n": 18,
+      "asked": 0,
+      "match_rate": 0.5,
+      "mean_loss": 20.055555555555557,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 2,
+      "margin": 0.0,
+      "confidence_threshold": 1.0,
+      "n": 18,
+      "asked": 0,
+      "match_rate": 0.5,
+      "mean_loss": 20.055555555555557,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 2,
+      "margin": 0.25,
+      "confidence_threshold": 0.0,
+      "n": 18,
+      "asked": 8,
+      "match_rate": 0.4444444444444444,
+      "mean_loss": 20.166666666666668,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 2,
+      "margin": 0.25,
+      "confidence_threshold": 0.3,
+      "n": 18,
+      "asked": 8,
+      "match_rate": 0.5,
+      "mean_loss": 20.055555555555557,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 2,
+      "margin": 0.25,
+      "confidence_threshold": 0.5,
+      "n": 18,
+      "asked": 8,
+      "match_rate": 0.5,
+      "mean_loss": 20.055555555555557,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 2,
+      "margin": 0.25,
+      "confidence_threshold": 0.8,
+      "n": 18,
+      "asked": 8,
+      "match_rate": 0.5,
+      "mean_loss": 20.055555555555557,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 2,
+      "margin": 0.25,
+      "confidence_threshold": 1.0,
+      "n": 18,
+      "asked": 8,
+      "match_rate": 0.5,
+      "mean_loss": 20.055555555555557,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 2,
+      "margin": 0.5,
+      "confidence_threshold": 0.0,
+      "n": 18,
+      "asked": 13,
+      "match_rate": 0.3888888888888889,
+      "mean_loss": 24.0,
+      "blunder_rate": 0.2222222222222222
+    },
+    {
+      "shortlist_size": 2,
+      "margin": 0.5,
+      "confidence_threshold": 0.3,
+      "n": 18,
+      "asked": 13,
+      "match_rate": 0.4444444444444444,
+      "mean_loss": 23.88888888888889,
+      "blunder_rate": 0.2222222222222222
+    },
+    {
+      "shortlist_size": 2,
+      "margin": 0.5,
+      "confidence_threshold": 0.5,
+      "n": 18,
+      "asked": 13,
+      "match_rate": 0.4444444444444444,
+      "mean_loss": 23.88888888888889,
+      "blunder_rate": 0.2222222222222222
+    },
+    {
+      "shortlist_size": 2,
+      "margin": 0.5,
+      "confidence_threshold": 0.8,
+      "n": 18,
+      "asked": 13,
+      "match_rate": 0.5,
+      "mean_loss": 20.055555555555557,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 2,
+      "margin": 0.5,
+      "confidence_threshold": 1.0,
+      "n": 18,
+      "asked": 13,
+      "match_rate": 0.5,
+      "mean_loss": 20.055555555555557,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 2,
+      "margin": 1.0,
+      "confidence_threshold": 0.0,
+      "n": 18,
+      "asked": 14,
+      "match_rate": 0.3888888888888889,
+      "mean_loss": 24.0,
+      "blunder_rate": 0.2222222222222222
+    },
+    {
+      "shortlist_size": 2,
+      "margin": 1.0,
+      "confidence_threshold": 0.3,
+      "n": 18,
+      "asked": 14,
+      "match_rate": 0.4444444444444444,
+      "mean_loss": 23.88888888888889,
+      "blunder_rate": 0.2222222222222222
+    },
+    {
+      "shortlist_size": 2,
+      "margin": 1.0,
+      "confidence_threshold": 0.5,
+      "n": 18,
+      "asked": 14,
+      "match_rate": 0.4444444444444444,
+      "mean_loss": 23.88888888888889,
+      "blunder_rate": 0.2222222222222222
+    },
+    {
+      "shortlist_size": 2,
+      "margin": 1.0,
+      "confidence_threshold": 0.8,
+      "n": 18,
+      "asked": 14,
+      "match_rate": 0.5,
+      "mean_loss": 20.055555555555557,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 2,
+      "margin": 1.0,
+      "confidence_threshold": 1.0,
+      "n": 18,
+      "asked": 14,
+      "match_rate": 0.5,
+      "mean_loss": 20.055555555555557,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 2,
+      "margin": 2.0,
+      "confidence_threshold": 0.0,
+      "n": 18,
+      "asked": 18,
+      "match_rate": 0.3888888888888889,
+      "mean_loss": 24.0,
+      "blunder_rate": 0.2222222222222222
+    },
+    {
+      "shortlist_size": 2,
+      "margin": 2.0,
+      "confidence_threshold": 0.3,
+      "n": 18,
+      "asked": 18,
+      "match_rate": 0.4444444444444444,
+      "mean_loss": 23.88888888888889,
+      "blunder_rate": 0.2222222222222222
+    },
+    {
+      "shortlist_size": 2,
+      "margin": 2.0,
+      "confidence_threshold": 0.5,
+      "n": 18,
+      "asked": 18,
+      "match_rate": 0.4444444444444444,
+      "mean_loss": 23.88888888888889,
+      "blunder_rate": 0.2222222222222222
+    },
+    {
+      "shortlist_size": 2,
+      "margin": 2.0,
+      "confidence_threshold": 0.8,
+      "n": 18,
+      "asked": 18,
+      "match_rate": 0.5,
+      "mean_loss": 20.055555555555557,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 2,
+      "margin": 2.0,
+      "confidence_threshold": 1.0,
+      "n": 18,
+      "asked": 18,
+      "match_rate": 0.5,
+      "mean_loss": 20.055555555555557,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 3,
+      "margin": 0.0,
+      "confidence_threshold": 0.0,
+      "n": 18,
+      "asked": 0,
+      "match_rate": 0.5,
+      "mean_loss": 20.055555555555557,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 3,
+      "margin": 0.0,
+      "confidence_threshold": 0.3,
+      "n": 18,
+      "asked": 0,
+      "match_rate": 0.5,
+      "mean_loss": 20.055555555555557,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 3,
+      "margin": 0.0,
+      "confidence_threshold": 0.5,
+      "n": 18,
+      "asked": 0,
+      "match_rate": 0.5,
+      "mean_loss": 20.055555555555557,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 3,
+      "margin": 0.0,
+      "confidence_threshold": 0.8,
+      "n": 18,
+      "asked": 0,
+      "match_rate": 0.5,
+      "mean_loss": 20.055555555555557,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 3,
+      "margin": 0.0,
+      "confidence_threshold": 1.0,
+      "n": 18,
+      "asked": 0,
+      "match_rate": 0.5,
+      "mean_loss": 20.055555555555557,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 3,
+      "margin": 0.25,
+      "confidence_threshold": 0.0,
+      "n": 18,
+      "asked": 8,
+      "match_rate": 0.5,
+      "mean_loss": 20.055555555555557,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 3,
+      "margin": 0.25,
+      "confidence_threshold": 0.3,
+      "n": 18,
+      "asked": 8,
+      "match_rate": 0.5,
+      "mean_loss": 20.055555555555557,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 3,
+      "margin": 0.25,
+      "confidence_threshold": 0.5,
+      "n": 18,
+      "asked": 8,
+      "match_rate": 0.5,
+      "mean_loss": 20.055555555555557,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 3,
+      "margin": 0.25,
+      "confidence_threshold": 0.8,
+      "n": 18,
+      "asked": 8,
+      "match_rate": 0.5,
+      "mean_loss": 20.055555555555557,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 3,
+      "margin": 0.25,
+      "confidence_threshold": 1.0,
+      "n": 18,
+      "asked": 8,
+      "match_rate": 0.5,
+      "mean_loss": 20.055555555555557,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 3,
+      "margin": 0.5,
+      "confidence_threshold": 0.0,
+      "n": 18,
+      "asked": 13,
+      "match_rate": 0.4444444444444444,
+      "mean_loss": 23.944444444444443,
+      "blunder_rate": 0.2222222222222222
+    },
+    {
+      "shortlist_size": 3,
+      "margin": 0.5,
+      "confidence_threshold": 0.3,
+      "n": 18,
+      "asked": 13,
+      "match_rate": 0.4444444444444444,
+      "mean_loss": 23.944444444444443,
+      "blunder_rate": 0.2222222222222222
+    },
+    {
+      "shortlist_size": 3,
+      "margin": 0.5,
+      "confidence_threshold": 0.5,
+      "n": 18,
+      "asked": 13,
+      "match_rate": 0.4444444444444444,
+      "mean_loss": 23.944444444444443,
+      "blunder_rate": 0.2222222222222222
+    },
+    {
+      "shortlist_size": 3,
+      "margin": 0.5,
+      "confidence_threshold": 0.8,
+      "n": 18,
+      "asked": 13,
+      "match_rate": 0.5,
+      "mean_loss": 20.11111111111111,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 3,
+      "margin": 0.5,
+      "confidence_threshold": 1.0,
+      "n": 18,
+      "asked": 13,
+      "match_rate": 0.5,
+      "mean_loss": 20.055555555555557,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 3,
+      "margin": 1.0,
+      "confidence_threshold": 0.0,
+      "n": 18,
+      "asked": 14,
+      "match_rate": 0.4444444444444444,
+      "mean_loss": 23.944444444444443,
+      "blunder_rate": 0.2222222222222222
+    },
+    {
+      "shortlist_size": 3,
+      "margin": 1.0,
+      "confidence_threshold": 0.3,
+      "n": 18,
+      "asked": 14,
+      "match_rate": 0.5,
+      "mean_loss": 20.11111111111111,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 3,
+      "margin": 1.0,
+      "confidence_threshold": 0.5,
+      "n": 18,
+      "asked": 14,
+      "match_rate": 0.5,
+      "mean_loss": 20.11111111111111,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 3,
+      "margin": 1.0,
+      "confidence_threshold": 0.8,
+      "n": 18,
+      "asked": 14,
+      "match_rate": 0.5,
+      "mean_loss": 20.11111111111111,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 3,
+      "margin": 1.0,
+      "confidence_threshold": 1.0,
+      "n": 18,
+      "asked": 14,
+      "match_rate": 0.5,
+      "mean_loss": 20.055555555555557,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 3,
+      "margin": 2.0,
+      "confidence_threshold": 0.0,
+      "n": 18,
+      "asked": 18,
+      "match_rate": 0.4444444444444444,
+      "mean_loss": 23.944444444444443,
+      "blunder_rate": 0.2222222222222222
+    },
+    {
+      "shortlist_size": 3,
+      "margin": 2.0,
+      "confidence_threshold": 0.3,
+      "n": 18,
+      "asked": 18,
+      "match_rate": 0.5,
+      "mean_loss": 20.11111111111111,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 3,
+      "margin": 2.0,
+      "confidence_threshold": 0.5,
+      "n": 18,
+      "asked": 18,
+      "match_rate": 0.5,
+      "mean_loss": 20.11111111111111,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 3,
+      "margin": 2.0,
+      "confidence_threshold": 0.8,
+      "n": 18,
+      "asked": 18,
+      "match_rate": 0.5,
+      "mean_loss": 20.11111111111111,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 3,
+      "margin": 2.0,
+      "confidence_threshold": 1.0,
+      "n": 18,
+      "asked": 18,
+      "match_rate": 0.5,
+      "mean_loss": 20.055555555555557,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 4,
+      "margin": 0.0,
+      "confidence_threshold": 0.0,
+      "n": 18,
+      "asked": 0,
+      "match_rate": 0.5,
+      "mean_loss": 20.055555555555557,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 4,
+      "margin": 0.0,
+      "confidence_threshold": 0.3,
+      "n": 18,
+      "asked": 0,
+      "match_rate": 0.5,
+      "mean_loss": 20.055555555555557,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 4,
+      "margin": 0.0,
+      "confidence_threshold": 0.5,
+      "n": 18,
+      "asked": 0,
+      "match_rate": 0.5,
+      "mean_loss": 20.055555555555557,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 4,
+      "margin": 0.0,
+      "confidence_threshold": 0.8,
+      "n": 18,
+      "asked": 0,
+      "match_rate": 0.5,
+      "mean_loss": 20.055555555555557,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 4,
+      "margin": 0.0,
+      "confidence_threshold": 1.0,
+      "n": 18,
+      "asked": 0,
+      "match_rate": 0.5,
+      "mean_loss": 20.055555555555557,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 4,
+      "margin": 0.25,
+      "confidence_threshold": 0.0,
+      "n": 18,
+      "asked": 8,
+      "match_rate": 0.4444444444444444,
+      "mean_loss": 21.666666666666668,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 4,
+      "margin": 0.25,
+      "confidence_threshold": 0.3,
+      "n": 18,
+      "asked": 8,
+      "match_rate": 0.4444444444444444,
+      "mean_loss": 21.666666666666668,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 4,
+      "margin": 0.25,
+      "confidence_threshold": 0.5,
+      "n": 18,
+      "asked": 8,
+      "match_rate": 0.5,
+      "mean_loss": 20.055555555555557,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 4,
+      "margin": 0.25,
+      "confidence_threshold": 0.8,
+      "n": 18,
+      "asked": 8,
+      "match_rate": 0.5,
+      "mean_loss": 20.055555555555557,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 4,
+      "margin": 0.25,
+      "confidence_threshold": 1.0,
+      "n": 18,
+      "asked": 8,
+      "match_rate": 0.5,
+      "mean_loss": 20.055555555555557,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 4,
+      "margin": 0.5,
+      "confidence_threshold": 0.0,
+      "n": 18,
+      "asked": 13,
+      "match_rate": 0.3888888888888889,
+      "mean_loss": 25.555555555555557,
+      "blunder_rate": 0.2222222222222222
+    },
+    {
+      "shortlist_size": 4,
+      "margin": 0.5,
+      "confidence_threshold": 0.3,
+      "n": 18,
+      "asked": 13,
+      "match_rate": 0.4444444444444444,
+      "mean_loss": 25.444444444444443,
+      "blunder_rate": 0.2222222222222222
+    },
+    {
+      "shortlist_size": 4,
+      "margin": 0.5,
+      "confidence_threshold": 0.5,
+      "n": 18,
+      "asked": 13,
+      "match_rate": 0.4444444444444444,
+      "mean_loss": 23.944444444444443,
+      "blunder_rate": 0.2222222222222222
+    },
+    {
+      "shortlist_size": 4,
+      "margin": 0.5,
+      "confidence_threshold": 0.8,
+      "n": 18,
+      "asked": 13,
+      "match_rate": 0.5,
+      "mean_loss": 20.11111111111111,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 4,
+      "margin": 0.5,
+      "confidence_threshold": 1.0,
+      "n": 18,
+      "asked": 13,
+      "match_rate": 0.5,
+      "mean_loss": 20.055555555555557,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 4,
+      "margin": 1.0,
+      "confidence_threshold": 0.0,
+      "n": 18,
+      "asked": 14,
+      "match_rate": 0.4444444444444444,
+      "mean_loss": 21.72222222222222,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 4,
+      "margin": 1.0,
+      "confidence_threshold": 0.3,
+      "n": 18,
+      "asked": 14,
+      "match_rate": 0.5,
+      "mean_loss": 21.61111111111111,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 4,
+      "margin": 1.0,
+      "confidence_threshold": 0.5,
+      "n": 18,
+      "asked": 14,
+      "match_rate": 0.5,
+      "mean_loss": 20.11111111111111,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 4,
+      "margin": 1.0,
+      "confidence_threshold": 0.8,
+      "n": 18,
+      "asked": 14,
+      "match_rate": 0.5,
+      "mean_loss": 20.11111111111111,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 4,
+      "margin": 1.0,
+      "confidence_threshold": 1.0,
+      "n": 18,
+      "asked": 14,
+      "match_rate": 0.5,
+      "mean_loss": 20.055555555555557,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 4,
+      "margin": 2.0,
+      "confidence_threshold": 0.0,
+      "n": 18,
+      "asked": 18,
+      "match_rate": 0.5,
+      "mean_loss": 21.055555555555557,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 4,
+      "margin": 2.0,
+      "confidence_threshold": 0.3,
+      "n": 18,
+      "asked": 18,
+      "match_rate": 0.5555555555555556,
+      "mean_loss": 20.944444444444443,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 4,
+      "margin": 2.0,
+      "confidence_threshold": 0.5,
+      "n": 18,
+      "asked": 18,
+      "match_rate": 0.5555555555555556,
+      "mean_loss": 19.444444444444443,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 4,
+      "margin": 2.0,
+      "confidence_threshold": 0.8,
+      "n": 18,
+      "asked": 18,
+      "match_rate": 0.5,
+      "mean_loss": 20.11111111111111,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 4,
+      "margin": 2.0,
+      "confidence_threshold": 1.0,
+      "n": 18,
+      "asked": 18,
+      "match_rate": 0.5,
+      "mean_loss": 20.055555555555557,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 5,
+      "margin": 0.0,
+      "confidence_threshold": 0.0,
+      "n": 18,
+      "asked": 0,
+      "match_rate": 0.5,
+      "mean_loss": 20.055555555555557,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 5,
+      "margin": 0.0,
+      "confidence_threshold": 0.3,
+      "n": 18,
+      "asked": 0,
+      "match_rate": 0.5,
+      "mean_loss": 20.055555555555557,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 5,
+      "margin": 0.0,
+      "confidence_threshold": 0.5,
+      "n": 18,
+      "asked": 0,
+      "match_rate": 0.5,
+      "mean_loss": 20.055555555555557,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 5,
+      "margin": 0.0,
+      "confidence_threshold": 0.8,
+      "n": 18,
+      "asked": 0,
+      "match_rate": 0.5,
+      "mean_loss": 20.055555555555557,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 5,
+      "margin": 0.0,
+      "confidence_threshold": 1.0,
+      "n": 18,
+      "asked": 0,
+      "match_rate": 0.5,
+      "mean_loss": 20.055555555555557,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 5,
+      "margin": 0.25,
+      "confidence_threshold": 0.0,
+      "n": 18,
+      "asked": 8,
+      "match_rate": 0.4444444444444444,
+      "mean_loss": 21.666666666666668,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 5,
+      "margin": 0.25,
+      "confidence_threshold": 0.3,
+      "n": 18,
+      "asked": 8,
+      "match_rate": 0.4444444444444444,
+      "mean_loss": 21.666666666666668,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 5,
+      "margin": 0.25,
+      "confidence_threshold": 0.5,
+      "n": 18,
+      "asked": 8,
+      "match_rate": 0.5,
+      "mean_loss": 20.055555555555557,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 5,
+      "margin": 0.25,
+      "confidence_threshold": 0.8,
+      "n": 18,
+      "asked": 8,
+      "match_rate": 0.5,
+      "mean_loss": 20.055555555555557,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 5,
+      "margin": 0.25,
+      "confidence_threshold": 1.0,
+      "n": 18,
+      "asked": 8,
+      "match_rate": 0.5,
+      "mean_loss": 20.055555555555557,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 5,
+      "margin": 0.5,
+      "confidence_threshold": 0.0,
+      "n": 18,
+      "asked": 13,
+      "match_rate": 0.3888888888888889,
+      "mean_loss": 26.88888888888889,
+      "blunder_rate": 0.2777777777777778
+    },
+    {
+      "shortlist_size": 5,
+      "margin": 0.5,
+      "confidence_threshold": 0.3,
+      "n": 18,
+      "asked": 13,
+      "match_rate": 0.4444444444444444,
+      "mean_loss": 26.77777777777778,
+      "blunder_rate": 0.2777777777777778
+    },
+    {
+      "shortlist_size": 5,
+      "margin": 0.5,
+      "confidence_threshold": 0.5,
+      "n": 18,
+      "asked": 13,
+      "match_rate": 0.3888888888888889,
+      "mean_loss": 26.88888888888889,
+      "blunder_rate": 0.2777777777777778
+    },
+    {
+      "shortlist_size": 5,
+      "margin": 0.5,
+      "confidence_threshold": 0.8,
+      "n": 18,
+      "asked": 13,
+      "match_rate": 0.4444444444444444,
+      "mean_loss": 23.055555555555557,
+      "blunder_rate": 0.2222222222222222
+    },
+    {
+      "shortlist_size": 5,
+      "margin": 0.5,
+      "confidence_threshold": 1.0,
+      "n": 18,
+      "asked": 13,
+      "match_rate": 0.5,
+      "mean_loss": 20.055555555555557,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 5,
+      "margin": 1.0,
+      "confidence_threshold": 0.0,
+      "n": 18,
+      "asked": 14,
+      "match_rate": 0.4444444444444444,
+      "mean_loss": 23.055555555555557,
+      "blunder_rate": 0.2222222222222222
+    },
+    {
+      "shortlist_size": 5,
+      "margin": 1.0,
+      "confidence_threshold": 0.3,
+      "n": 18,
+      "asked": 14,
+      "match_rate": 0.5,
+      "mean_loss": 22.944444444444443,
+      "blunder_rate": 0.2222222222222222
+    },
+    {
+      "shortlist_size": 5,
+      "margin": 1.0,
+      "confidence_threshold": 0.5,
+      "n": 18,
+      "asked": 14,
+      "match_rate": 0.4444444444444444,
+      "mean_loss": 23.055555555555557,
+      "blunder_rate": 0.2222222222222222
+    },
+    {
+      "shortlist_size": 5,
+      "margin": 1.0,
+      "confidence_threshold": 0.8,
+      "n": 18,
+      "asked": 14,
+      "match_rate": 0.4444444444444444,
+      "mean_loss": 23.055555555555557,
+      "blunder_rate": 0.2222222222222222
+    },
+    {
+      "shortlist_size": 5,
+      "margin": 1.0,
+      "confidence_threshold": 1.0,
+      "n": 18,
+      "asked": 14,
+      "match_rate": 0.5,
+      "mean_loss": 20.055555555555557,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "shortlist_size": 5,
+      "margin": 2.0,
+      "confidence_threshold": 0.0,
+      "n": 18,
+      "asked": 18,
+      "match_rate": 0.4444444444444444,
+      "mean_loss": 25.444444444444443,
+      "blunder_rate": 0.2777777777777778
+    },
+    {
+      "shortlist_size": 5,
+      "margin": 2.0,
+      "confidence_threshold": 0.3,
+      "n": 18,
+      "asked": 18,
+      "match_rate": 0.5,
+      "mean_loss": 25.333333333333332,
+      "blunder_rate": 0.2777777777777778
+    },
+    {
+      "shortlist_size": 5,
+      "margin": 2.0,
+      "confidence_threshold": 0.5,
+      "n": 18,
+      "asked": 18,
+      "match_rate": 0.4444444444444444,
+      "mean_loss": 25.444444444444443,
+      "blunder_rate": 0.2777777777777778
+    },
+    {
+      "shortlist_size": 5,
+      "margin": 2.0,
+      "confidence_threshold": 0.8,
+      "n": 18,
+      "asked": 18,
+      "match_rate": 0.3888888888888889,
+      "mean_loss": 25.944444444444443,
+      "blunder_rate": 0.2777777777777778
+    },
+    {
+      "shortlist_size": 5,
+      "margin": 2.0,
+      "confidence_threshold": 1.0,
+      "n": 18,
+      "asked": 18,
+      "match_rate": 0.5,
+      "mean_loss": 20.055555555555557,
+      "blunder_rate": 0.16666666666666666
+    }
+  ],
+  "asks": [
+    {
+      "position": 0,
+      "shortlist": [
+        "c3",
+        "c5"
+      ],
+      "probabilities": {
+        "c3": 0.65,
+        "c5": 0.35
+      },
+      "confidence": 0.3,
+      "choice": "c3"
+    },
+    {
+      "position": 0,
+      "shortlist": [
+        "c3",
+        "c5",
+        "g3"
+      ],
+      "probabilities": {
+        "c3": 0.53,
+        "c5": 0.33,
+        "g3": 0.14
+      },
+      "confidence": 0.3,
+      "choice": "c3"
+    },
+    {
+      "position": 0,
+      "shortlist": [
+        "c3",
+        "c5",
+        "g3",
+        "g5"
+      ],
+      "probabilities": {
+        "c3": 0.69,
+        "c5": 0.2,
+        "g3": 0.05,
+        "g5": 0.06
+      },
+      "confidence": 0.6,
+      "choice": "c3"
+    },
+    {
+      "position": 1,
+      "shortlist": [
+        "c4",
+        "c5"
+      ],
+      "probabilities": {
+        "c4": 0.68,
+        "c5": 0.32
+      },
+      "confidence": 0.35,
+      "choice": "c4"
+    },
+    {
+      "position": 1,
+      "shortlist": [
+        "c4",
+        "c5",
+        "e7"
+      ],
+      "probabilities": {
+        "c4": 0.52,
+        "c5": 0.35,
+        "e7": 0.13
+      },
+      "confidence": 0.28,
+      "choice": "c4"
+    },
+    {
+      "position": 1,
+      "shortlist": [
+        "c4",
+        "c5",
+        "e7",
+        "f5"
+      ],
+      "probabilities": {
+        "c4": 0.48,
+        "c5": 0.21,
+        "e7": 0.11,
+        "f5": 0.2
+      },
+      "confidence": 0.3,
+      "choice": "c4"
+    },
+    {
+      "position": 1,
+      "shortlist": [
+        "c4",
+        "c5",
+        "e7",
+        "f5",
+        "b2"
+      ],
+      "probabilities": {
+        "c4": 0.03,
+        "c5": 0.04,
+        "e7": 0.02,
+        "f5": 0.02,
+        "b2": 0.89
+      },
+      "confidence": 0.86,
+      "choice": "b2"
+    },
+    {
+      "position": 2,
+      "shortlist": [
+        "e7",
+        "f6"
+      ],
+      "probabilities": {
+        "e7": 0.98,
+        "f6": 0.02
+      },
+      "confidence": 0.97,
+      "choice": "e7"
+    },
+    {
+      "position": 2,
+      "shortlist": [
+        "e7",
+        "f6",
+        "f4"
+      ],
+      "probabilities": {
+        "e7": 0.97,
+        "f6": 0.02,
+        "f4": 0.01
+      },
+      "confidence": 0.96,
+      "choice": "e7"
+    },
+    {
+      "position": 2,
+      "shortlist": [
+        "e7",
+        "f6",
+        "f4",
+        "d7"
+      ],
+      "probabilities": {
+        "e7": 0.97,
+        "f6": 0.02,
+        "f4": 0.01,
+        "d7": 0.0
+      },
+      "confidence": 0.96,
+      "choice": "e7"
+    },
+    {
+      "position": 2,
+      "shortlist": [
+        "e7",
+        "f6",
+        "f4",
+        "d7",
+        "f7"
+      ],
+      "probabilities": {
+        "e7": 0.98,
+        "f6": 0.01,
+        "f4": 0.01,
+        "d7": 0.0,
+        "f7": 0.0
+      },
+      "confidence": 0.97,
+      "choice": "e7"
+    },
+    {
+      "position": 3,
+      "shortlist": [
+        "b5",
+        "d2"
+      ],
+      "probabilities": {
+        "b5": 0.55,
+        "d2": 0.45
+      },
+      "confidence": 0.11,
+      "choice": "b5"
+    },
+    {
+      "position": 3,
+      "shortlist": [
+        "b5",
+        "d2",
+        "b4"
+      ],
+      "probabilities": {
+        "b5": 0.0,
+        "d2": 0.0,
+        "b4": 1.0
+      },
+      "confidence": 0.99,
+      "choice": "b4"
+    },
+    {
+      "position": 3,
+      "shortlist": [
+        "b5",
+        "d2",
+        "b4",
+        "e2"
+      ],
+      "probabilities": {
+        "b5": 0.01,
+        "d2": 0.01,
+        "b4": 0.97,
+        "e2": 0.01
+      },
+      "confidence": 0.95,
+      "choice": "b4"
+    },
+    {
+      "position": 3,
+      "shortlist": [
+        "b5",
+        "d2",
+        "b4",
+        "e2",
+        "b3"
+      ],
+      "probabilities": {
+        "b5": 0.03,
+        "d2": 0.02,
+        "b4": 0.95,
+        "e2": 0.0,
+        "b3": 0.0
+      },
+      "confidence": 0.92,
+      "choice": "b4"
+    },
+    {
+      "position": 4,
+      "shortlist": [
+        "c2",
+        "d7"
+      ],
+      "probabilities": {
+        "c2": 0.67,
+        "d7": 0.33
+      },
+      "confidence": 0.35,
+      "choice": "c2"
+    },
+    {
+      "position": 4,
+      "shortlist": [
+        "c2",
+        "d7",
+        "f2"
+      ],
+      "probabilities": {
+        "c2": 0.65,
+        "d7": 0.22,
+        "f2": 0.13
+      },
+      "confidence": 0.46,
+      "choice": "c2"
+    },
+    {
+      "position": 4,
+      "shortlist": [
+        "c2",
+        "d7",
+        "f2",
+        "a2"
+      ],
+      "probabilities": {
+        "c2": 0.27,
+        "d7": 0.12,
+        "f2": 0.07,
+        "a2": 0.54
+      },
+      "confidence": 0.39,
+      "choice": "a2"
+    },
+    {
+      "position": 4,
+      "shortlist": [
+        "c2",
+        "d7",
+        "f2",
+        "a2",
+        "g2"
+      ],
+      "probabilities": {
+        "c2": 0.0,
+        "d7": 0.0,
+        "f2": 0.0,
+        "a2": 0.01,
+        "g2": 0.99
+      },
+      "confidence": 0.98,
+      "choice": "g2"
+    },
+    {
+      "position": 5,
+      "shortlist": [
+        "d6",
+        "f5"
+      ],
+      "probabilities": {
+        "d6": 0.95,
+        "f5": 0.05
+      },
+      "confidence": 0.89,
+      "choice": "d6"
+    },
+    {
+      "position": 5,
+      "shortlist": [
+        "d6",
+        "f5",
+        "c5"
+      ],
+      "probabilities": {
+        "d6": 0.1,
+        "f5": 0.01,
+        "c5": 0.89
+      },
+      "confidence": 0.84,
+      "choice": "c5"
+    },
+    {
+      "position": 5,
+      "shortlist": [
+        "d6",
+        "f5",
+        "c5",
+        "b5"
+      ],
+      "probabilities": {
+        "d6": 0.14,
+        "f5": 0.01,
+        "c5": 0.85,
+        "b5": 0.0
+      },
+      "confidence": 0.8,
+      "choice": "c5"
+    },
+    {
+      "position": 5,
+      "shortlist": [
+        "d6",
+        "f5",
+        "c5",
+        "b5",
+        "e6"
+      ],
+      "probabilities": {
+        "d6": 0.23,
+        "f5": 0.0,
+        "c5": 0.77,
+        "b5": 0.0,
+        "e6": 0.0
+      },
+      "confidence": 0.7,
+      "choice": "c5"
+    },
+    {
+      "position": 6,
+      "shortlist": [
+        "a2",
+        "b7"
+      ],
+      "probabilities": {
+        "a2": 0.73,
+        "b7": 0.27
+      },
+      "confidence": 0.47,
+      "choice": "a2"
+    },
+    {
+      "position": 6,
+      "shortlist": [
+        "a2",
+        "b7",
+        "g7"
+      ],
+      "probabilities": {
+        "a2": 0.85,
+        "b7": 0.05,
+        "g7": 0.1
+      },
+      "confidence": 0.77,
+      "choice": "a2"
+    },
+    {
+      "position": 7,
+      "shortlist": [
+        "f3",
+        "e8"
+      ],
+      "probabilities": {
+        "f3": 0.54,
+        "e8": 0.46
+      },
+      "confidence": 0.08,
+      "choice": "f3"
+    },
+    {
+      "position": 7,
+      "shortlist": [
+        "f3",
+        "e8",
+        "c6"
+      ],
+      "probabilities": {
+        "f3": 0.32,
+        "e8": 0.46,
+        "c6": 0.22
+      },
+      "confidence": 0.19,
+      "choice": "e8"
+    },
+    {
+      "position": 7,
+      "shortlist": [
+        "f3",
+        "e8",
+        "c6",
+        "d2"
+      ],
+      "probabilities": {
+        "f3": 0.2,
+        "e8": 0.56,
+        "c6": 0.13,
+        "d2": 0.11
+      },
+      "confidence": 0.42,
+      "choice": "e8"
+    },
+    {
+      "position": 7,
+      "shortlist": [
+        "f3",
+        "e8",
+        "c6",
+        "d2",
+        "b5"
+      ],
+      "probabilities": {
+        "f3": 0.15,
+        "e8": 0.53,
+        "c6": 0.12,
+        "d2": 0.08,
+        "b5": 0.12
+      },
+      "confidence": 0.41,
+      "choice": "e8"
+    },
+    {
+      "position": 8,
+      "shortlist": [
+        "b4",
+        "e6"
+      ],
+      "probabilities": {
+        "b4": 0.95,
+        "e6": 0.05
+      },
+      "confidence": 0.9,
+      "choice": "b4"
+    },
+    {
+      "position": 9,
+      "shortlist": [
+        "b4",
+        "h5"
+      ],
+      "probabilities": {
+        "b4": 0.48,
+        "h5": 0.52
+      },
+      "confidence": 0.04,
+      "choice": "h5"
+    },
+    {
+      "position": 10,
+      "shortlist": [
+        "b5",
+        "e2"
+      ],
+      "probabilities": {
+        "b5": 0.95,
+        "e2": 0.05
+      },
+      "confidence": 0.9,
+      "choice": "b5"
+    },
+    {
+      "position": 10,
+      "shortlist": [
+        "b5",
+        "e2",
+        "e7"
+      ],
+      "probabilities": {
+        "b5": 0.86,
+        "e2": 0.06,
+        "e7": 0.08
+      },
+      "confidence": 0.79,
+      "choice": "b5"
+    },
+    {
+      "position": 10,
+      "shortlist": [
+        "b5",
+        "e2",
+        "e7",
+        "b2"
+      ],
+      "probabilities": {
+        "b5": 0.62,
+        "e2": 0.07,
+        "e7": 0.08,
+        "b2": 0.23
+      },
+      "confidence": 0.49,
+      "choice": "b5"
+    },
+    {
+      "position": 10,
+      "shortlist": [
+        "b5",
+        "e2",
+        "e7",
+        "b2",
+        "d7"
+      ],
+      "probabilities": {
+        "b5": 0.75,
+        "e2": 0.02,
+        "e7": 0.08,
+        "b2": 0.13,
+        "d7": 0.02
+      },
+      "confidence": 0.69,
+      "choice": "b5"
+    },
+    {
+      "position": 11,
+      "shortlist": [
+        "d1",
+        "a3"
+      ],
+      "probabilities": {
+        "d1": 0.16,
+        "a3": 0.84
+      },
+      "confidence": 0.68,
+      "choice": "a3"
+    },
+    {
+      "position": 11,
+      "shortlist": [
+        "d1",
+        "a3",
+        "e2"
+      ],
+      "probabilities": {
+        "d1": 0.2,
+        "a3": 0.52,
+        "e2": 0.28
+      },
+      "confidence": 0.28,
+      "choice": "a3"
+    },
+    {
+      "position": 11,
+      "shortlist": [
+        "d1",
+        "a3",
+        "e2",
+        "f2"
+      ],
+      "probabilities": {
+        "d1": 0.45,
+        "a3": 0.27,
+        "e2": 0.13,
+        "f2": 0.15
+      },
+      "confidence": 0.27,
+      "choice": "d1"
+    },
+    {
+      "position": 11,
+      "shortlist": [
+        "d1",
+        "a3",
+        "e2",
+        "f2",
+        "a2"
+      ],
+      "probabilities": {
+        "d1": 0.41,
+        "a3": 0.15,
+        "e2": 0.05,
+        "f2": 0.05,
+        "a2": 0.34
+      },
+      "confidence": 0.27,
+      "choice": "d1"
+    },
+    {
+      "position": 12,
+      "shortlist": [
+        "h3",
+        "h7"
+      ],
+      "probabilities": {
+        "h3": 0.88,
+        "h7": 0.12
+      },
+      "confidence": 0.77,
+      "choice": "h3"
+    },
+    {
+      "position": 13,
+      "shortlist": [
+        "a8",
+        "b7"
+      ],
+      "probabilities": {
+        "a8": 0.98,
+        "b7": 0.02
+      },
+      "confidence": 0.96,
+      "choice": "a8"
+    },
+    {
+      "position": 14,
+      "shortlist": [
+        "e1",
+        "c1"
+      ],
+      "probabilities": {
+        "e1": 0.96,
+        "c1": 0.04
+      },
+      "confidence": 0.92,
+      "choice": "e1"
+    },
+    {
+      "position": 14,
+      "shortlist": [
+        "e1",
+        "c1",
+        "a7"
+      ],
+      "probabilities": {
+        "e1": 0.96,
+        "c1": 0.01,
+        "a7": 0.03
+      },
+      "confidence": 0.94,
+      "choice": "e1"
+    },
+    {
+      "position": 14,
+      "shortlist": [
+        "e1",
+        "c1",
+        "a7",
+        "g1"
+      ],
+      "probabilities": {
+        "e1": 0.99,
+        "c1": 0.01,
+        "a7": 0.0,
+        "g1": 0.0
+      },
+      "confidence": 0.98,
+      "choice": "e1"
+    },
+    {
+      "position": 15,
+      "shortlist": [
+        "h1",
+        "g5"
+      ],
+      "probabilities": {
+        "h1": 0.87,
+        "g5": 0.13
+      },
+      "confidence": 0.74,
+      "choice": "h1"
+    },
+    {
+      "position": 15,
+      "shortlist": [
+        "h1",
+        "g5",
+        "g2"
+      ],
+      "probabilities": {
+        "h1": 0.95,
+        "g5": 0.03,
+        "g2": 0.02
+      },
+      "confidence": 0.92,
+      "choice": "h1"
+    },
+    {
+      "position": 15,
+      "shortlist": [
+        "h1",
+        "g5",
+        "g2",
+        "b2"
+      ],
+      "probabilities": {
+        "h1": 0.7,
+        "g5": 0.02,
+        "g2": 0.01,
+        "b2": 0.27
+      },
+      "confidence": 0.61,
+      "choice": "h1"
+    },
+    {
+      "position": 15,
+      "shortlist": [
+        "h1",
+        "g5",
+        "g2",
+        "b2",
+        "g1"
+      ],
+      "probabilities": {
+        "h1": 0.79,
+        "g5": 0.01,
+        "g2": 0.0,
+        "b2": 0.2,
+        "g1": 0.0
+      },
+      "confidence": 0.73,
+      "choice": "h1"
+    },
+    {
+      "position": 16,
+      "shortlist": [
+        "b8",
+        "b3"
+      ],
+      "probabilities": {
+        "b8": 0.77,
+        "b3": 0.23
+      },
+      "confidence": 0.54,
+      "choice": "b8"
+    },
+    {
+      "position": 16,
+      "shortlist": [
+        "b8",
+        "b3",
+        "b4"
+      ],
+      "probabilities": {
+        "b8": 0.92,
+        "b3": 0.05,
+        "b4": 0.03
+      },
+      "confidence": 0.89,
+      "choice": "b8"
+    },
+    {
+      "position": 17,
+      "shortlist": [
+        "c6",
+        "a6"
+      ],
+      "probabilities": {
+        "c6": 0.76,
+        "a6": 0.24
+      },
+      "confidence": 0.53,
+      "choice": "c6"
+    },
+    {
+      "position": 17,
+      "shortlist": [
+        "c6",
+        "a6",
+        "b4"
+      ],
+      "probabilities": {
+        "c6": 0.64,
+        "a6": 0.26,
+        "b4": 0.1
+      },
+      "confidence": 0.45,
+      "choice": "c6"
+    },
+    {
+      "position": 17,
+      "shortlist": [
+        "c6",
+        "a6",
+        "b4",
+        "h1"
+      ],
+      "probabilities": {
+        "c6": 0.22,
+        "a6": 0.03,
+        "b4": 0.05,
+        "h1": 0.7
+      },
+      "confidence": 0.61,
+      "choice": "h1"
+    }
+  ],
+  "beats_baseline": true,
+  "return_to_stage3": false,
+  "chosen": {
+    "shortlist_size": 4,
+    "margin": 2.0,
+    "confidence_threshold": 0.5,
+    "mean_loss": 19.444444444444443
+  },
+  "positions": [
+    {
+      "index": 0,
+      "stage": "opening",
+      "empties": 57,
+      "side_to_move": "white",
+      "board": [
+        "........",
+        "........",
+        "........",
+        "...BW...",
+        "...BBB..",
+        "...BW...",
+        "........",
+        "........"
+      ],
+      "best_value": -1,
+      "code_best": "c3",
+      "code_best_loss": 0,
+      "values": {
+        "c3": -1,
+        "g3": -2,
+        "c5": -4,
+        "g5": -6
+      }
+    },
+    {
+      "index": 1,
+      "stage": "opening",
+      "empties": 54,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "........",
+        "....WB..",
+        "...BW...",
+        "...WB...",
+        "..WBBB..",
+        "........",
+        "........"
+      ],
+      "best_value": 1,
+      "code_best": "c4",
+      "code_best_loss": 0,
+      "values": {
+        "b2": -54,
+        "b3": -1,
+        "c4": 1,
+        "c5": 0,
+        "f5": -1,
+        "d6": -1,
+        "e7": -4,
+        "f7": -4
+      }
+    },
+    {
+      "index": 2,
+      "stage": "opening",
+      "empties": 49,
+      "side_to_move": "white",
+      "board": [
+        "........",
+        "........",
+        "..B.B...",
+        "..WWBWW.",
+        "..WWB...",
+        "..WWWWW.",
+        "........",
+        "........"
+      ],
+      "best_value": -5,
+      "code_best": "e7",
+      "code_best_loss": 5,
+      "values": {
+        "f4": -7,
+        "f6": -5,
+        "b7": -55,
+        "c7": -5,
+        "d7": -13,
+        "e7": -10,
+        "f7": -10
+      }
+    },
+    {
+      "index": 3,
+      "stage": "opening",
+      "empties": 50,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "........",
+        "..WB.B..",
+        "..WBB...",
+        "..WWB...",
+        "..WWWWW.",
+        "........",
+        "........"
+      ],
+      "best_value": 0,
+      "code_best": "b5",
+      "code_best_loss": 6,
+      "values": {
+        "b2": -47,
+        "c2": 0,
+        "d2": -1,
+        "e2": -3,
+        "g2": -47,
+        "b3": -7,
+        "b4": -4,
+        "b5": -6,
+        "b6": -3,
+        "b7": -50
+      }
+    },
+    {
+      "index": 4,
+      "stage": "opening",
+      "empties": 45,
+      "side_to_move": "white",
+      "board": [
+        "..W.....",
+        "..W.....",
+        "..WBBB..",
+        "..WBBB..",
+        "..WWBB..",
+        ".BBBBB..",
+        "........",
+        "........"
+      ],
+      "best_value": 14,
+      "code_best": "c2",
+      "code_best_loss": 0,
+      "values": {
+        "a2": -15,
+        "b2": -39,
+        "c2": 14,
+        "d2": 11,
+        "e2": 6,
+        "f2": 8,
+        "g2": -39,
+        "g3": 0,
+        "g4": 0,
+        "g5": 0,
+        "g6": 5,
+        "d7": 7,
+        "e7": 7,
+        "f7": 1,
+        "g7": -39
+      }
+    },
+    {
+      "index": 5,
+      "stage": "opening",
+      "empties": 51,
+      "side_to_move": "white",
+      "board": [
+        "........",
+        "........",
+        "........",
+        "...BW...",
+        "..BBB...",
+        "WWWWWB..",
+        ".B......",
+        "B......."
+      ],
+      "best_value": -45,
+      "code_best": "d6",
+      "code_best_loss": 2,
+      "values": {
+        "b1": -164,
+        "c1": -134,
+        "g3": -46,
+        "b5": -46,
+        "c5": -50,
+        "f5": -45,
+        "d6": -47,
+        "e6": -48
+      }
+    },
+    {
+      "index": 6,
+      "stage": "midgame",
+      "empties": 17,
+      "side_to_move": "white",
+      "board": [
+        "BBBBBBWB",
+        "B.WBBW.B",
+        "BBBBWBWB",
+        "BBBBBWWB",
+        "BBBBWWWB",
+        "BBWWWW..",
+        "...W.W..",
+        ".....W.."
+      ],
+      "best_value": -296,
+      "code_best": "a2",
+      "code_best_loss": 75,
+      "values": {
+        "a2": -371,
+        "b7": -296,
+        "g7": -314
+      }
+    },
+    {
+      "index": 7,
+      "stage": "midgame",
+      "empties": 33,
+      "side_to_move": "white",
+      "board": [
+        "...W.BWB",
+        "..W.W.W.",
+        ".B.WWWWW",
+        "..BWW.W.",
+        "..WBWWWB",
+        "..WWB.W.",
+        ".....BWW",
+        "....B..."
+      ],
+      "best_value": -237,
+      "code_best": "f3",
+      "code_best_loss": 2,
+      "values": {
+        "d2": -242,
+        "e2": -269,
+        "f3": -239,
+        "b4": -276,
+        "a5": -273,
+        "b5": -276,
+        "c6": -268,
+        "e8": -237
+      }
+    },
+    {
+      "index": 8,
+      "stage": "midgame",
+      "empties": 38,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "........",
+        "..B..B..",
+        "WWWWWW.B",
+        "W.WWWWB.",
+        "WWBWWB..",
+        ".W....B.",
+        "BW.....B"
+      ],
+      "best_value": 210,
+      "code_best": "b4",
+      "code_best_loss": 0,
+      "values": {
+        "c1": 75,
+        "b4": 210,
+        "e6": 208
+      }
+    },
+    {
+      "index": 9,
+      "stage": "midgame",
+      "empties": 40,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "........",
+        "..B..B..",
+        "WWWWWW..",
+        "W.WWWWW.",
+        "WWBWWB..",
+        ".B....B.",
+        "B......B"
+      ],
+      "best_value": 87,
+      "code_best": "b4",
+      "code_best_loss": 0,
+      "values": {
+        "b4": 87,
+        "h5": 85
+      }
+    },
+    {
+      "index": 10,
+      "stage": "midgame",
+      "empties": 34,
+      "side_to_move": "black",
+      "board": [
+        ".....B..",
+        ".....B..",
+        "..WWWB..",
+        "B.WWWB..",
+        "BWWWBB..",
+        "BBWWBBBB",
+        "..BW....",
+        "..WWW..."
+      ],
+      "best_value": 13,
+      "code_best": "b5",
+      "code_best_loss": 7,
+      "values": {
+        "b2": -34,
+        "e2": 2,
+        "b5": 6,
+        "b6": 4,
+        "b7": -34,
+        "c7": 8,
+        "d7": 13,
+        "e7": 6
+      }
+    },
+    {
+      "index": 11,
+      "stage": "midgame",
+      "empties": 41,
+      "side_to_move": "white",
+      "board": [
+        "........",
+        "..W.W...",
+        "..W.W...",
+        "..WWWWW.",
+        "B.WWW...",
+        ".BBWBBBB",
+        "..B.....",
+        ".WB....."
+      ],
+      "best_value": -24,
+      "code_best": "d1",
+      "code_best_loss": 0,
+      "values": {
+        "d1": -24,
+        "a2": -142,
+        "b2": -158,
+        "e2": -112,
+        "f2": -112,
+        "g2": -156,
+        "a3": -93
+      }
+    },
+    {
+      "index": 12,
+      "stage": "endgame",
+      "empties": 6,
+      "side_to_move": "white",
+      "board": [
+        "BBBBBBBB",
+        "WWWWWBW.",
+        ".W.WBBBW",
+        "WWWWBBBB",
+        "W.WBWBBB",
+        "WWWWWBW.",
+        "WWBWWWWW",
+        "BBBBBBW."
+      ],
+      "best_value": -384,
+      "code_best": "h3",
+      "code_best_loss": 0,
+      "values": {
+        "h3": -384,
+        "h7": -384
+      }
+    },
+    {
+      "index": 13,
+      "stage": "endgame",
+      "empties": 7,
+      "side_to_move": "white",
+      "board": [
+        "..WWWWW.",
+        "B.BBBW..",
+        "BBBWWWWW",
+        "BBBBWBWW",
+        "BBBWBBWW",
+        "BBBBWBBW",
+        "BBBWWBW.",
+        "WWWWWWWW"
+      ],
+      "best_value": 412,
+      "code_best": "a8",
+      "code_best_loss": 154,
+      "values": {
+        "h2": 412,
+        "b7": 90,
+        "a8": 258,
+        "b8": 258
+      }
+    },
+    {
+      "index": 14,
+      "stage": "endgame",
+      "empties": 9,
+      "side_to_move": "white",
+      "board": [
+        "B.B..B.B",
+        ".BWWWWWW",
+        "BWBWWWWW",
+        "WWWBWWWW",
+        "WWWBBBBW",
+        "WWWBWBWW",
+        ".WWBBBBW",
+        "BW.B.B.B"
+      ],
+      "best_value": -441,
+      "code_best": "e1",
+      "code_best_loss": 98,
+      "values": {
+        "c1": -441,
+        "e1": -539,
+        "g1": -571,
+        "a7": -547,
+        "b8": -535
+      }
+    },
+    {
+      "index": 15,
+      "stage": "endgame",
+      "empties": 12,
+      "side_to_move": "black",
+      "board": [
+        ".BBBBB..",
+        "..BBBB.B",
+        "WWWBBWWB",
+        "WBBBBW.B",
+        "WWBWWWWB",
+        "WWWBWWWB",
+        "W.BWWW.W",
+        ".BBBBB.."
+      ],
+      "best_value": 184,
+      "code_best": "h1",
+      "code_best_loss": 0,
+      "values": {
+        "g1": -82,
+        "h1": 184,
+        "b2": -88,
+        "g2": -156,
+        "g5": -86,
+        "a7": 24,
+        "b7": -144,
+        "g7": -12
+      }
+    },
+    {
+      "index": 16,
+      "stage": "endgame",
+      "empties": 14,
+      "side_to_move": "white",
+      "board": [
+        "..BBBBWB",
+        "..WBBBW.",
+        ".W.WBBWW",
+        "WWWWBBW.",
+        "..WBWBWB",
+        "..BBWBW.",
+        "WWWWWWWW",
+        "BBBBBBW."
+      ],
+      "best_value": -524,
+      "code_best": "b8",
+      "code_best_loss": 0,
+      "values": {
+        "b3": -560,
+        "b4": -560,
+        "b8": -524
+      }
+    },
+    {
+      "index": 17,
+      "stage": "endgame",
+      "empties": 5,
+      "side_to_move": "black",
+      "board": [
+        "BBBBBBBB",
+        "WWWWWBW.",
+        ".W.WWBBW",
+        "WWWWBWBW",
+        "W.WBWBWW",
+        "WWWWWBWW",
+        "WWBWWWWW",
+        "BBBBBBW."
+      ],
+      "best_value": 384,
+      "code_best": "c6",
+      "code_best_loss": 12,
+      "values": {
+        "h1": 384,
+        "b4": 260,
+        "a6": 366,
+        "c6": 372,
+        "h7": 260
+      }
+    }
+  ]
+}
