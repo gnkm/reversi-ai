@@ -1,0 +1,123 @@
+{
+  "recorded_at": "2026-09-20 14:38",
+  "protocol": {
+    "positions_per_stage": 6,
+    "search_depth": 4,
+    "exact_empty": 8,
+    "label": "alphabeta",
+    "wthor": false,
+    "selection": {
+      "shortlist_size": 3,
+      "margin": 0.5,
+      "confidence_threshold": 0.3
+    },
+    "notes": [
+      "変更は 1 つずつ入れ、改訂用局面の平均損失が下がったときだけ別局面でも測る。",
+      "別局面でも平均損失が下がった変更だけを採用する。",
+      "指標は絞り込み方式の平均損失（対局時と同じ経路）。",
+      "正解は手元の αβ（深さ 4。空きマスが 8 以下なら終局まで）の評価値。",
+      "WTHOR の手は正解に使っていない。資格情報と課金が要る呼出しは CI に載せない。"
+    ]
+  },
+  "trials": [
+    {
+      "change": "instructions_reference_stage_and_side",
+      "mean_loss_before": 40.22222222222222,
+      "mean_loss_after": 40.22222222222222,
+      "accepted": false,
+      "n": 18,
+      "asked_before": 8,
+      "asked_after": 8,
+      "mean_flips_jev_before": 4.166666666666667,
+      "mean_flips_jev_after": 4.166666666666667,
+      "mean_flips_code_best": 3.888888888888889
+    },
+    {
+      "change": "drop_objective",
+      "mean_loss_before": 40.22222222222222,
+      "mean_loss_after": 39.44444444444444,
+      "accepted": false,
+      "n": 18,
+      "asked_before": 8,
+      "asked_after": 8,
+      "mean_flips_jev_before": 4.166666666666667,
+      "mean_flips_jev_after": 4.166666666666667,
+      "mean_flips_code_best": 3.888888888888889,
+      "holdout_mean_loss_before": 14.055555555555555,
+      "holdout_mean_loss_after": 14.222222222222221,
+      "holdout_n": 18
+    },
+    {
+      "change": "gives_corner_newly",
+      "mean_loss_before": 40.22222222222222,
+      "mean_loss_after": 34.22222222222222,
+      "accepted": false,
+      "n": 18,
+      "asked_before": 8,
+      "asked_after": 8,
+      "mean_flips_jev_before": 4.166666666666667,
+      "mean_flips_jev_after": 4.166666666666667,
+      "mean_flips_code_best": 3.888888888888889,
+      "holdout_mean_loss_before": 14.055555555555555,
+      "holdout_mean_loss_after": 14.055555555555555,
+      "holdout_n": 18
+    },
+    {
+      "change": "add_takes_edge",
+      "mean_loss_before": 40.22222222222222,
+      "mean_loss_after": 40.22222222222222,
+      "accepted": false,
+      "n": 18,
+      "asked_before": 8,
+      "asked_after": 8,
+      "mean_flips_jev_before": 4.166666666666667,
+      "mean_flips_jev_after": 4.166666666666667,
+      "mean_flips_code_best": 3.888888888888889
+    },
+    {
+      "change": "add_stable_increase",
+      "mean_loss_before": 40.22222222222222,
+      "mean_loss_after": 40.22222222222222,
+      "accepted": false,
+      "n": 18,
+      "asked_before": 8,
+      "asked_after": 8,
+      "mean_flips_jev_before": 4.166666666666667,
+      "mean_flips_jev_after": 4.166666666666667,
+      "mean_flips_code_best": 3.888888888888889
+    },
+    {
+      "change": "add_reply_change",
+      "mean_loss_before": 40.22222222222222,
+      "mean_loss_after": 40.22222222222222,
+      "accepted": false,
+      "n": 18,
+      "asked_before": 8,
+      "asked_after": 8,
+      "mean_flips_jev_before": 4.166666666666667,
+      "mean_flips_jev_after": 4.166666666666667,
+      "mean_flips_code_best": 3.888888888888889
+    }
+  ],
+  "accepted_changes": [],
+  "holdout": {
+    "n": 18,
+    "mean_loss_baseline": 14.055555555555555,
+    "mean_loss_accepted": 14.055555555555555,
+    "improved": false,
+    "trials": [
+      {
+        "change": "drop_objective",
+        "mean_loss_before": 14.055555555555555,
+        "mean_loss_after": 14.222222222222221,
+        "improved": false
+      },
+      {
+        "change": "gives_corner_newly",
+        "mean_loss_before": 14.055555555555555,
+        "mean_loss_after": 14.055555555555555,
+        "improved": false
+      }
+    ]
+  }
+}

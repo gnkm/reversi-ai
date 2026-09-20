@@ -1044,6 +1044,75 @@ def test_jev_stage2_record_has_three_methods_and_confidence_bins() -> None:
     assert [item.display_name for item in items()].count("生成 AI (Jev)") == 1
 
 
+def test_jev_stage3_record_has_per_change_loss_and_holdout() -> None:
+    root = Path(__file__).resolve().parents[2] / "docs" / "benchmarks"
+    records = sorted(root.glob("jev-stage3*.json"))
+    assert records, "段階 3 のオフライン評価 JSON が docs/benchmarks/ に無い"
+    data = json.loads(records[-1].read_text(encoding="utf-8"))
+    trials = data["trials"]
+    assert trials, "試行が空"
+    for row in trials:
+        for key in ("change", "mean_loss_before", "mean_loss_after", "accepted"):
+            assert key in row, key
+    accepted = data["accepted_changes"]
+    assert isinstance(accepted, list)
+    holdout = data.get("holdout")
+    assert holdout, "別局面での確認が無い"
+    spec = json.loads(jev.PROMPT_PATH.read_text(encoding="utf-8"))
+    blob = json.dumps(spec, ensure_ascii=False).lower()
+    loaded = jev._load_spec()
+    if "instructions_reference_stage_and_side" in accepted:
+        assert "`stage`" in loaded.instructions
+        assert "`side_to_move`" in loaded.instructions
+        assert not loaded.places_in_state
+    else:
+        assert loaded.places_in_state
+    if "drop_objective" in accepted:
+        assert "objective" not in spec
+        assert loaded.objective == ""
+    else:
+        assert "more discs" in str(spec.get("objective", "")).lower()
+    if "gives_corner_newly" in accepted:
+        assert loaded.gives_corner_newly
+        assert "newly lets the opponent take a corner" in blob
+    else:
+        assert not loaded.gives_corner_newly
+        assert "newly lets the opponent take a corner" not in blob
+    if "add_takes_edge" not in accepted:
+        assert "occupies an edge" not in blob
+    if "add_stable_increase" not in accepted:
+        assert "stable discs increase" not in blob
+    if "add_reply_change" not in accepted:
+        assert "opponent replies vs now" not in blob
+    assert [item.display_name for item in items()].count("生成 AI (Jev)") == 1
+
+
+def test_jev_gives_corner_newly_does_not_mark_all_when_opponent_already_has_corner() -> None:
+    rows = (
+        "........",
+        "........",
+        "........",
+        "...BW...",
+        "...WB...",
+        "W.......",
+        "B.......",
+        "........",
+    )
+    position = _position_from_rank8_rows(rows, Color.BLACK)
+    places = legal_places(position)
+    assert len(places) >= 2
+    opponent = Position(position.board, Color.WHITE)
+    assert any(place.algebraic in {"a1", "h1", "a8", "h8"} for place in legal_places(opponent))
+    spec = jev._load_spec()
+    newly = replace(spec, gives_corner_newly=True)
+    flags = [jev._gives_corner(position, square, newly) for square in places]
+    assert flags
+    assert not all(flags)
+    if spec.gives_corner_newly:
+        production = [jev._gives_corner(position, square, spec) for square in places]
+        assert not all(production)
+
+
 def _black_feature_index(square: Square) -> int:
     return square.rank * 8 + square.file
 
