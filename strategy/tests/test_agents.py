@@ -1,4 +1,4 @@
-"""カタログと戦略個体（ランダム・最多取り・位置評価・ミニマックス・定石・機械学習・強化学習・ニューラルネットワーク・生成 AI）。"""
+"""カタログと戦略個体（ランダム・最多取り・位置評価・ミニマックス・定石・機械学習・LightGBM・強化学習・ニューラルネットワーク・生成 AI）。"""
 
 from __future__ import annotations
 
@@ -927,6 +927,233 @@ def test_ml_training_skips_unfinished_wthor(tmp_path: Path) -> None:
     _write_wtb(wthor_dir / "cut.wtb", ((Square.parse("f5"),),))
     with pytest.raises(ValueError, match="学習例"):
         train(wthor=wthor_dir, games=tmp_path / "missing.sqlite")
+
+
+class _LinearValueStub:
+    """黒平面の指定マスの占有に比例する価値。LightGBM の predict 形に合わせる。"""
+
+    def __init__(
+        self,
+        black_squares: dict[str, float],
+        bias: float = 0.0,
+        weights: tuple[float, ...] | None = None,
+    ) -> None:
+        if weights is None:
+            values = [0.0] * VECTOR_SIZE
+            for algebraic, value in black_squares.items():
+                square = Square.parse(algebraic)
+                values[_black_feature_index(square)] = value
+            self._weights = tuple(values)
+        else:
+            self._weights = weights
+        self._bias = bias
+
+    def predict(self, data: list[list[float]]) -> list[float]:
+        row = data[0]
+        total = self._bias
+        for weight, feature in zip(self._weights, row, strict=True):
+            total += weight * feature
+        return [total]
+
+
+def test_catalog_lists_ml_lightgbm() -> None:
+    from reversi.agents import lgbm
+
+    item = _item_by_display_name("機械学習 (LightGBM)")
+    ridge = _item_by_display_name("機械学習 (棋譜)")
+    assert item.specimen_id == lgbm.SPECIMEN_ID == "lgbm"
+    assert item.category == lgbm.CATEGORY == "machine_learning"
+    assert item.display_name == lgbm.DISPLAY_NAME
+    assert item.description == lgbm.DESCRIPTION
+    assert item.description.strip()
+    assert "WTHOR" in item.description
+    assert "永続化" in item.description
+    assert "LightGBM" in item.description
+    assert "ニューラルネットワーク" in item.description
+    assert _JAPANESE.search(item.description)
+    assert item.display_name != ridge.display_name
+    assert item.specimen_id != ridge.specimen_id
+    assert item.category == ridge.category
+    names = [entry.display_name for entry in items()]
+    assert len(names) == len(set(names))
+    assert get(lgbm.SPECIMEN_ID) == item
+    with pytest.raises(KeyError):
+        get("machine_learning")
+
+
+def test_lgbm_greedy_maximizes_black_value() -> None:
+    from reversi.agents import lgbm
+
+    position = initial_position()
+    model = _LinearValueStub({"c4": 4.0, "d3": 1.0})
+    move = lgbm.choose_move(position, model=model)
+    assert move == Place(Square.parse("c4"))
+    assert move.square in legal_places(position)
+    via_catalog = catalog_choose(lgbm.SPECIMEN_ID, position)
+    assert via_catalog is not None
+    assert via_catalog.square in legal_places(position)
+
+
+def test_lgbm_white_minimizes_black_value() -> None:
+    from reversi.agents import lgbm
+
+    after_black = play(initial_position(), Place(Square.parse("d3")))
+    assert after_black.side_to_move is Color.WHITE
+    places = legal_places(after_black)
+    assert len(places) >= 2
+    model = _LinearValueStub(
+        {},
+        weights=tuple(float(index) for index in range(VECTOR_SIZE)),
+    )
+    move = lgbm.choose_move(after_black, model=model)
+    assert move is not None
+    scored = {
+        square: lgbm.value_of(
+            apply_place(after_black.board, square, Color.WHITE),
+            model,
+        )
+        for square in places
+    }
+    best = min(scored.values())
+    expected = next(square for square in places if scored[square] == best)
+    assert move.square == expected
+    assert scored[move.square] == best
+
+
+def test_lgbm_tie_breaks_a1_to_h8_order() -> None:
+    from reversi.agents import lgbm
+
+    position = initial_position()
+    places = legal_places(position)
+    model = _LinearValueStub({})
+    values = [
+        lgbm.value_of(apply_place(position.board, square, Color.BLACK), model)
+        for square in places
+    ]
+    assert values and len(set(values)) == 1
+    move = lgbm.choose_move(position, Random(0), model=model)
+    assert move == Place(places[0])
+    assert move == Place(Square.parse("d3"))
+
+
+def test_lgbm_does_not_move_when_no_legal_places() -> None:
+    from reversi.agents import lgbm
+
+    model = _LinearValueStub({"a1": 1.0})
+    assert lgbm.choose_move(_almost_full_white_with_black_on_b1(), model=model) is None
+    assert lgbm.choose_move(_both_sides_cannot_place(), model=model) is None
+
+
+def test_lgbm_default_model_plays_only_legal_moves_to_the_end() -> None:
+    from reversi.agents import lgbm
+
+    assert lgbm.DEFAULT_MODEL_PATH.is_file()
+    model = lgbm.load_model(lgbm.DEFAULT_MODEL_PATH)
+    position = initial_position()
+    while not is_over(position):
+        if pass_is_legal(position):
+            position = play(position, PassMove())
+            continue
+        move = lgbm.choose_move(position, model=model)
+        assert move is not None
+        assert move.square in legal_places(position)
+        position = play(position, move)
+    assert is_over(position)
+
+
+def test_lgbm_default_model_values_vary_across_positions() -> None:
+    from reversi.agents import lgbm
+
+    model = lgbm.load_model(lgbm.DEFAULT_MODEL_PATH)
+    start = initial_position()
+    after = play(start, Place(Square.parse("d3")))
+    later = play(after, Place(legal_places(after)[0]))
+    scores = {
+        round(lgbm.value_of(start.board, model), 8),
+        round(lgbm.value_of(after.board, model), 8),
+        round(lgbm.value_of(later.board, model), 8),
+    }
+    assert len(scores) >= 2
+
+
+def test_lgbm_source_does_not_import_nn_sklearn_joblib_or_pickle() -> None:
+    source = _module_source("lgbm.py")
+    roots = _imported_roots(source)
+    assert roots.isdisjoint(_FORBIDDEN_IMPORT_ROOTS)
+    assert "lightgbm" in roots
+    assert "torch" not in roots
+    assert "onnxruntime" not in roots
+    assert "sklearn" not in roots
+    assert "joblib" not in roots
+    assert "pickle" not in roots
+    assert "openrouter" not in roots
+    tree = ast.parse(source)
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            lowered = node.value.lower()
+            assert "ffothello.org" not in lowered
+            assert ".wtb" not in lowered
+            assert "openrouter.ai" not in lowered
+
+
+def test_lgbm_load_model_rejects_non_native_text(tmp_path: Path) -> None:
+    from reversi.agents import lgbm
+
+    fake = tmp_path / "lgbm.txt"
+    fake.write_bytes(b"\x80\x04joblib")
+    with pytest.raises(ValueError, match="テキスト形式"):
+        lgbm.load_model(fake)
+    fake.write_text("{}\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="テキスト形式"):
+        lgbm.load_model(fake)
+
+
+def test_lgbm_training_fits_lightgbm_on_wthor_and_persisted_games(tmp_path: Path) -> None:
+    from reversi.agents import lgbm, most_flips, positional
+    from reversi.api.persist import MODE_AGENT_VS_AGENT, save_if_over
+    from reversi.train.lgbm import train_and_write
+
+    wthor_dir = tmp_path / "wthor"
+    wthor_dir.mkdir()
+    db_path = tmp_path / "games.sqlite"
+    out = tmp_path / "lgbm.txt"
+
+    finished, moves, squares = _play_record(
+        most_flips.choose_move,
+        positional.choose_move,
+    )
+    assert squares
+    written = save_if_over(
+        finished,
+        mode=MODE_AGENT_VS_AGENT,
+        black={"kind": "specimen", "specimen_id": most_flips.SPECIMEN_ID},
+        white={"kind": "specimen", "specimen_id": positional.SPECIMEN_ID},
+        moves=moves,
+        db_path=db_path,
+    )
+    assert written is True
+    _write_wtb(wthor_dir / "played.wtb", (squares[:60],))
+
+    booster = train_and_write(out, wthor=wthor_dir, games=db_path)
+    raw = out.read_bytes()
+    assert not raw.startswith(b"\x80")
+    text = out.read_text(encoding="utf-8")
+    assert text.lstrip("\ufeff").startswith("tree")
+    loaded = lgbm.load_model(out)
+    opening = initial_position()
+    move = lgbm.choose_move(opening, model=loaded)
+    assert move is not None
+    assert move.square in legal_places(opening)
+    assert lgbm.value_of(opening.board, loaded) == pytest.approx(
+        lgbm.value_of(opening.board, booster),
+    )
+
+
+def test_lgbm_training_requires_wthor_or_persisted_games(tmp_path: Path) -> None:
+    from reversi.train.lgbm import train
+
+    with pytest.raises(ValueError, match="学習例"):
+        train(wthor=tmp_path / "missing-wthor", games=tmp_path / "missing.sqlite")
 
 
 def _spec_leaf_score(board: Board, root: Color) -> int:

@@ -1,13 +1,13 @@
 ---
 title: アーキテクチャ
 product: Reversi Agents
-version: 0.1.10
+version: 0.1.11
 status: working
 date: 2026-09-20
 source: docs/srs.md
 srs_version: 0.1.24
 tech_stack: docs/tech-stack.md
-tech_stack_version: 0.2.12
+tech_stack_version: 0.2.13
 ---
 
 # アーキテクチャ
@@ -16,10 +16,10 @@ tech_stack_version: 0.2.12
 | --- | --- |
 | 文書識別 | reversi-ai-architecture |
 | 対象ソフトウェア | Reversi Agents |
-| 版 | 0.1.10 |
+| 版 | 0.1.11 |
 | 状態 | 現行（設計。要求ではない） |
 | 日付 | 2026-09-20 |
-| 入力 | [`docs/srs.md`](srs.md) 0.1.24、[`docs/tech-stack.md`](tech-stack.md) 0.2.12 |
+| 入力 | [`docs/srs.md`](srs.md) 0.1.24、[`docs/tech-stack.md`](tech-stack.md) 0.2.13 |
 
 本文書は**配置と層**の設計正本である。ソフトウェア要求の正本は [`docs/srs.md`](srs.md) であり、本文書は shall を追加・変更・撤回しない。言語・ライブラリ・コンテナの選定は [`docs/tech-stack.md`](tech-stack.md) を正とする。ディレクトリ名は tech-stack 2.3 と一致させ、ファイル単位の置き場と目的は本文書を正とする。
 
@@ -61,7 +61,7 @@ flowchart LR
 | --- | --- | --- |
 | `web` コンテナ（Hono） | ホスト `127.0.0.1` のみ HTTPS | UI 配信、Origin 照合、SSE、戦略プロセスへ中継 |
 | `strategy` コンテナ（FastAPI） | Pod 内のみ。ホストへ出さない | 規則、全エージェントの着手、進行中 1 局、終局の永続化、OpenRouter。torch は入れない |
-| 学習（`podman-compose run --rm train`） | 待ち受けしない。`up` の対象外 | 学習用イメージ（`train` グループを焼く）。ML / RL / NN の書き出し |
+| 学習（`podman-compose run --rm train`） | 待ち受けしない。`up` の対象外 | 学習用イメージ（`train` グループを焼く）。ML / LightGBM / RL / NN の書き出し |
 
 同時対局は 1。進行中の局は戦略プロセスのメモリ上。終局だけ SQLite へ書く。
 
@@ -167,6 +167,7 @@ reversi-ai/
 │   │   │   ├── minimax.py             # ルールベース (ミニマックス) 深さ 4
 │   │   │   ├── opening.py             # ルールベース (定石) 虎・牛・鼠
 │   │   │   ├── ml.py                  # 機械学習 (棋譜)。係数 JSON の積和のみ
+│   │   │   ├── lgbm.py                # 機械学習 (LightGBM)。ネイティブテキストを読む
 │   │   │   ├── rl.py                  # 強化学習 (自己対局)。線形重み。NN も OpenRouter も使わない
 │   │   │   ├── nn.py                  # ニューラルネットワーク (棋譜)。ONNX CPU
 │   │   │   ├── prompt.py              # prompts/ の Markdown を読む
@@ -184,7 +185,9 @@ reversi-ai/
 │   │   └── train/                     # 学習。対局経路からは import しない
 │   │       ├── __init__.py
 │   │       ├── wthor.py               # .wtb を読む。8×8 以外は捨てる
+│   │       ├── examples.py            # WTHOR と永続化対局から教師あり学習例を集める
 │   │       ├── ml.py                  # scikit-learn → models/ml.json
+│   │       ├── lgbm.py                # LightGBM → models/lgbm.txt
 │   │       ├── rl.py                  # NumPy 線形 TD → models/rl.json
 │   │       └── nn.py                  # PyTorch CPU → models/nn.onnx
 │   └── tests/                         # pytest。規則とエージェントの正
@@ -194,10 +197,11 @@ reversi-ai/
 │       ├── test_wthor.py
 │       ├── test_api.py                # カタログと 1 局の開始・着手・違法拒否
 │       ├── test_persist.py
-│       └── test_layers.py             # ML/RL が NN ランタイムを import しないこと
+│       └── test_layers.py             # ML / LightGBM / RL が NN ランタイムを import しないこと
 │
 ├── models/                            # 学習成果物。原本棋譜は置かない。Git 管理する
 │   ├── ml.json                        # ML 対局時の係数
+│   ├── lgbm.txt                       # LightGBM 対局時のネイティブテキスト
 │   ├── rl.json                        # RL 対局時の重み
 │   └── nn.onnx                        # NN 対局時の順伝播
 │
@@ -298,6 +302,7 @@ reversi-ai/
 | `minimax.py` | ルールベース (ミニマックス) | 深さ 4。葉は位置評価表の差。アルファベータは同一の葉評価になる範囲で可 |
 | `opening.py` | ルールベース (定石) | 虎・牛・鼠の 3 列と 8 対称。外れは位置評価 |
 | `ml.py` | 機械学習 (棋譜) | `models/ml.json` の積和。onnxruntime / PyTorch を import しない |
+| `lgbm.py` | 機械学習 (LightGBM) | `models/lgbm.txt` を LightGBM ネイティブ形式で読む。onnxruntime / PyTorch / joblib / pickle を import しない |
 | `rl.py` | 強化学習 (自己対局) | `models/rl.json`。NN 推論も OpenRouter も使わない |
 | `nn.py` | ニューラルネットワーク (棋譜) | `models/nn.onnx` を onnxruntime CPU で順伝播し、合法手へマスク |
 | `prompt.py` | （指示ファイル） | `prompts/` の Markdown を対局時に読む。欠落は継続不能 |
@@ -327,7 +332,9 @@ Pod 内 HTTP。TLS は Hono が担う。
 | ファイル | 機能 |
 | --- | --- |
 | `wthor.py` | `.wtb` を読む。ヘッダの盤サイズが 0 または 8 のファイルだけを 8×8 として扱う。再生できないレコードは捨てる。WTHOR はパスを持たないので、合法手が無い側ではエンジンのパスを挿入する。原本を HTTP で出さない |
+| `examples.py` | WTHOR と永続化対局から、Ridge と LightGBM が共有する教師あり学習例を集める |
 | `ml.py` | sklearn で学習し、対局用の係数 JSON を書く |
+| `lgbm.py` | LightGBM で学習し、対局用のネイティブテキストを書く |
 | `rl.py` | 自己対局の線形 TD。WTHOR を使わない |
 | `nn.py` | PyTorch CPU で学習し ONNX へ出す |
 
@@ -353,7 +360,7 @@ TypeScript 側は Zod（`web/server/src/schemas.ts`）、Python 側は Pydantic�
 
 | 置き場 | 中身 | Git |
 | --- | --- | --- |
-| `models/*.json`, `models/nn.onnx` | 対局時に読む学習成果物 | 含める |
+| `models/*.json`, `models/lgbm.txt`, `models/nn.onnx` | 対局時に読む学習成果物 | 含める |
 | `prompts/*.md` | 生成 AI の固定指示。戦略イメージへ COPY し、Compose では bind | 含める |
 | `data/games.sqlite` | 終局棋譜。`.wtb` ではない | 含めない |
 | `data/wthor/` | WTHOR 原本 | 含めない。再配布しない |
@@ -426,6 +433,9 @@ podman-compose -f compose.yaml -f compose.dev.yaml up --build
 podman-compose run --rm train python -m reversi.train.ml \
   --wthor /data/wthor --games /data/games.sqlite --out /models/ml.json
 
+podman-compose run --rm train python -m reversi.train.lgbm \
+  --wthor /data/wthor --games /data/games.sqlite --out /models/lgbm.txt
+
 podman-compose run --rm train python -m reversi.train.rl \
   --out /models/rl.json
 
@@ -460,7 +470,8 @@ Issue の検証欄と CI は、この節の生コマンドを使う。ラッパ�
 
 | 版 | 日付 | 内容 |
 | --- | --- | --- |
-| 0.1.10 | 2026-09-20 | カタログをカード選択にし、盤面を盤中心の横並びに揃える |
+| 0.1.11 | 2026-09-20 | カタログをカード選択にし、盤面を盤中心の横並びに揃える |
+| 0.1.10 | 2026-09-20 | 機械学習 (LightGBM) をカタログに載せ、ネイティブテキスト成果物を `models/lgbm.txt` とする
 | 0.1.9 | 2026-09-20 | 追加の生成 AI を `data/config.toml` と構造化出力に置き、自由文パースを既定にしない |
 | 0.1.8 | 2026-09-20 | エージェント対エージェントの着手間隔を戦略プロセスの適用待ちとし、開始 API へ渡す |
 | 0.1.7 | 2026-09-20 | 学習を `train` イメージに分け、対局用 strategy から torch を外す |

@@ -9,6 +9,7 @@ from random import Random
 from reversi.agents import (
     extra_genai,
     jev,
+    lgbm,
     minimax,
     ml,
     most_flips,
@@ -25,6 +26,7 @@ Chooser = Callable[[Position, Random | None], Place | None]
 
 __all__ = [
     "JEV",
+    "LGBM",
     "MINIMAX",
     "ML",
     "MOST_FLIPS",
@@ -86,6 +88,12 @@ ML = CatalogItem(
     display_name=ml.DISPLAY_NAME,
     description=ml.DESCRIPTION,
 )
+LGBM = CatalogItem(
+    specimen_id=lgbm.SPECIMEN_ID,
+    category=lgbm.CATEGORY,
+    display_name=lgbm.DISPLAY_NAME,
+    description=lgbm.DESCRIPTION,
+)
 RL = CatalogItem(
     specimen_id=rl.SPECIMEN_ID,
     category=rl.CATEGORY,
@@ -113,6 +121,7 @@ _BUILTIN: tuple[tuple[CatalogItem, Chooser], ...] = (
     (MINIMAX, minimax.choose_move),
     (OPENING, opening.choose_move),
     (ML, ml.choose_move),
+    (LGBM, lgbm.choose_move),
     (RL, rl.choose_move),
     (NN, nn.choose_move),
     (JEV, jev.choose_move),
