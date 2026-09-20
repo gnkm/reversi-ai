@@ -1,7 +1,7 @@
 ---
 title: アーキテクチャ
 product: Reversi Agents
-version: 0.1.28
+version: 0.1.29
 status: working
 date: 2026-09-20
 source: docs/srs.md
@@ -16,7 +16,7 @@ tech_stack_version: 0.2.19
 | --- | --- |
 | 文書識別 | reversi-ai-architecture |
 | 対象ソフトウェア | Reversi Agents |
-| 版 | 0.1.28 |
+| 版 | 0.1.29 |
 | 状態 | 現行（設計。要求ではない） |
 | 日付 | 2026-09-20 |
 | 入力 | [`docs/srs.md`](srs.md) 0.1.24、[`docs/tech-stack.md`](tech-stack.md) 0.2.19 |
@@ -123,6 +123,8 @@ reversi-ai/
 │   │   ├── jev_stage3.py              # 変更を 1 つずつ入れて平均損失を比べる。CI では走らせない
 │   │   ├── jev-stage4.json            # Jev 段階 4（絞り込みパラメータのオフライン格子）の記録
 │   │   ├── jev_stage4.py              # shortlist / margin / threshold を振る。CI では走らせない
+│   │   ├── jev-stage5.json            # Jev 段階 5（対局による最終確認）の記録
+│   │   ├── jev_stage5.py              # 基準線と指名設定を対で対局する。CI では走らせない
 │   │   └── archive/                   # 過去の総当たり正本（現行と同じ形）
 │   └── source-of-truth/
 │       ├── 01-seed.md                 # シード。AI は編集禁止
@@ -320,10 +322,10 @@ reversi-ai/
 | `rl.py` | 強化学習 (自己対局) | `models/rl.json`。NN 推論も OpenRouter も使わない |
 | `nn.py` | ニューラルネットワーク (棋譜) | `models/nn.onnx` を onnxruntime CPU で順伝播し、合法手へマスク |
 | `prompt.py` | （指示ファイル） | `prompts/` の Markdown と JSON を対局時に読む。欠落は継続不能 |
-| `jev.py` | 生成 AI (Jev) | `typesafe/jev-1.13` の Decisions API。1 着手 1 呼出しで、コード評価が最善から `margin` 以内かつ上位 `shortlist_size` 手だけを Choice のキーにする。盤面配列は渡さない。マスの種類・角・角渡し・相手手数・裏返しはコードが言葉にして渡す。候補が 1 手、または `margin = 0` なら Decisions を呼ばずコードの最善手を指す。confidence が `confidence_threshold` 未満ならコードの最善手へ戻す。加算合成では着手を決めない。各合法手のコード評価・指標・確率・confidence・shortlist・最終選択を標準エラーへ 1 行ずつ出す。指示は `prompts/jev.json`。合法手の外を採用しない。検証用に第 1 版定数・コードだけ・全合法手 Choice・絞り込みの 4 構成を切り替えられる。カタログ表示名は増やさない。既定は絞り込みである |
+| `jev.py` | 生成 AI (Jev) | `typesafe/jev-1.13` の Decisions API。1 着手 1 呼出しで、コード評価が最善から `margin` 以内かつ上位 `shortlist_size` 手だけを Choice のキーにする。盤面配列は渡さない。マスの種類・角・角渡し・相手手数・裏返しはコードが言葉にして渡す。候補が 1 手、または `margin = 0` なら Decisions を呼ばずコードの最善手を指す。confidence が `confidence_threshold` 未満ならコードの最善手へ戻す。加算合成では着手を決めない。各合法手のコード評価・指標・確率・confidence・shortlist・最終選択を標準エラーへ 1 行ずつ出す。指示は `prompts/jev.json`。合法手の外を採用しない。検証用に第 1 版定数・コードだけ・全合法手 Choice・絞り込みの 4 構成を切り替えられる。カタログ表示名は増やさない。段階 5 の対局で不採用のため、カタログの既定はコード最善（構成 `v2_jev0`）である |
 | `chat_completions.py` | 生成 AI (〈呼称〉) | 運用者が与えたテキスト生成モデル ID。固定の system は `prompts/chat-completions.md`。応答は JSON Schema を Pydantic で検証する |
 
-カテゴリ `random` は「ランダム」である。`position_table.py` は FUN-025 の点数表だけを持つ。`extra_genai.py` は `data/config.toml` を読む（対局者向けウィザードは置かない）。Jev は盤の数値配列を渡さず、合法手ごとの事実（マスの種類、角、角渡し、相手の手数、裏返し）をコードが語彙に直してから、同一項目の Choice で比べさせる。選択肢のキーは代数記法のマスであり、コード評価で最善から `margin` 以内かつ上位 `shortlist_size` 手に限る。全合法手を選択肢にしない。質問の型と instructions は合法手数で変えない。Choice の criteria は `state` の places と同じ言葉にする。段階と石取りの重みは空きマスなどコードが数える量から決める。角が取れるか、着手後に相手が角を取れるか、着手後の相手手数、裏返し枚数もコードが計算する。数値の 8×8 盤や `origin` による添字変換は `state` に置かない。合法手の点数は `jev.py` が着手を適用したあとの盤から付ける（位置評価表の差、モビリティ、石差、角の差。切片は着手後 1 手であり、相手の応手は探索しない。合法手内の min-max で 0 と 1 に引き伸ばさない）。カタログのミニマックス個体の `choose_move` には委譲しない。探索を深くしてミニマックス個体に寄せない。`margin = 0` または候補が 1 手なら、コードの最善手を指す（同点は a1…h8）。候補が 2 手以上ならその候補だけを Choice にかけ、confidence が `confidence_threshold` 未満ならコードの最善手へ戻す。加算合成（`w_jev × probability × confidence`）では着手を決めない。各合法手のコード評価・指標・Jev の確率と confidence・shortlist・最終選択を戦略プロセスの標準エラーへ 1 行ずつ出す。合法手が 1 つのときは Decisions を呼ばない。失敗時にコード評価だけで指す代替経路は、confidence 不足のときコード最善へ戻す経路を除き置かない。反転数やリスト長は Jev に数えさせない。固定の語彙・バケット・selection・重み・instructions は `prompts/jev.json` に置き、`strategy/src` には埋め込まない。対局中に増えるのは Choice のキーと、それに対応する言葉だけである。JSON を変えてイメージを作り直すか、開発時の bind（`./prompts:/prompts`）を更新すると、次の着手呼出しからその指示を使う。Chat Completions の指示は散文なので `prompts/chat-completions.md` のままである。`prompts/` に JSON と Markdown が混在してよい。日本語の注釈は本節に置き、質問ファイルは JSONC にしない。Choice のフィールドの形は [`docs/jev-decisions.md`](jev-decisions.md)。プロンプトの書き方（字義どおり、数え上げをコードへ移す、state を絞る）は [`docs/source-of-truth/jev-prompt-guide.md`](source-of-truth/jev-prompt-guide.md) を読む。AI は編集しない。
+カテゴリ `random` は「ランダム」である。`position_table.py` は FUN-025 の点数表だけを持つ。`extra_genai.py` は `data/config.toml` を読む（対局者向けウィザードは置かない）。Jev は盤の数値配列を渡さず、合法手ごとの事実（マスの種類、角、角渡し、相手の手数、裏返し）をコードが語彙に直してから、同一項目の Choice で比べさせる。選択肢のキーは代数記法のマスであり、コード評価で最善から `margin` 以内かつ上位 `shortlist_size` 手に限る。全合法手を選択肢にしない。質問の型と instructions は合法手数で変えない。Choice の criteria は `state` の places と同じ言葉にする。段階と石取りの重みは空きマスなどコードが数える量から決める。角が取れるか、着手後に相手が角を取れるか、着手後の相手手数、裏返し枚数もコードが計算する。数値の 8×8 盤や `origin` による添字変換は `state` に置かない。合法手の点数は `jev.py` が着手を適用したあとの盤から付ける（位置評価表の差、モビリティ、石差、角の差。切片は着手後 1 手であり、相手の応手は探索しない。合法手内の min-max で 0 と 1 に引き伸ばさない）。カタログのミニマックス個体の `choose_move` には委譲しない。探索を深くしてミニマックス個体に寄せない。段階 5 の対局で絞り込みは不採用のため、カタログ個体の既定はコード最善（構成 `v2_jev0`）である。`margin = 0` または候補が 1 手なら、コードの最善手を指す（同点は a1…h8）。候補が 2 手以上ならその候補だけを Choice にかけ、confidence が `confidence_threshold` 未満ならコードの最善手へ戻す。加算合成（`w_jev × probability × confidence`）では着手を決めない。各合法手のコード評価・指標・Jev の確率と confidence・shortlist・最終選択を戦略プロセスの標準エラーへ 1 行ずつ出す。合法手が 1 つのときは Decisions を呼ばない。失敗時にコード評価だけで指す代替経路は、confidence 不足のときコード最善へ戻す経路を除き置かない。反転数やリスト長は Jev に数えさせない。固定の語彙・バケット・selection・重み・instructions は `prompts/jev.json` に置き、`strategy/src` には埋め込まない。対局中に増えるのは Choice のキーと、それに対応する言葉だけである。JSON を変えてイメージを作り直すか、開発時の bind（`./prompts:/prompts`）を更新すると、次の着手呼出しからその指示を使う。Chat Completions の指示は散文なので `prompts/chat-completions.md` のままである。`prompts/` に JSON と Markdown が混在してよい。日本語の注釈は本節に置き、質問ファイルは JSONC にしない。Choice のフィールドの形は [`docs/jev-decisions.md`](jev-decisions.md)。プロンプトの書き方（字義どおり、数え上げをコードへ移す、state を絞る）は [`docs/source-of-truth/jev-prompt-guide.md`](source-of-truth/jev-prompt-guide.md) を読む。AI は編集しない。
 
 ### 4.5 `strategy` — `reversi.api`
 
@@ -424,6 +426,7 @@ web コンテナが Pod 内で `0.0.0.0:3000` を聞くのはよい。戦略コ�
 
 | 版 | 日付 | 内容 |
 | --- | --- | --- |
+| 0.1.29 | 2026-09-20 | Jev 段階 5 の対局記録を置き、カタログ既定をコード最善にする |
 | 0.1.28 | 2026-09-20 | Jev の絞り込みパラメータをオフラインで調整する記録を置く |
 | 0.1.27 | 2026-09-20 | Jev のプロンプトを 1 変更ずつオフライン評価する記録を置く |
 | 0.1.26 | 2026-09-20 | ルールベース (αβ) の葉を Mobility・Corner・石差の一次結合にする |
