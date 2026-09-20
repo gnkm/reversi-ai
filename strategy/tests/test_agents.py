@@ -1420,8 +1420,25 @@ def test_nn_training_writes_onnx_when_torch_is_installed(tmp_path: Path) -> None
     assert len(logits) == 64
 
 
-def _write_extra_genai(path: Path, entries: list[dict[str, str]]) -> Path:
-    path.write_text(json.dumps(entries), encoding="utf-8")
+def _toml_literal(value: object) -> str:
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, str):
+        escaped = value.replace("\\", "\\\\").replace('"', '\\"')
+        return f'"{escaped}"'
+    if isinstance(value, int | float):
+        return str(value)
+    raise TypeError(type(value))
+
+
+def _write_extra_genai(path: Path, entries: list[dict[str, object]]) -> Path:
+    chunks: list[str] = []
+    for entry in entries:
+        chunks.append("[[generative_ai]]")
+        for key, value in entry.items():
+            chunks.append(f"{key} = {_toml_literal(value)}")
+        chunks.append("")
+    path.write_text("\n".join(chunks), encoding="utf-8")
     return path
 
 
@@ -1429,7 +1446,7 @@ def test_extra_genai_missing_config_does_not_add_specimens(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(extra_genai, "CONFIG_PATH", tmp_path / "missing.json")
+    monkeypatch.setattr(extra_genai, "CONFIG_PATH", tmp_path / "missing.toml")
     listed = items()
     names = [item.display_name for item in listed]
     assert names.count("生成 AI (Jev)") == 1
@@ -1443,7 +1460,7 @@ def test_extra_genai_does_not_preplace_opus_or_astra(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(extra_genai, "CONFIG_PATH", tmp_path / "missing.json")
+    monkeypatch.setattr(extra_genai, "CONFIG_PATH", tmp_path / "missing.toml")
     names = [item.display_name for item in items()]
     lowered = " ".join(names).lower()
     assert "opus" not in lowered
@@ -1458,8 +1475,8 @@ def test_extra_genai_config_adds_display_name_and_calls_model_id(
 ) -> None:
     model_id = "openai/gpt-test-not-a-catalog-default"
     config = _write_extra_genai(
-        tmp_path / "genai.json",
-        [{"model_id": model_id, "name": "GPT"}],
+        tmp_path / "config.toml",
+        [{"model": model_id, "name": "GPT"}],
     )
     monkeypatch.setattr(extra_genai, "CONFIG_PATH", config)
     item = _item_by_display_name("生成 AI (GPT)")
@@ -1475,7 +1492,7 @@ def test_extra_genai_config_adds_display_name_and_calls_model_id(
 
     seen: dict[str, str] = {}
 
-    def pick(_position, places, called_model_id: str):
+    def pick(_position, places, called_model_id: str, **_kwargs):
         seen["model_id"] = called_model_id
         return places[0]
 
@@ -1492,10 +1509,10 @@ def test_extra_genai_display_names_are_unique_in_catalog(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     config = _write_extra_genai(
-        tmp_path / "genai.json",
+        tmp_path / "config.toml",
         [
-            {"model_id": "vendor/one", "name": "One"},
-            {"model_id": "vendor/two", "name": "Two"},
+            {"model": "vendor/one", "name": "One"},
+            {"model": "vendor/two", "name": "Two"},
         ],
     )
     monkeypatch.setattr(extra_genai, "CONFIG_PATH", config)
@@ -1516,8 +1533,8 @@ def test_extra_genai_rejects_duplicate_display_name(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     config = _write_extra_genai(
-        tmp_path / "genai.json",
-        [{"model_id": "vendor/other", "name": "Jev"}],
+        tmp_path / "config.toml",
+        [{"model": "vendor/other", "name": "Jev"}],
     )
     monkeypatch.setattr(extra_genai, "CONFIG_PATH", config)
     listed = items()
@@ -1527,10 +1544,10 @@ def test_extra_genai_rejects_duplicate_display_name(
     assert get(jev.SPECIMEN_ID).display_name == "生成 AI (Jev)"
 
     dup = _write_extra_genai(
-        tmp_path / "dup.json",
+        tmp_path / "dup.toml",
         [
-            {"model_id": "vendor/a", "name": "Same"},
-            {"model_id": "vendor/b", "name": "Same"},
+            {"model": "vendor/a", "name": "Same"},
+            {"model": "vendor/b", "name": "Same"},
         ],
     )
     monkeypatch.setattr(extra_genai, "CONFIG_PATH", dup)
@@ -1545,7 +1562,7 @@ def test_extra_genai_invalid_config_keeps_builtin_catalog(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    broken = tmp_path / "genai.json"
+    broken = tmp_path / "config.toml"
     broken.write_text("{", encoding="utf-8")
     monkeypatch.setattr(extra_genai, "CONFIG_PATH", broken)
     with pytest.raises(extra_genai.ConfigError):
@@ -1561,14 +1578,14 @@ def test_extra_genai_picks_legal_place_from_chat_double(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     config = _write_extra_genai(
-        tmp_path / "genai.json",
-        [{"model_id": "vendor/chat", "name": "Chat"}],
+        tmp_path / "config.toml",
+        [{"model": "vendor/chat", "name": "Chat"}],
     )
     monkeypatch.setattr(extra_genai, "CONFIG_PATH", config)
     position = initial_position()
     places = legal_places(position)
 
-    def pick_second(_position, legal, _model_id: str):
+    def pick_second(_position, legal, _model_id: str, **_kwargs):
         return legal[1]
 
     monkeypatch.setattr(chat_completions, "_call_openrouter", pick_second)
@@ -1582,15 +1599,15 @@ def test_extra_genai_does_not_adopt_place_outside_legal_set(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     config = _write_extra_genai(
-        tmp_path / "genai.json",
-        [{"model_id": "vendor/chat", "name": "Chat"}],
+        tmp_path / "config.toml",
+        [{"model": "vendor/chat", "name": "Chat"}],
     )
     monkeypatch.setattr(extra_genai, "CONFIG_PATH", config)
     position = initial_position()
     illegal = Square.parse("a1")
     assert illegal not in legal_places(position)
 
-    def pick_illegal(_position, _legal, _model_id: str):
+    def pick_illegal(_position, _legal, _model_id: str, **_kwargs):
         return illegal
 
     monkeypatch.setattr(chat_completions, "_call_openrouter", pick_illegal)
@@ -1604,7 +1621,7 @@ def test_extra_genai_does_not_move_when_no_legal_places(
 ) -> None:
     called = {"n": 0}
 
-    def should_not_run(_position, _legal, _model_id: str):
+    def should_not_run(_position, _legal, _model_id: str, **_kwargs):
         called["n"] += 1
         raise AssertionError("合法手が無い局面で OpenRouter を呼んではいけない")
 
@@ -1620,11 +1637,94 @@ def test_extra_genai_does_not_move_when_no_legal_places(
     assert called["n"] == 0
 
 
+def test_extra_genai_config_passes_parameters_and_prompt(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config = _write_extra_genai(
+        tmp_path / "config.toml",
+        [
+            {
+                "model": "vendor/chat",
+                "name": "Chat",
+                "temperature": 0.2,
+                "max_tokens": 32,
+                "prompt": "chat-completions.md",
+            }
+        ],
+    )
+    monkeypatch.setattr(extra_genai, "CONFIG_PATH", config)
+    extra = extra_genai.load()[0]
+    assert extra.parameters == {"temperature": 0.2, "max_tokens": 32}
+    assert extra.prompt_path == chat_completions.PROMPT_PATH
+    seen: dict[str, object] = {}
+
+    def pick(_position, places, called_model_id: str, **kwargs):
+        seen["model_id"] = called_model_id
+        seen["kwargs"] = kwargs
+        return places[0]
+
+    monkeypatch.setattr(chat_completions, "_call_openrouter", pick)
+    position = initial_position()
+    move = extra.choose_move(position)
+    assert move is not None
+    assert seen["model_id"] == "vendor/chat"
+    kwargs = seen["kwargs"]
+    assert isinstance(kwargs, dict)
+    assert kwargs["parameters"] == {"temperature": 0.2, "max_tokens": 32}
+    assert kwargs["prompt_path"] == chat_completions.PROMPT_PATH
+
+
+def test_extra_genai_empty_toml_does_not_add_specimens(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    empty = tmp_path / "config.toml"
+    empty.write_text("# 追加個体なし\n", encoding="utf-8")
+    monkeypatch.setattr(extra_genai, "CONFIG_PATH", empty)
+    assert extra_genai.load() == ()
+    assert all(not item.specimen_id.startswith("genai:") for item in items())
+
+
+def test_extra_genai_legacy_json_without_toml_is_config_error(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    leftover = tmp_path / "genai.json"
+    leftover.write_text(
+        '[{"model_id": "vendor/old", "name": "Old"}]',
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(extra_genai, "CONFIG_PATH", tmp_path / "config.toml")
+    with pytest.raises(extra_genai.ConfigError, match="config.toml に移して"):
+        extra_genai.load()
+    listed = items()
+    assert get(jev.SPECIMEN_ID) in listed
+    assert all(not item.specimen_id.startswith("genai:") for item in listed)
+
+
+def test_extra_genai_rejects_out_of_range_parameters(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cases = (
+        ({"model": "vendor/chat", "name": "Chat", "temperature": float("nan")}, "temperature"),
+        ({"model": "vendor/chat", "name": "Chat", "top_p": -0.1}, "top_p"),
+        ({"model": "vendor/chat", "name": "Chat", "max_tokens": 0}, "max_tokens"),
+    )
+    for entry, key in cases:
+        config = _write_extra_genai(tmp_path / f"{key}.toml", [entry])
+        monkeypatch.setattr(extra_genai, "CONFIG_PATH", config)
+        with pytest.raises(extra_genai.ConfigError, match=key):
+            extra_genai.load()
+        assert all(not item.specimen_id.startswith("genai:") for item in items())
+
+
 def test_extra_genai_source_has_no_player_wizard() -> None:
     extra_source = _module_source("extra_genai.py")
     chat_source = _module_source("chat_completions.py")
     catalog_source = _module_source("catalog.py")
-    assert "data/genai.json" in extra_source
+    assert "config.toml" in extra_source
     assert "ウィザード" in extra_source
     combined = extra_source + chat_source + catalog_source
     assert "wizard" not in combined.lower()
@@ -1637,6 +1737,10 @@ def test_extra_genai_source_has_no_player_wizard() -> None:
     assert "chat.send" in chat_source or "chat" in chat_source
     assert "typesafe/jev-1.13" not in chat_source
     assert "Choose exactly one legal Reversi" not in chat_source
+    assert "model_validate_json" in chat_source
+    assert "response_format" in chat_source
+    assert "json_schema" in chat_source
+    assert "split()[0]" not in chat_source
     tree = ast.parse(chat_source)
     for node in ast.walk(tree):
         if (

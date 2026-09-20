@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import json
 import os
 from collections.abc import Callable
 from pathlib import Path
@@ -417,7 +418,10 @@ def test_extra_genai_chat_uses_https_and_given_model_id(
         return SimpleNamespace(
             choices=[
                 SimpleNamespace(
-                    message=SimpleNamespace(content=chosen.algebraic, role="assistant")
+                    message=SimpleNamespace(
+                        content=json.dumps({"square": chosen.algebraic}),
+                        role="assistant",
+                    )
                 )
             ]
         )
@@ -445,6 +449,15 @@ def test_extra_genai_chat_uses_https_and_given_model_id(
     assert messages[0]["content"] in prompt_text
     assert "Choose exactly one legal Reversi" in messages[0]["content"]
     assert chosen.algebraic in messages[1]["content"] or "legal_places" in messages[1]["content"]
+    fmt = send["response_format"]
+    assert isinstance(fmt, dict)
+    assert fmt["type"] == "json_schema"
+    schema = fmt["json_schema"]
+    assert isinstance(schema, dict)
+    assert schema["name"] == "chosen_move"
+    assert schema["strict"] is True
+    assert schema["schema"] == chat_completions.ChosenMove.model_json_schema()
+    assert "temperature" not in send
 
 
 def test_extra_genai_chat_http_error_is_unplayable(
@@ -478,7 +491,11 @@ def test_extra_genai_chat_rejects_choice_outside_legal(
     def illegal(kwargs: dict[str, object]) -> SimpleNamespace:
         del kwargs
         return SimpleNamespace(
-            choices=[SimpleNamespace(message=SimpleNamespace(content="a1"))]
+            choices=[
+                SimpleNamespace(
+                    message=SimpleNamespace(content=json.dumps({"square": "a1"}))
+                )
+            ]
         )
 
     monkeypatch.setattr(chat_completions, "OpenRouter", _fake_chat_openrouter(illegal))
@@ -509,8 +526,73 @@ def test_extra_genai_missing_prompt_file_is_unplayable_without_calling_openroute
 
 
 def test_extra_genai_config_path_is_gitignored_data_file() -> None:
-    assert extra_genai.CONFIG_PATH.name == "genai.json"
+    assert extra_genai.CONFIG_PATH.name == "config.toml"
     assert extra_genai.CONFIG_PATH.parent.name == "data"
     assert extra_genai.CONFIG_PATH == (
-        Path(__file__).resolve().parents[2] / "data" / "genai.json"
+        Path(__file__).resolve().parents[2] / "data" / "config.toml"
     )
+
+
+def test_extra_genai_chat_rejects_free_text_first_token(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    secret = tmp_path / "openrouter-api-key"
+    secret.write_text(_API_KEY, encoding="utf-8")
+    monkeypatch.setattr(chat_completions, "SECRET_PATH", secret)
+    position = initial_position()
+    chosen = legal_places(position)[0]
+
+    def free_text(kwargs: dict[str, object]) -> SimpleNamespace:
+        del kwargs
+        return SimpleNamespace(
+            choices=[
+                SimpleNamespace(
+                    message=SimpleNamespace(
+                        content=f"{chosen.algebraic} is the best move"
+                    )
+                )
+            ]
+        )
+
+    monkeypatch.setattr(chat_completions, "OpenRouter", _fake_chat_openrouter(free_text))
+    with pytest.raises(jev.ExternalModelError, match="検証"):
+        chat_completions.choose_move(position, "vendor/extra-chat-model")
+
+
+def test_extra_genai_chat_passes_sampling_parameters(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    secret = tmp_path / "openrouter-api-key"
+    secret.write_text(_API_KEY, encoding="utf-8")
+    monkeypatch.setattr(chat_completions, "SECRET_PATH", secret)
+    position = initial_position()
+    chosen = legal_places(position)[0]
+
+    def respond(kwargs: dict[str, object]) -> SimpleNamespace:
+        del kwargs
+        return SimpleNamespace(
+            choices=[
+                SimpleNamespace(
+                    message=SimpleNamespace(
+                        content=json.dumps({"square": chosen.algebraic})
+                    )
+                )
+            ]
+        )
+
+    fake = _fake_chat_openrouter(respond)
+    monkeypatch.setattr(chat_completions, "OpenRouter", fake)
+    move = chat_completions.choose_move(
+        position,
+        "vendor/extra-chat-model",
+        parameters={"temperature": 0.0, "max_tokens": 16},
+    )
+    assert move is not None
+    assert move.square == chosen
+    send = fake.last_send
+    assert isinstance(send, dict)
+    assert send["temperature"] == 0.0
+    assert send["max_tokens"] == 16
+    assert send["response_format"]["type"] == "json_schema"
