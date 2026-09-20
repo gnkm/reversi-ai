@@ -1,7 +1,7 @@
 ---
 title: 技術スタック
 product: Reversi Agents
-version: 0.2.18
+version: 0.2.19
 status: working
 date: 2026-09-20
 source: docs/srs.md
@@ -14,7 +14,7 @@ srs_version: 0.1.24
 | --- | --- |
 | 文書識別 | reversi-ai-tech-stack |
 | 対象ソフトウェア | Reversi Agents |
-| 版 | 0.2.18 |
+| 版 | 0.2.19 |
 | 状態 | 現行（設計。要求ではない） |
 | 日付 | 2026-09-20 |
 | 入力 | [`docs/srs.md`](srs.md) 0.1.24 |
@@ -183,6 +183,7 @@ Hono は盤の合法手計算を持たない。人間の着手指定は戦略プ
 | --- | --- | --- |
 | ランダム (一様) | 合法手の一様乱択 | なし |
 | ルールベース 4 個体 | 最多取り・位置評価・ミニマックス（深さ 4）・定石。外部モデルも学習済み重みも読まない | なし |
+| ルールベース (αβ) | 深さ 6 の Negamax。外部モデルも学習済み重みも読まない。必須カタログの shall ではない | なし |
 | 機械学習 (棋譜) | 線形モデルの係数の積和。NN ランタイムを使わない | scikit-learn。WTHOR + 永続化対局 |
 | 機械学習 (LightGBM) | LightGBM ネイティブテキストの推論。NN ランタイムも joblib / pickle も使わない | LightGBM。WTHOR + 永続化対局 |
 | 強化学習 (自己対局) | 線形関数近似の重み。NN 推論も OpenRouter も使わない | NumPy。同じエンジンで自己対局。WTHOR を使わない |
@@ -463,6 +464,7 @@ OpenRouter の API キーは `podman secret create` でホストに置く。名�
 
 | 版 | 日付 | 内容 |
 | --- | --- | --- |
+| 0.2.19 | 2026-09-20 | ルールベース (αβ) を個体表に載せる（必須 4 個体の shall は変えない） |
 | 0.2.18 | 2026-09-20 | Decisions Choice の形は `docs/jev-decisions.md` を正とする |
 | 0.2.17 | 2026-09-20 | Decisions Choice の criteria map と answers の probabilities / confidence を 3.7 に書く |
 | 0.2.16 | 2026-09-20 | 対局の `up` は `web` と `strategy` を明示する |
