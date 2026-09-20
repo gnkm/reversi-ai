@@ -730,6 +730,68 @@ def test_jev_missing_probabilities_use_choice() -> None:
     assert jev._select_square(position, places, parsed, spec) == chosen
 
 
+def test_jev_buckets_cover_thirty_three_places_and_twenty_one_flips() -> None:
+    spec = jev._load_spec()
+    for count in range(0, 65):
+        assert jev._bucket_label(count, spec.opponent_buckets) in {
+            "few",
+            "some",
+            "many",
+        }
+    for count in range(1, 65):
+        assert jev._bucket_label(count, spec.flip_buckets) in {"few", "some", "many"}
+    assert jev._bucket_label(33, spec.opponent_buckets) == "many"
+    assert jev._bucket_label(21, spec.flip_buckets) == "many"
+    assert spec.opponent_buckets["many"][1] == 64
+    assert spec.flip_buckets["many"][1] == 64
+
+
+def test_jev_same_position_and_parsed_answers_repeat_the_square() -> None:
+    position = initial_position()
+    places = legal_places(position)
+    spec = jev._load_spec()
+    parsed = _jev_parsed(places, focused=places[1].algebraic)
+    first = jev._select_square(position, places, parsed, spec)
+    second = jev._select_square(position, places, parsed, spec)
+    assert first == second
+    lines = jev._place_lines(position, places, spec)
+    again = jev._place_lines(position, places, spec)
+    assert lines == again
+    assert jev._decision_state(position, spec, lines) == jev._decision_state(
+        position, spec, again
+    )
+    assert jev._decision_questions(spec, lines) == jev._decision_questions(spec, again)
+
+
+def test_jev_logs_candidate_code_probability_and_selection(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    position = initial_position()
+    places = legal_places(position)
+    spec = jev._load_spec()
+    parsed = _jev_parsed(places, focused=places[1].algebraic)
+    square = jev._select_square(position, places, parsed, spec)
+    err = capsys.readouterr().err
+    lines = [line for line in err.splitlines() if line.startswith("jev candidate ")]
+    assert len(lines) == len(places)
+    selected_count = 0
+    for line, place in zip(lines, places, strict=True):
+        assert f"square={place.algebraic}" in line
+        assert "code=" in line
+        assert "position=" in line
+        assert "mobility=" in line
+        assert "material=" in line
+        assert "corners=" in line
+        assert "probability=" in line
+        assert "confidence=" in line
+        if place == square:
+            assert "selected=true" in line
+            selected_count += 1
+        else:
+            assert "selected=false" in line
+    assert selected_count == 1
+
+
 def _black_feature_index(square: Square) -> int:
     return square.rank * 8 + square.file
 

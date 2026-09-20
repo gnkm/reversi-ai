@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from math import isfinite
@@ -288,8 +289,8 @@ def _load_spec(path: Path | None = None) -> _Spec:
     )
     flip_buckets = _bucket_map(_mapping_field(buckets, "flips"), _AMOUNT_KEYS)
     _require_cover(empty_buckets, 0, 64)
-    _require_cover(opponent_buckets, 0, 32)
-    _require_cover(flip_buckets, 1, 20)
+    _require_cover(opponent_buckets, 0, 64)
+    _require_cover(flip_buckets, 1, 64)
     weights = _mapping_field(loaded, "weights")
     w_jev, w_code, w_confidence, metrics, scales, stage = _load_weights(weights)
     return _Spec(
@@ -537,6 +538,56 @@ def _combined_score(
     return spec.w_code * code + spec.w_jev * spec.w_confidence * jev
 
 
+def _format_number(value: float) -> str:
+    return format(value, ".6g")
+
+
+def _candidate_log_line(
+    square: Square,
+    metrics: _Metrics,
+    parsed: _Parsed,
+    spec: _Spec,
+    stage: str,
+    selected: bool,
+) -> str:
+    probability = parsed.probabilities.get(square.algebraic, 0.0)
+    fields = (
+        f"square={square.algebraic}",
+        f"code={_format_number(_code_score(metrics, spec, stage))}",
+        f"position={_format_number(metrics.position)}",
+        f"mobility={_format_number(metrics.mobility)}",
+        f"material={_format_number(metrics.material)}",
+        f"corners={_format_number(metrics.corners)}",
+        f"probability={_format_number(probability)}",
+        f"confidence={_format_number(parsed.confidence)}",
+        f"selected={'true' if selected else 'false'}",
+    )
+    return "jev candidate " + " ".join(fields)
+
+
+def _log_candidates(
+    places: Sequence[Square],
+    metrics: Mapping[Square, _Metrics],
+    parsed: _Parsed,
+    spec: _Spec,
+    stage: str,
+    selected: Square,
+) -> None:
+    for square in places:
+        print(
+            _candidate_log_line(
+                square,
+                metrics[square],
+                parsed,
+                spec,
+                stage,
+                square == selected,
+            ),
+            file=sys.stderr,
+            flush=True,
+        )
+
+
 def _select_square(
     position: Position,
     places: Sequence[Square],
@@ -552,6 +603,7 @@ def _select_square(
         if score > best_score:
             best_score = score
             best_square = square
+    _log_candidates(places, metrics, parsed, spec, stage, best_square)
     return best_square
 
 
