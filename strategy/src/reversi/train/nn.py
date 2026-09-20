@@ -63,7 +63,7 @@ def _require_torch():
     except ImportError as exc:
         raise RuntimeError(
             "NN の学習には PyTorch CPU が必要です。"
-            "`podman compose run --rm train python -m reversi.train.nn` を使います。"
+            "`podman-compose run --rm train python -m reversi.train.nn` を使います。"
             "対局用の strategy イメージには torch を入れません。"
         ) from exc
     return torch

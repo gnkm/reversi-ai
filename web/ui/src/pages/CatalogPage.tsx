@@ -1,6 +1,13 @@
 import { type FormEvent, useEffect, useState } from "react";
 import { createGame, fetchCatalog } from "../api.ts";
 import { CatalogList } from "../components/CatalogList.tsx";
+import {
+  DEFAULT_AGENT_MOVE_INTERVAL_SECONDS,
+  MAX_AGENT_MOVE_INTERVAL_SECONDS,
+  MIN_AGENT_MOVE_INTERVAL_SECONDS,
+  moveIntervalMsFromSeconds,
+  parseMoveIntervalSeconds,
+} from "../moveInterval.ts";
 import type {
   CatalogItem,
   Color,
@@ -10,7 +17,11 @@ import type {
 } from "../types.ts";
 
 type CatalogPageProps = {
-  onStarted: (game: GameState, items: readonly CatalogItem[]) => void;
+  onStarted: (
+    game: GameState,
+    items: readonly CatalogItem[],
+    moveIntervalMs: number,
+  ) => void;
 };
 
 export function buildCreateGameRequest(input: {
@@ -47,6 +58,9 @@ export function CatalogPage({ onStarted }: CatalogPageProps) {
   const [whiteId, setWhiteId] = useState("");
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
+  const [intervalSeconds, setIntervalSeconds] = useState(
+    String(DEFAULT_AGENT_MOVE_INTERVAL_SECONDS),
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -85,7 +99,11 @@ export function CatalogPage({ onStarted }: CatalogPageProps) {
           whiteId,
         }),
       );
-      onStarted(game, items);
+      onStarted(
+        game,
+        items,
+        moveIntervalMsFromSeconds(parseMoveIntervalSeconds(intervalSeconds)),
+      );
     } catch {
       setStartError("対局を開始できませんでした。");
     } finally {
@@ -199,6 +217,18 @@ export function CatalogPage({ onStarted }: CatalogPageProps) {
                   </option>
                 ))}
               </select>
+            </label>
+            <label className="select-label">
+              着手間隔（秒）
+              <input
+                type="number"
+                name="move-interval"
+                min={MIN_AGENT_MOVE_INTERVAL_SECONDS}
+                max={MAX_AGENT_MOVE_INTERVAL_SECONDS}
+                step={0.1}
+                value={intervalSeconds}
+                onChange={(event) => setIntervalSeconds(event.target.value)}
+              />
             </label>
           </>
         )}

@@ -7,15 +7,16 @@ import {
   DEFAULT_STRATEGY_TIMEOUT_MS,
   LISTEN_HOST,
   listenPort,
+  PUBLIC_HOST,
   publicOrigin,
   strategyTimeoutMs,
   uiRoot,
 } from "./listen.ts";
 
 describe("listen", () => {
-  it("既定の待ち受けは 127.0.0.1 であり 0.0.0.0 を置かない", () => {
-    expect(LISTEN_HOST).toBe("127.0.0.1");
-    expect(LISTEN_HOST).not.toBe("0.0.0.0");
+  it("コンテナ内は 0.0.0.0 を聞き、公開オリジンは 127.0.0.1 のままにする", () => {
+    expect(LISTEN_HOST).toBe("0.0.0.0");
+    expect(PUBLIC_HOST).toBe("127.0.0.1");
     expect(listenPort({})).toBe(3000);
     expect(publicOrigin({})).toBe("https://127.0.0.1:3000");
     expect(DEFAULT_CERT_FILE).toBe("data/certs/cert.pem");

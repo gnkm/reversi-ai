@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { DEFAULT_AGENT_MOVE_INTERVAL_MS } from "./moveInterval.ts";
 import { CatalogPage } from "./pages/CatalogPage.tsx";
 import { GamePage } from "./pages/GamePage.tsx";
 import type { CatalogItem, GameState } from "./types.ts";
@@ -19,6 +20,9 @@ export function App() {
   const [path, setPath] = useState(() => currentPath());
   const [game, setGame] = useState<GameState | null>(null);
   const [items, setItems] = useState<CatalogItem[]>([]);
+  const [moveIntervalMs, setMoveIntervalMs] = useState(
+    DEFAULT_AGENT_MOVE_INTERVAL_MS,
+  );
 
   const onGame = useCallback((next: GameState) => {
     setGame(next);
@@ -36,9 +40,14 @@ export function App() {
     setPath("/");
   }
 
-  function handleStarted(next: GameState, catalog: readonly CatalogItem[]) {
+  function handleStarted(
+    next: GameState,
+    catalog: readonly CatalogItem[],
+    intervalMs: number,
+  ) {
     setItems([...catalog]);
     setGame(next);
+    setMoveIntervalMs(intervalMs);
     go("/game");
     setPath("/game");
   }
@@ -50,6 +59,7 @@ export function App() {
         specimenNames={nameMap(items)}
         onGame={onGame}
         onBack={showCatalog}
+        moveIntervalMs={moveIntervalMs}
       />
     );
   }

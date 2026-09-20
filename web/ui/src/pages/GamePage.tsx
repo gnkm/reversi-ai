@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   type GameStreamFailure,
   MoveRejectedError,
@@ -6,6 +6,10 @@ import {
   subscribeGameEvents,
 } from "../api.ts";
 import { Board } from "../components/Board.tsx";
+import {
+  createMovePresenter,
+  DEFAULT_AGENT_MOVE_INTERVAL_MS,
+} from "../moveInterval.ts";
 import type { GameState, PlayerSpec } from "../types.ts";
 
 type GamePageProps = {
@@ -13,6 +17,7 @@ type GamePageProps = {
   specimenNames: ReadonlyMap<string, string>;
   onGame: (game: GameState) => void;
   onBack: () => void;
+  moveIntervalMs?: number;
 };
 
 export function isHumanTurn(game: GameState): boolean {
@@ -82,12 +87,17 @@ export function GamePage({
   specimenNames,
   onGame,
   onBack,
+  moveIntervalMs = DEFAULT_AGENT_MOVE_INTERVAL_MS,
 }: GamePageProps) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [streamError, setStreamError] = useState<GameStreamFailure | null>(
     null,
   );
+  const onGameRef = useRef(onGame);
+  onGameRef.current = onGame;
+  const gameRef = useRef(game);
+  gameRef.current = game;
   const humanTurn = isHumanTurn(game);
   const vsAgents =
     game.black.kind === "specimen" && game.white.kind === "specimen";
@@ -97,10 +107,20 @@ export function GamePage({
     if (!vsAgents || finished) {
       return;
     }
-    return subscribeGameEvents(game.id, onGame, (code) => {
+    const presenter = createMovePresenter(
+      (next) => {
+        onGameRef.current(next);
+      },
+      { intervalMs: moveIntervalMs, initial: gameRef.current },
+    );
+    const stop = subscribeGameEvents(game.id, presenter.enqueue, (code) => {
       setStreamError(code);
     });
-  }, [vsAgents, finished, game.id, onGame]);
+    return () => {
+      presenter.dispose();
+      stop();
+    };
+  }, [vsAgents, finished, game.id, moveIntervalMs]);
 
   async function submitMove(move: Parameters<typeof playMove>[1]) {
     if (!humanTurn || busy) {
