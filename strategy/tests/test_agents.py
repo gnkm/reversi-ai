@@ -732,7 +732,7 @@ def test_jev_missing_probabilities_use_choice() -> None:
 
 def test_jev_buckets_cover_thirty_three_places_and_twenty_one_flips() -> None:
     spec = jev._load_spec()
-    for count in range(0, 65):
+    for count in range(65):
         assert jev._bucket_label(count, spec.opponent_buckets) in {
             "few",
             "some",
