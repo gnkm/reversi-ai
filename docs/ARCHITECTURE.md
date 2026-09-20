@@ -1,13 +1,13 @@
 ---
 title: アーキテクチャ
 product: Reversi Agents
-version: 0.1.2
+version: 0.1.3
 status: working
-date: 2026-09-19
+date: 2026-09-20
 source: docs/srs.md
 srs_version: 0.1.22
 tech_stack: docs/tech-stack.md
-tech_stack_version: 0.2.8
+tech_stack_version: 0.2.9
 ---
 
 # アーキテクチャ
@@ -16,10 +16,10 @@ tech_stack_version: 0.2.8
 | --- | --- |
 | 文書識別 | reversi-ai-architecture |
 | 対象ソフトウェア | Reversi Agents |
-| 版 | 0.1.2 |
+| 版 | 0.1.3 |
 | 状態 | 現行（設計。要求ではない） |
-| 日付 | 2026-09-19 |
-| 入力 | [`docs/srs.md`](srs.md) 0.1.22、[`docs/tech-stack.md`](tech-stack.md) 0.2.8 |
+| 日付 | 2026-09-20 |
+| 入力 | [`docs/srs.md`](srs.md) 0.1.22、[`docs/tech-stack.md`](tech-stack.md) 0.2.9 |
 
 本文書は**配置と層**の設計正本である。ソフトウェア要求の正本は [`docs/srs.md`](srs.md) であり、本文書は shall を追加・変更・撤回しない。言語・ライブラリ・コンテナの選定は [`docs/tech-stack.md`](tech-stack.md) を正とする。ディレクトリ名は tech-stack 2.3 と一致させ、ファイル単位の置き場と目的は本文書を正とする。
 
@@ -60,8 +60,8 @@ flowchart LR
 | プロセス | 公開 | 目的 |
 | --- | --- | --- |
 | `web` コンテナ（Hono） | ホスト `127.0.0.1` のみ HTTPS | UI 配信、Origin 照合、SSE、戦略プロセスへ中継 |
-| `strategy` コンテナ（FastAPI） | Pod 内のみ。ホストへ出さない | 規則、全エージェントの着手、進行中 1 局、終局の永続化、OpenRouter |
-| 学習（`podman compose run`） | 待ち受けしない | 対局と同じ strategy イメージ。ML / RL / NN の書き出し |
+| `strategy` コンテナ（FastAPI） | Pod 内のみ。ホストへ出さない | 規則、全エージェントの着手、進行中 1 局、終局の永続化、OpenRouter。torch は入れない |
+| 学習（`podman compose run --rm train`） | 待ち受けしない。`up` の対象外 | 学習用イメージ（`train` グループを焼く）。ML / RL / NN の書き出し |
 
 同時対局は 1。進行中の局は戦略プロセスのメモリ上。終局だけ SQLite へ書く。
 
@@ -95,7 +95,7 @@ reversi-ai/
 ├── AGENTS.md                          # エージェント作業ルール（要求正本・編集禁止）
 ├── CONTRIBUTING.md                    # Issue / PR / ブランチ / コミット規約
 ├── LICENSE
-├── compose.yaml                       # Podman Compose。同一 Pod に web と strategy
+├── compose.yaml                       # Podman Compose。同一 Pod に web と strategy。学習は train
 ├── compose.dev.yaml                   # 開発用オーバーレイ。bind mount と reload だけを足す
 ├── package.json                       # ウェブアプリ（UI + Hono）の依存とスクリプト
 ├── pnpm-lock.yaml
@@ -140,7 +140,7 @@ reversi-ai/
 │           └── sse.ts                 # エージェント対エージェントの盤面更新
 │
 ├── strategy/                          # 戦略プロセス。着手と学習
-│   ├── Containerfile                  # FastAPI。secret と data/ をマウント
+│   ├── Containerfile                  # 対局 (strategy) と学習 (train) のターゲット
 │   ├── pyproject.toml                 # パッケージ reversi、Ruff、import-linter
 │   ├── uv.lock
 │   ├── src/reversi/
@@ -362,7 +362,7 @@ tech-stack 第 5 節に加え、配置として次を置かない。
 
 動かすもの（対局・学習）は Podman。測るもの（pytest、Vitest、Biome、Ruff、lefthook）はホスト。根拠は [`docs/tech-stack.md`](tech-stack.md) 3.11 と 4.8。
 
-コンテナの `CMD` と `podman compose run` は、同じ `python -m` / `node` 入口を指す。コンソールスクリプトやルートの pnpm から Python を叩く入口は置かない。
+対局の `CMD` は `python -m reversi.api` / `node` である。学習は待ち受けせず、`podman compose run --rm train python -m reversi.train.*` で入口を指定する。コンソールスクリプトやルートの pnpm から Python を叩く入口は置かない。
 
 ### 8.1 一度だけ
 
@@ -390,6 +390,8 @@ podman compose up --build
 | `web` | ビルド済み UI を出す Hono（`node`） | ホストへは `127.0.0.1` のみ |
 | `strategy` | `python -m reversi.api` | Pod 内のみ。ホストへ公開しない。コンテナ内は `8000` でよい |
 
+`train` は `up` では起動しない（8.3）。
+
 戦略コンテナが Pod 内で `0.0.0.0:8000` を聞くのはよい。禁止するのはホストへの `0.0.0.0` である。
 
 ホットリロードが要るときだけ、別スタックを増やさずオーバーレイを足す。
@@ -402,16 +404,16 @@ podman compose -f compose.yaml -f compose.dev.yaml up --build
 
 ### 8.3 学習
 
-対局と同じ strategy イメージで、待ち受けせず一発起動する。ホストの `uv run` を正にしない。
+学習用イメージ（`strategy/Containerfile` の `train` ターゲット。`uv sync --frozen --no-dev --group train` を焼く）を、待ち受けせず一発起動する。`podman compose up` の常時起動対象にしない。ホストの `uv run` を正にしない。実行時に `uv sync --group train` しない。対局用 `strategy` に torch は入れない。
 
 ```bash
-podman compose run --rm strategy python -m reversi.train.ml \
+podman compose run --rm train python -m reversi.train.ml \
   --wthor /data/wthor --games /data/games.sqlite --out /models/ml.json
 
-podman compose run --rm strategy python -m reversi.train.rl \
+podman compose run --rm train python -m reversi.train.rl \
   --out /models/rl.json
 
-podman compose run --rm strategy python -m reversi.train.nn \
+podman compose run --rm train python -m reversi.train.nn \
   --wthor /data/wthor --games /data/games.sqlite --out /models/nn.onnx
 ```
 
@@ -442,6 +444,7 @@ Issue の検証欄と CI は、この節の生コマンドを使う。ラッパ�
 
 | 版 | 日付 | 内容 |
 | --- | --- | --- |
+| 0.1.3 | 2026-09-20 | 学習を `train` イメージに分け、対局用 strategy から torch を外す |
 | 0.1.2 | 2026-09-19 | Biome の検査対象を CI と同じ `web` にする |
 | 0.1.1 | 2026-09-19 | 対局と学習の起動を Podman に揃え、試験はホストとするコマンドを書く |
 | 0.1.0 | 2026-09-19 | tech-stack 0.2.7 を入力に、ディレクトリとファイルの配置を初稿とする |

@@ -101,6 +101,23 @@ podman compose down
 
 学習し直さなくても、これらの相手とは対局できます。
 
+## 学習し直す（任意）
+
+対局用の `strategy` ではなく、学習用サービスを待ち受けせず一発起動します。実行時に `uv sync` はしません。ホストの `uv run` は学習の正ではありません。WTHOR 原本は `data/wthor/` に置き、再配布しません。
+
+```bash
+podman compose run --rm train python -m reversi.train.ml \
+  --wthor /data/wthor --games /data/games.sqlite --out /models/ml.json
+
+podman compose run --rm train python -m reversi.train.rl \
+  --out /models/rl.json
+
+podman compose run --rm train python -m reversi.train.nn \
+  --wthor /data/wthor --games /data/games.sqlite --out /models/nn.onnx
+```
+
+書き出した成果物を既に動いている対局が読むなら、`strategy` を再起動してください。
+
 ## 他の生成 AI を足す（任意）
 
 OpenRouter 上の別モデルをカタログに足すときは、`data/genai.json` にモデル ID と呼称を書きます。対局画面から足す操作はありません。

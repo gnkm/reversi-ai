@@ -1,4 +1,5 @@
 # Podman Compose。web と strategy を同一 Pod で起動する。
+# 学習は train サービス（profile train）。待ち受けせず一発起動する。
 # 公開はホストのループバックだけ。secret の中身は書かない。
 
 name: reversi-ai
@@ -25,6 +26,7 @@ services:
     build:
       context: .
       dockerfile: strategy/Containerfile
+      target: strategy
     network_mode: service:web
     depends_on:
       - web
@@ -33,6 +35,20 @@ services:
       - ./models:/models
     secrets:
       - openrouter-api-key
+
+  train:
+    profiles:
+      - train
+    build:
+      context: .
+      dockerfile: strategy/Containerfile
+      target: train
+    # イメージに uv sync --frozen --no-dev --group train を焼く。実行時には sync しない。
+    volumes:
+      - ./data:/data
+      - ./models:/models
+    x-podman:
+      in_pod: false
 
 secrets:
   openrouter-api-key:
