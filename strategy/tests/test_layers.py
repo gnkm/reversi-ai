@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import tomllib
 from pathlib import Path
 
 _SRC = Path(__file__).resolve().parents[1] / "src" / "reversi"
@@ -172,3 +173,31 @@ def test_play_time_ml_and_rl_files_avoid_nn_runtimes() -> None:
         assert "sklearn" not in roots
         assert "torch" not in roots
         assert "onnxruntime" not in roots
+
+
+def _train_group_packages() -> tuple[str, ...]:
+    pyproject = Path(__file__).resolve().parents[1] / "pyproject.toml"
+    data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
+    names: list[str] = []
+    for requirement in data["dependency-groups"]["train"]:
+        names.append(requirement.split(">", 1)[0].split("=", 1)[0].split("[", 1)[0])
+    return tuple(names)
+
+
+def test_train_group_includes_onnx_and_torch() -> None:
+    packages = _train_group_packages()
+    assert "onnx" in packages
+    assert "torch" in packages
+
+
+def test_containerfile_bakes_train_group_only_on_train_target() -> None:
+    text = (Path(__file__).resolve().parents[1] / "Containerfile").read_text(
+        encoding="utf-8",
+    )
+    train_stage, _, rest = text.partition("FROM base AS train")
+    strategy_stage = rest.partition("FROM base AS strategy")[2]
+    assert "uv sync --frozen --no-dev --group train" in rest.partition(
+        "FROM base AS strategy",
+    )[0]
+    assert "--group train" not in strategy_stage
+    assert "--group train" not in train_stage

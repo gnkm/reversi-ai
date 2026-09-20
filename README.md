@@ -155,7 +155,7 @@ curl -sk https://127.0.0.1:3000/api/games \
 
 ## 学習し直す（任意）
 
-対局と同じ strategy の入れ物を、待ち受けせず一発起動します。専用 GPU は不要です。
+対局用の `strategy` ではなく、学習用サービスを待ち受けせず一発起動します。実行時に `uv sync` はしません。ホストの `uv run` は学習の正ではありません。専用 GPU は不要です。
 
 **機械学習 (棋譜)** と **ニューラルネットワーク (棋譜)** は、[WTHOR](https://www.ffothello.org/informatique/la-base-wthor) の 8×8 棋譜（`.wtb`）と、終局して残った自対局（`data/games.sqlite`）を使います。WTHOR の ZIP を手元で展開し、拡張子が `.wtb` のファイルを `data/wthor/` の直下に置いてください。ファイル名は問いません（例: `2024.wtb`、`2025.wtb`）。置いた `.wtb` をすべて読みます。このリポジトリから原本は配りません。再配布しないでください。
 
@@ -164,13 +164,13 @@ curl -sk https://127.0.0.1:3000/api/games \
 ```bash
 mkdir -p data/wthor
 
-podman-compose run --rm strategy python -m reversi.train.ml \
+podman-compose run --rm train python -m reversi.train.ml \
   --wthor /data/wthor --games /data/games.sqlite --out /models/ml.json
 
-podman-compose run --rm strategy python -m reversi.train.rl \
+podman-compose run --rm train python -m reversi.train.rl \
   --out /models/rl.json
 
-podman-compose run --rm strategy python -m reversi.train.nn \
+podman-compose run --rm train python -m reversi.train.nn \
   --wthor /data/wthor --games /data/games.sqlite --out /models/nn.onnx
 ```
 

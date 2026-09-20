@@ -1,13 +1,13 @@
 ---
 title: アーキテクチャ
 product: Reversi Agents
-version: 0.1.6
+version: 0.1.8
 status: working
 date: 2026-09-20
 source: docs/srs.md
 srs_version: 0.1.24
 tech_stack: docs/tech-stack.md
-tech_stack_version: 0.2.9
+tech_stack_version: 0.2.11
 ---
 
 # アーキテクチャ
@@ -16,10 +16,10 @@ tech_stack_version: 0.2.9
 | --- | --- |
 | 文書識別 | reversi-ai-architecture |
 | 対象ソフトウェア | Reversi Agents |
-| 版 | 0.1.6 |
+| 版 | 0.1.8 |
 | 状態 | 現行（設計。要求ではない） |
 | 日付 | 2026-09-20 |
-| 入力 | [`docs/srs.md`](srs.md) 0.1.24、[`docs/tech-stack.md`](tech-stack.md) 0.2.9 |
+| 入力 | [`docs/srs.md`](srs.md) 0.1.24、[`docs/tech-stack.md`](tech-stack.md) 0.2.11 |
 
 本文書は**配置と層**の設計正本である。ソフトウェア要求の正本は [`docs/srs.md`](srs.md) であり、本文書は shall を追加・変更・撤回しない。言語・ライブラリ・コンテナの選定は [`docs/tech-stack.md`](tech-stack.md) を正とする。ディレクトリ名は tech-stack 2.3 と一致させ、ファイル単位の置き場と目的は本文書を正とする。
 
@@ -60,8 +60,8 @@ flowchart LR
 | プロセス | 公開 | 目的 |
 | --- | --- | --- |
 | `web` コンテナ（Hono） | ホスト `127.0.0.1` のみ HTTPS | UI 配信、Origin 照合、SSE、戦略プロセスへ中継 |
-| `strategy` コンテナ（FastAPI） | Pod 内のみ。ホストへ出さない | 規則、全エージェントの着手、進行中 1 局、終局の永続化、OpenRouter |
-| 学習（`podman-compose run`） | 待ち受けしない | 対局と同じ strategy イメージ。ML / RL / NN の書き出し |
+| `strategy` コンテナ（FastAPI） | Pod 内のみ。ホストへ出さない | 規則、全エージェントの着手、進行中 1 局、終局の永続化、OpenRouter。torch は入れない |
+| 学習（`podman-compose run --rm train`） | 待ち受けしない。`up` の対象外 | 学習用イメージ（`train` グループを焼く）。ML / RL / NN の書き出し |
 
 同時対局は 1。進行中の局は戦略プロセスのメモリ上。終局だけ SQLite へ書く。
 
@@ -95,7 +95,7 @@ reversi-ai/
 ├── AGENTS.md                          # エージェント作業ルール（要求正本・編集禁止）
 ├── CONTRIBUTING.md                    # Issue / PR / ブランチ / コミット規約
 ├── LICENSE
-├── compose.yaml                       # Podman Compose。同一 Pod に web と strategy
+├── compose.yaml                       # Podman Compose。同一 Pod に web と strategy。学習は train
 ├── compose.dev.yaml                   # 開発用オーバーレイ。bind mount と reload だけを足す
 ├── package.json                       # ウェブアプリ（UI + Hono）の依存とスクリプト
 ├── pnpm-lock.yaml
@@ -144,7 +144,7 @@ reversi-ai/
 │           └── sse.ts                 # エージェント対エージェントの盤面更新
 │
 ├── strategy/                          # 戦略プロセス。着手と学習
-│   ├── Containerfile                  # FastAPI。secret と data/ をマウント
+│   ├── Containerfile                  # 対局 (strategy) と学習 (train) のターゲット。prompts/ を載せる
 │   ├── pyproject.toml                 # パッケージ reversi、Ruff、import-linter
 │   ├── uv.lock
 │   ├── src/reversi/
@@ -168,6 +168,7 @@ reversi-ai/
 │   │   │   ├── ml.py                  # 機械学習 (棋譜)。係数 JSON の積和のみ
 │   │   │   ├── rl.py                  # 強化学習 (自己対局)。線形重み。NN も OpenRouter も使わない
 │   │   │   ├── nn.py                  # ニューラルネットワーク (棋譜)。ONNX CPU
+│   │   │   ├── prompt.py              # prompts/ の Markdown を読む
 │   │   │   ├── jev.py                 # 生成 AI (Jev)。Decisions API
 │   │   │   └── chat_completions.py    # 追加の生成 AI。Chat Completions
 │   │   ├── api/                       # 内部 FastAPI。ブラウザからは到達させない
@@ -198,6 +199,10 @@ reversi-ai/
 │   ├── ml.json                        # ML 対局時の係数
 │   ├── rl.json                        # RL 対局時の重み
 │   └── nn.onnx                        # NN 対局時の順伝播
+│
+├── prompts/                           # 生成 AI の固定指示。戦略プロセスが対局時に読む
+│   ├── jev.md                         # 生成 AI (Jev) の Decisions 指示
+│   └── chat-completions.md            # 追加の生成 AI の Chat Completions 指示
 │
 ├── e2e/                               # Playwright。対象はマシン上の Google Chrome
 │   ├── playwright.config.ts
@@ -292,10 +297,11 @@ reversi-ai/
 | `ml.py` | 機械学習 (棋譜) | `models/ml.json` の積和。onnxruntime / PyTorch を import しない |
 | `rl.py` | 強化学習 (自己対局) | `models/rl.json`。NN 推論も OpenRouter も使わない |
 | `nn.py` | ニューラルネットワーク (棋譜) | `models/nn.onnx` を onnxruntime CPU で順伝播し、合法手へマスク |
-| `jev.py` | 生成 AI (Jev) | `typesafe/jev-1.13` の Decisions API。合法手の外を採用しない |
-| `chat_completions.py` | 生成 AI (〈呼称〉) | 運用者が与えたテキスト生成モデル ID |
+| `prompt.py` | （指示ファイル） | `prompts/` の Markdown を対局時に読む。欠落は継続不能 |
+| `jev.py` | 生成 AI (Jev) | `typesafe/jev-1.13` の Decisions API。指示は `prompts/jev.md`。合法手の外を採用しない |
+| `chat_completions.py` | 生成 AI (〈呼称〉) | 運用者が与えたテキスト生成モデル ID。固定の system は `prompts/chat-completions.md` |
 
-カテゴリ `random` は「ランダム」である。`position_table.py` は FUN-025 の点数表だけを持つ。`extra_genai.py` は `data/genai.json` を読む（対局者向けウィザードは置かない）。
+カテゴリ `random` は「ランダム」である。`position_table.py` は FUN-025 の点数表だけを持つ。`extra_genai.py` は `data/genai.json` を読む（対局者向けウィザードは置かない）。Jev の固定指示は `prompts/jev.md` に置き、`strategy/src` には埋め込まない。Markdown を変えてイメージを作り直すか、開発時の bind（`./prompts:/prompts`）を更新すると、次の着手呼出しからその指示を使う。
 
 ### 4.5 `strategy` — `reversi.api`
 
@@ -345,6 +351,7 @@ TypeScript 側は Zod（`web/server/src/schemas.ts`）、Python 側は Pydantic�
 | 置き場 | 中身 | Git |
 | --- | --- | --- |
 | `models/*.json`, `models/nn.onnx` | 対局時に読む学習成果物 | 含める |
+| `prompts/*.md` | 生成 AI の固定指示。戦略イメージへ COPY し、Compose では bind | 含める |
 | `data/games.sqlite` | 終局棋譜。`.wtb` ではない | 含めない |
 | `data/wthor/` | WTHOR 原本 | 含めない。再配布しない |
 | `data/genai.json` | 追加生成 AI のモデル ID と呼称 | 含めない |
@@ -368,7 +375,7 @@ tech-stack 第 5 節に加え、配置として次を置かない。
 
 動かすもの（対局・学習）は Podman。測るもの（pytest、Vitest、Biome、Ruff、lefthook）はホスト。根拠は [`docs/tech-stack.md`](tech-stack.md) 3.11 と 4.8。
 
-コンテナの `CMD` と `podman-compose run` は、同じ `python -m` / `node` 入口を指す。コンソールスクリプトやルートの pnpm から Python を叩く入口は置かない。起動の正は Python の `podman-compose` である。プラグインの `podman compose`（docker-compose）は `secrets.external` を扱えず使わない。
+対局の `CMD` は `python -m reversi.api` / `node` である。学習は待ち受けせず、`podman-compose run --rm train python -m reversi.train.*` で入口を指定する。コンソールスクリプトやルートの pnpm から Python を叩く入口は置かない。起動の正は Python の `podman-compose` である。プラグインの `podman compose`（docker-compose）は `secrets.external` を扱えず使わない。
 
 ### 8.1 一度だけ
 
@@ -396,6 +403,8 @@ podman-compose up --build
 | `web` | ビルド済み UI を出す Hono（`node`） | コンテナ内は `0.0.0.0`。ホストへは `127.0.0.1` のみ |
 | `strategy` | `python -m reversi.api` | Pod 内のみ。ホストへ公開しない。コンテナ内は `8000` でよい |
 
+`train` は `up` では起動しない（8.3）。
+
 web コンテナが Pod 内で `0.0.0.0:3000` を聞くのはよい。戦略コンテナが Pod 内で `0.0.0.0:8000` を聞くのもよい。禁止するのはホストへの `0.0.0.0` である。
 
 ホットリロードが要るときだけ、別スタックを増やさずオーバーレイを足す。
@@ -408,16 +417,16 @@ podman-compose -f compose.yaml -f compose.dev.yaml up --build
 
 ### 8.3 学習
 
-対局と同じ strategy イメージで、待ち受けせず一発起動する。ホストの `uv run` を正にしない。
+学習用イメージ（`strategy/Containerfile` の `train` ターゲット。`uv sync --frozen --no-dev --group train` を焼く）を、待ち受けせず一発起動する。`podman-compose up` の常時起動対象にしない。ホストの `uv run` を正にしない。実行時に `uv sync --group train` しない。対局用 `strategy` に torch は入れない。
 
 ```bash
-podman-compose run --rm strategy python -m reversi.train.ml \
+podman-compose run --rm train python -m reversi.train.ml \
   --wthor /data/wthor --games /data/games.sqlite --out /models/ml.json
 
-podman-compose run --rm strategy python -m reversi.train.rl \
+podman-compose run --rm train python -m reversi.train.rl \
   --out /models/rl.json
 
-podman-compose run --rm strategy python -m reversi.train.nn \
+podman-compose run --rm train python -m reversi.train.nn \
   --wthor /data/wthor --games /data/games.sqlite --out /models/nn.onnx
 ```
 
@@ -448,7 +457,9 @@ Issue の検証欄と CI は、この節の生コマンドを使う。ラッパ�
 
 | 版 | 日付 | 内容 |
 | --- | --- | --- |
-| 0.1.6 | 2026-09-20 | エージェント対エージェントの着手間隔を戦略プロセスの適用待ちとし、開始 API へ渡す |
+| 0.1.8 | 2026-09-20 | エージェント対エージェントの着手間隔を戦略プロセスの適用待ちとし、開始 API へ渡す |
+| 0.1.7 | 2026-09-20 | 学習を `train` イメージに分け、対局用 strategy から torch を外す |
+| 0.1.6 | 2026-09-20 | 生成 AI の固定指示を `prompts/` に置き、strategy イメージが読む |
 | 0.1.5 | 2026-09-20 | 起動の正を `podman-compose` に揃え、文書表の日付をフロントマターと一致させる |
 | 0.1.4 | 2026-09-20 | 総当たり基準結果を `docs/benchmarks/` に置く |
 | 0.1.3 | 2026-09-20 | web はコンテナ内で `0.0.0.0` を聞き、ホストへ出す口は `127.0.0.1` のままにする |

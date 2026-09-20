@@ -10,10 +10,12 @@ from openrouter import OpenRouter
 from openrouter.utils.retries import BackoffStrategy, RetryConfig
 
 from reversi.agents.jev import SECRET_PATH, ExternalModelError, read_secret
+from reversi.agents.prompt import PROMPTS_DIR, PromptFileError, load_sections
 from reversi.engine.board import BOARD_SIZE, Square
 from reversi.engine.rules import Place, Position, legal_places
 
 CHAT_SERVER = "https://openrouter.ai"
+PROMPT_PATH = PROMPTS_DIR / "chat-completions.md"
 # Hono の戦略中継は 60 秒。それより先に失敗させ、ロックを返す。
 CHAT_TIMEOUT_MS = 55_000
 _NO_RETRY = RetryConfig("none", BackoffStrategy(0, 0, 1.0, 0), False)
@@ -21,6 +23,7 @@ _NO_RETRY = RetryConfig("none", BackoffStrategy(0, 0, 1.0, 0), False)
 __all__ = [
     "CHAT_SERVER",
     "CHAT_TIMEOUT_MS",
+    "PROMPT_PATH",
     "SECRET_PATH",
     "choose_move",
 ]
@@ -44,17 +47,17 @@ def _board_state(position: Position, places: Sequence[Square]) -> dict[str, Any]
     }
 
 
+def _system_instructions() -> str:
+    try:
+        return load_sections(PROMPT_PATH, "system")["system"]
+    except PromptFileError as exc:
+        raise ExternalModelError(str(exc)) from exc
+
+
 def _messages(position: Position, places: Sequence[Square]) -> list[dict[str, str]]:
     legal = ", ".join(square.algebraic for square in places)
     return [
-        {
-            "role": "system",
-            "content": (
-                "Choose exactly one legal Reversi move for the side to move. "
-                "Reply with only the algebraic square (for example d3). "
-                "a1 is bottom-left for Black."
-            ),
-        },
+        {"role": "system", "content": _system_instructions()},
         {
             "role": "user",
             "content": (
@@ -95,6 +98,7 @@ def _call_openrouter(
     model_id: str,
 ) -> Square:
     key = read_secret(SECRET_PATH)
+    messages = _messages(position, places)
     try:
         with OpenRouter(
             api_key=key,
@@ -103,7 +107,7 @@ def _call_openrouter(
         ) as client:
             response = client.chat.send(
                 model=model_id,
-                messages=_messages(position, places),
+                messages=messages,
                 retries=_NO_RETRY,
                 timeout_ms=CHAT_TIMEOUT_MS,
             )

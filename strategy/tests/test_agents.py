@@ -486,6 +486,8 @@ def test_jev_source_uses_jev_model_and_skips_wthor() -> None:
     source = _module_source("jev.py")
     assert "typesafe/jev-1.13" in source
     assert "https://openrouter.ai" in source
+    assert "Choose exactly one legal Reversi" not in source
+    assert "Place a stone on" not in source
     roots = _imported_roots(source)
     assert "wthor" not in roots
     assert "reversi" in roots or "openrouter" in roots
@@ -1396,6 +1398,27 @@ def test_nn_training_skips_corrupt_persisted_games(tmp_path: Path) -> None:
     assert [example.square.algebraic for example in examples] == ["f5"]
 
 
+def test_nn_training_writes_onnx_when_torch_is_installed(tmp_path: Path) -> None:
+    pytest.importorskip("torch")
+    pytest.importorskip("onnx")
+    from reversi.agents.nn import infer_logits
+    from reversi.train.nn import train_and_write
+
+    out = tmp_path / "nn.onnx"
+    n_examples = train_and_write(
+        out,
+        wthor=tmp_path / "missing-wthor",
+        games=tmp_path / "missing.sqlite",
+        hidden=8,
+        epochs=1,
+        seed=0,
+    )
+    assert n_examples == 0
+    assert out.is_file()
+    logits = infer_logits(initial_position().board, out)
+    assert len(logits) == 64
+
+
 def _write_extra_genai(path: Path, entries: list[dict[str, str]]) -> Path:
     path.write_text(json.dumps(entries), encoding="utf-8")
     return path
@@ -1612,6 +1635,7 @@ def test_extra_genai_source_has_no_player_wizard() -> None:
     assert "https://openrouter.ai" in chat_source
     assert "chat.send" in chat_source or "chat" in chat_source
     assert "typesafe/jev-1.13" not in chat_source
+    assert "Choose exactly one legal Reversi" not in chat_source
     tree = ast.parse(chat_source)
     for node in ast.walk(tree):
         if (
