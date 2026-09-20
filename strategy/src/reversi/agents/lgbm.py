@@ -57,7 +57,11 @@ def value_of(board: Board, model: ValueModel) -> float:
 def load_model(path: Path | None = None) -> lgb.Booster:
     """対局用の LightGBM ネイティブテキストを読む。pickle / joblib は使わない。"""
     model_path = DEFAULT_MODEL_PATH if path is None else path
-    text = model_path.read_text(encoding="utf-8")
+    raw = model_path.read_bytes()
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise ValueError("lgbm.txt は LightGBM のテキスト形式でなければなりません") from exc
     first = text.lstrip("\ufeff").splitlines()[0].strip() if text.strip() else ""
     if first != NATIVE_HEADER:
         raise ValueError("lgbm.txt は LightGBM のテキスト形式でなければなりません")
