@@ -1,11 +1,11 @@
 ---
 title: アーキテクチャ
 product: Reversi Agents
-version: 0.1.5
+version: 0.1.6
 status: working
 date: 2026-09-20
 source: docs/srs.md
-srs_version: 0.1.22
+srs_version: 0.1.24
 tech_stack: docs/tech-stack.md
 tech_stack_version: 0.2.9
 ---
@@ -16,10 +16,10 @@ tech_stack_version: 0.2.9
 | --- | --- |
 | 文書識別 | reversi-ai-architecture |
 | 対象ソフトウェア | Reversi Agents |
-| 版 | 0.1.5 |
+| 版 | 0.1.6 |
 | 状態 | 現行（設計。要求ではない） |
 | 日付 | 2026-09-20 |
-| 入力 | [`docs/srs.md`](srs.md) 0.1.22、[`docs/tech-stack.md`](tech-stack.md) 0.2.9 |
+| 入力 | [`docs/srs.md`](srs.md) 0.1.24、[`docs/tech-stack.md`](tech-stack.md) 0.2.9 |
 
 本文書は**配置と層**の設計正本である。ソフトウェア要求の正本は [`docs/srs.md`](srs.md) であり、本文書は shall を追加・変更・撤回しない。言語・ライブラリ・コンテナの選定は [`docs/tech-stack.md`](tech-stack.md) を正とする。ディレクトリ名は tech-stack 2.3 と一致させ、ファイル単位の置き場と目的は本文書を正とする。
 
@@ -233,9 +233,10 @@ reversi-ai/
 
 | ファイル | 機能 |
 | --- | --- |
-| `CatalogPage.tsx` | 対局モード（利用者対エージェント / エージェント対エージェント）、石色、相手個体を選び、開始して `/game` へ移る |
+| `CatalogPage.tsx` | 対局モード（利用者対エージェント / エージェント対エージェント）、石色、相手個体、エージェント対エージェントの着手間隔を選び、開始して `/game` へ移る |
 | `GamePage.tsx` | 盤と手番と終局を出す。人間手番はマス指定を POST する。エージェント対エージェントは SSE を購読する。カタログへ戻る |
 | `Board.tsx` | 8×8 を CSS Grid で描く。a1 は黒から見て左下。利用者手番に合法手の印、直前着手の印 |
+| `moveInterval.ts` | 着手間隔（秒）の入力。未設定は 1 秒。開始 API へ渡す値に使う |
 | `api.ts` | `GET /api/catalog`、`POST /api/games`、`POST /api/games/:id/moves`、`GET /api/games/:id/events` |
 
 ### 4.2 `web/server`
@@ -306,7 +307,7 @@ Pod 内 HTTP。TLS は Hono が担う。
 | `errors.py` | RFC 9457 の Problem と違法着手の 409 |
 | `schemas.py` | 中継 JSON の Pydantic。`docs/openapi.yml` の `components` と同じ形 |
 | `routes.py` | カタログ、対局開始、着手適用、状態取得。エージェント対エージェントは開始後に終局まで進める |
-| `session.py` | 進行中 1 局。同時対局は 1 |
+| `session.py` | 進行中 1 局。同時対局は 1。エージェント対エージェントは開始 API の `move_interval_seconds`（省略時は待たない）を下限として、1 手を盤に適用してから次を適用する |
 | `persist.py` | 終局時に対局モード、黒と白の主体、着手列、終局面、公式スコア、勝敗を書く。個人識別子の列は作らない |
 | `openrouter_key.py` | secret ファイルだけを読む。環境変数へコピーしない |
 
@@ -336,6 +337,7 @@ TypeScript 側は Zod（`web/server/src/schemas.ts`）、Python 側は Pydantic�
 - カタログ: 個体 ID、カテゴリ、表示名、説明文
 - 対局状態: 盤 64 マス、手番、合法手、直前着手、終局、公式スコア、勝敗
 - 着手指定: 座標（違法なら適用せず、再指定可能）
+- 対局開始: 任意の `move_interval_seconds`（エージェント対エージェントの適用間隔。省略時は待たない）
 - 障害: 外部モデル失敗時は部分盤面を返さず、継続不能を表す
 
 ## 6 データと秘密
@@ -446,6 +448,7 @@ Issue の検証欄と CI は、この節の生コマンドを使う。ラッパ�
 
 | 版 | 日付 | 内容 |
 | --- | --- | --- |
+| 0.1.6 | 2026-09-20 | エージェント対エージェントの着手間隔を戦略プロセスの適用待ちとし、開始 API へ渡す |
 | 0.1.5 | 2026-09-20 | 起動の正を `podman-compose` に揃え、文書表の日付をフロントマターと一致させる |
 | 0.1.4 | 2026-09-20 | 総当たり基準結果を `docs/benchmarks/` に置く |
 | 0.1.3 | 2026-09-20 | web はコンテナ内で `0.0.0.0` を聞き、ホストへ出す口は `127.0.0.1` のままにする |
