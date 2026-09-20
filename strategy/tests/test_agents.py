@@ -34,7 +34,7 @@ from reversi.agents.random_uniform import (
     choose_move,
 )
 from reversi.encode import VECTOR_SIZE
-from reversi.engine.board import Board, Color, Square, Stone, empty_board
+from reversi.engine.board import Board, Color, Square, Stone, all_squares, empty_board
 from reversi.engine.rules import (
     PassMove,
     Place,
@@ -245,6 +245,7 @@ def _position_from_rank8_rows(rows: tuple[str, ...], side: Color) -> Position:
     cells = tuple(tuple(_STONE[ch] for ch in row) for row in reversed(rows))
     return Position(Board(cells), side)
 
+
 # a1 は 1 枚、d2 は 2 枚裏返す。角 a1 の位置点は中央より高い。
 _CORNER_VS_TWO_FLIPS = (
     "........",
@@ -372,7 +373,9 @@ def test_positional_tie_breaks_a1_to_h8_order() -> None:
     position = initial_position()
     places = legal_places(position)
     scores = [
-        positional.own_stone_score(apply_place(position.board, square, Color.BLACK), Color.BLACK)
+        positional.own_stone_score(
+            apply_place(position.board, square, Color.BLACK), Color.BLACK
+        )
         for square in places
     ]
     assert scores and len(set(scores)) == 1
@@ -663,7 +666,9 @@ def test_jev_choice_outside_shortlist_does_not_override_code_best() -> None:
     assert a1 in shortlist
     assert d2 not in shortlist
     even = jev._select_square(position, places, _jev_parsed(places), spec)
-    focused = jev._select_square(position, places, _jev_parsed(places, focused="d2"), spec)
+    focused = jev._select_square(
+        position, places, _jev_parsed(places, focused="d2"), spec
+    )
     assert even == a1
     assert focused == a1
     assert metrics[d2].material > metrics[a1].material
@@ -706,13 +711,19 @@ def test_jev_questions_keep_type_when_legal_places_change() -> None:
     one_q = jev._decision_questions(spec, one_lines)
     assert set(opening_q) == set(one_q) == {spec.question_id}
     assert spec.question_id not in {square.algebraic for square in opening}
-    assert opening_q[spec.question_id]["type"] == one_q[spec.question_id]["type"] == "choice"
+    assert (
+        opening_q[spec.question_id]["type"]
+        == one_q[spec.question_id]["type"]
+        == "choice"
+    )
     assert opening_q[spec.question_id]["instructions"] == spec.instructions
     assert one_q[spec.question_id]["instructions"] == spec.instructions
     assert set(opening_q[spec.question_id]["criteria"]) == {
         square.algebraic for square in opening
     }
-    assert set(one_q[spec.question_id]["criteria"]) == {square.algebraic for square in one}
+    assert set(one_q[spec.question_id]["criteria"]) == {
+        square.algebraic for square in one
+    }
     opening_state = jev._decision_state(initial_position(), spec, opening_lines)
     one_state = jev._decision_state(white_only, spec, one_lines)
     assert set(opening_state.keys()) == set(one_state.keys())
@@ -896,7 +907,9 @@ def test_jev_stage1_configs_switch_without_adding_catalog_names(
     with jev.stage1_config("v2_jev0"):
         even = jev.choose_move(position)
         focused_spec = jev._spec_for_config(jev._load_spec(), "v2_jev0")
-        even_sel = jev._select_square(position, places, _jev_parsed(places), focused_spec)
+        even_sel = jev._select_square(
+            position, places, _jev_parsed(places), focused_spec
+        )
         d2_sel = jev._select_square(
             position, places, _jev_parsed(places, focused="d2"), focused_spec
         )
@@ -920,12 +933,14 @@ def test_jev_stage1_configs_switch_without_adding_catalog_names(
     assert code0.confidence_threshold == 0.0
     assert as_is.shortlist_size == spec.shortlist_size
     assert as_is.margin == spec.margin
-    assert jev._select_square(
-        position, places, _jev_parsed(places, focused="d2"), code0
-    ) == d2
-    assert jev._select_square(
-        position, places, _jev_parsed(places, focused="d2"), as_is
-    ) == a1
+    assert (
+        jev._select_square(position, places, _jev_parsed(places, focused="d2"), code0)
+        == d2
+    )
+    assert (
+        jev._select_square(position, places, _jev_parsed(places, focused="d2"), as_is)
+        == a1
+    )
     assert jev._select_square(position, places, _jev_parsed(places), as_is) == a1
 
     names = [item.display_name for item in items()]
@@ -966,12 +981,14 @@ def test_jev_stage1_code0_failure_is_unplayable(
 
     monkeypatch.setattr(jev, "_call_openrouter", boom)
     position = initial_position()
-    with jev.stage1_config("v2_code0"), pytest.raises(
-        jev.ExternalModelError, match="失敗"
+    with (
+        jev.stage1_config("v2_code0"),
+        pytest.raises(jev.ExternalModelError, match="失敗"),
     ):
         jev.choose_move(position)
-    with jev.stage1_config("v2_as_is"), pytest.raises(
-        jev.ExternalModelError, match="失敗"
+    with (
+        jev.stage1_config("v2_as_is"),
+        pytest.raises(jev.ExternalModelError, match="失敗"),
     ):
         jev.choose_move(position)
 
@@ -987,9 +1004,7 @@ def test_jev_stage1_baseline_is_stronger_code_only_config() -> None:
     stronger = {"name": "v2_jev0", "points": 4.0, "stone_diff": -10, "wins": 4}
     loud = {"name": "v2_code0", "points": 99.0, "stone_diff": 99, "wins": 99}
     current = {"name": "v2_as_is", "points": 0.0, "stone_diff": 0, "wins": 0}
-    assert (
-        jev.select_stage1_baseline([weaker, stronger, loud, current]) == "v2_jev0"
-    )
+    assert jev.select_stage1_baseline([weaker, stronger, loud, current]) == "v2_jev0"
     tied_v1 = {"name": "v1_constant", "points": 3.0, "stone_diff": 10, "wins": 3}
     tied_v2 = {"name": "v2_jev0", "points": 3.0, "stone_diff": 10, "wins": 3}
     assert jev.select_stage1_baseline([tied_v2, tied_v1, loud, current]) == "v2_jev0"
@@ -1169,7 +1184,9 @@ def test_rl_source_does_not_import_nn_or_openrouter() -> None:
             assert "openrouter.ai" not in lowered
 
 
-def test_rl_training_does_not_read_wthor(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_rl_training_does_not_read_wthor(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     from reversi.train import wthor
     from reversi.train.rl import train_and_write
 
@@ -1241,7 +1258,9 @@ def _write_wtb(path: Path, games: tuple[tuple[Square, ...], ...]) -> Path:
     return path
 
 
-def _play_record(black, white) -> tuple[Position, tuple[dict[str, str], ...], tuple[Square, ...]]:
+def _play_record(
+    black, white
+) -> tuple[Position, tuple[dict[str, str], ...], tuple[Square, ...]]:
     position = initial_position()
     moves: list[dict[str, str]] = []
     squares: list[Square] = []
@@ -1630,7 +1649,9 @@ def test_lgbm_load_model_rejects_non_native_text(tmp_path: Path) -> None:
         lgbm.load_model(fake)
 
 
-def test_lgbm_training_fits_lightgbm_on_wthor_and_persisted_games(tmp_path: Path) -> None:
+def test_lgbm_training_fits_lightgbm_on_wthor_and_persisted_games(
+    tmp_path: Path,
+) -> None:
     from reversi.agents import lgbm, most_flips, positional
     from reversi.api.persist import MODE_AGENT_VS_AGENT, save_if_over
     from reversi.train.lgbm import train_and_write
@@ -1743,7 +1764,9 @@ def test_minimax_leaf_score_is_root_minus_opponent_table() -> None:
     assert score_at(Square.parse("c3")) == 1
     assert minimax.leaf_score(board, Color.BLACK) == 100 + 1 - (-20)
     assert minimax.leaf_score(board, Color.WHITE) == -20 - (100 + 1)
-    assert minimax.leaf_score(board, Color.BLACK) == _spec_leaf_score(board, Color.BLACK)
+    assert minimax.leaf_score(board, Color.BLACK) == _spec_leaf_score(
+        board, Color.BLACK
+    )
     assert minimax.leaf_score(board, Color.BLACK) != positional.own_stone_score(
         board, Color.BLACK
     )
@@ -1849,6 +1872,37 @@ def test_minimax_source_does_not_call_models() -> None:
                 assert "openrouter.ai" not in lowered
 
 
+_PHASE2_CORNERS = frozenset(Square.parse(name) for name in ("a1", "a8", "h1", "h8"))
+
+
+def _phase2_parts(board: Board, color: Color) -> tuple[int, int, int]:
+    """(Mobility 差, Corner 差, 石数差)。正規化しない生の差。"""
+    own_places = len(legal_places(Position(board, color)))
+    opp_places = len(legal_places(Position(board, color.opponent)))
+    own = color.stone
+    opponent = color.opponent.stone
+    corners = 0
+    discs = 0
+    for square in all_squares():
+        stone = board.stone_at(square)
+        if stone is own:
+            sign = 1
+        elif stone is opponent:
+            sign = -1
+        else:
+            continue
+        discs += sign
+        if square in _PHASE2_CORNERS:
+            corners += sign
+    return own_places - opp_places, corners, discs
+
+
+def _phase2_leaf_score(board: Board, color: Color) -> int:
+    """提案書 Phase 2 の葉。50 × Mobility 差 + 1000 × Corner 差 + 1 × 石数差。"""
+    mobility, corner, disc = _phase2_parts(board, color)
+    return 50 * mobility + 1000 * corner + disc
+
+
 def test_catalog_lists_alphabeta() -> None:
     item = _item_by_display_name("ルールベース (αβ)")
     minimax_item = _item_by_display_name("ルールベース (ミニマックス)")
@@ -1860,7 +1914,9 @@ def test_catalog_lists_alphabeta() -> None:
     assert _JAPANESE.search(item.description)
     assert "Negamax" in item.description
     assert "深さ 6" in item.description
-    assert "点数表" in item.description
+    assert "Mobility" in item.description
+    assert "Corner" in item.description
+    assert "点数表" not in item.description
     assert item.specimen_id != minimax_item.specimen_id
     assert item.display_name != minimax_item.display_name
     assert alphabeta.SEARCH_DEPTH == 6
@@ -1871,7 +1927,71 @@ def test_catalog_lists_alphabeta() -> None:
         get("rule_based")
 
 
-def test_alphabeta_leaf_score_matches_minimax_table() -> None:
+def test_alphabeta_leaf_prefers_own_corner_lead() -> None:
+    extra = empty_board().replacing(
+        {
+            Square.parse("a1"): Stone.BLACK,
+            Square.parse("e5"): Stone.WHITE,
+        }
+    )
+    even = empty_board().replacing(
+        {
+            Square.parse("a1"): Stone.BLACK,
+            Square.parse("h8"): Stone.WHITE,
+        }
+    )
+    extra_mob, extra_corner, extra_disc = _phase2_parts(extra, Color.BLACK)
+    even_mob, even_corner, even_disc = _phase2_parts(even, Color.BLACK)
+    assert extra_mob == even_mob == 0
+    assert extra_disc == even_disc == 0
+    assert extra_corner == 1
+    assert even_corner == 0
+    extra_score = alphabeta.leaf_score(extra, Color.BLACK)
+    even_score = alphabeta.leaf_score(even, Color.BLACK)
+    assert extra_score == _phase2_leaf_score(extra, Color.BLACK) == 1000
+    assert even_score == _phase2_leaf_score(even, Color.BLACK) == 0
+    assert extra_score > even_score
+    assert alphabeta.leaf_score(extra, Color.WHITE) == -1000
+
+
+def test_alphabeta_leaf_prefers_own_mobility_lead() -> None:
+    more = empty_board().replacing(
+        {
+            Square.parse("c5"): Stone.BLACK,
+            Square.parse("d5"): Stone.BLACK,
+            Square.parse("e5"): Stone.BLACK,
+            Square.parse("e4"): Stone.BLACK,
+            Square.parse("d4"): Stone.WHITE,
+            Square.parse("c4"): Stone.WHITE,
+            Square.parse("f4"): Stone.WHITE,
+            Square.parse("f5"): Stone.WHITE,
+        }
+    )
+    even = empty_board().replacing(
+        {
+            Square.parse("c4"): Stone.BLACK,
+            Square.parse("d5"): Stone.BLACK,
+            Square.parse("e4"): Stone.BLACK,
+            Square.parse("f5"): Stone.BLACK,
+            Square.parse("d4"): Stone.WHITE,
+            Square.parse("e5"): Stone.WHITE,
+            Square.parse("c5"): Stone.WHITE,
+            Square.parse("f4"): Stone.WHITE,
+        }
+    )
+    more_mob, more_corner, more_disc = _phase2_parts(more, Color.BLACK)
+    even_mob, even_corner, even_disc = _phase2_parts(even, Color.BLACK)
+    assert more_corner == even_corner == 0
+    assert more_disc == even_disc == 0
+    assert more_mob > even_mob
+    more_score = alphabeta.leaf_score(more, Color.BLACK)
+    even_score = alphabeta.leaf_score(even, Color.BLACK)
+    assert more_score == _phase2_leaf_score(more, Color.BLACK) == 50 * more_mob
+    assert even_score == _phase2_leaf_score(even, Color.BLACK) == 50 * even_mob
+    assert more_score > even_score
+
+
+def test_alphabeta_leaf_does_not_use_position_table() -> None:
     board = empty_board().replacing(
         {
             Square.parse("a1"): Stone.BLACK,
@@ -1879,43 +1999,14 @@ def test_alphabeta_leaf_score_matches_minimax_table() -> None:
             Square.parse("c3"): Stone.BLACK,
         }
     )
-    assert alphabeta.leaf_score(board, Color.BLACK) == minimax.leaf_score(
-        board, Color.BLACK
-    )
-    assert alphabeta.leaf_score(board, Color.WHITE) == minimax.leaf_score(
-        board, Color.WHITE
-    )
-    assert alphabeta.leaf_score(board, Color.BLACK) == _spec_leaf_score(
-        board, Color.BLACK
-    )
-
-
-def test_alphabeta_depth_four_matches_minimax_squares() -> None:
-    positions = (
-        initial_position(),
-        play(initial_position(), Place(Square.parse("d3"))),
-        _position_from_rank8_rows(_CORNER_VS_TWO_FLIPS, Color.BLACK),
-        Position(_almost_full_white_with_black_on_b1().board, Color.WHITE),
-    )
-    two_empties = empty_board().replacing(
-        {
-            Square.parse("b1"): Stone.BLACK,
-            Square.parse("g8"): Stone.BLACK,
-            **{
-                Square(file=file, rank=rank): Stone.WHITE
-                for rank in range(8)
-                for file in range(8)
-                if (file, rank) not in {(0, 0), (1, 0), (6, 7), (7, 7)}
-            },
-        }
-    )
-    positions = (*positions, Position(two_empties, Color.WHITE))
-    for position in positions:
-        expected = minimax.choose_move(position)
-        assert alphabeta.choose_at_depth(position, 4) == expected
-        assert alphabeta.choose_at_depth(position, 4) == _plain_minimax_choose(position)
-        if expected is not None:
-            assert expected.square in legal_places(position)
+    table = minimax.leaf_score(board, Color.BLACK)
+    phase2 = alphabeta.leaf_score(board, Color.BLACK)
+    assert phase2 == _phase2_leaf_score(board, Color.BLACK)
+    assert phase2 != table
+    assert table == _spec_leaf_score(board, Color.BLACK)
+    source = _module_source("alphabeta.py")
+    assert "score_at" not in source
+    assert "position_table" not in source
 
 
 def test_alphabeta_game_path_keeps_depth_six() -> None:
@@ -1928,22 +2019,26 @@ def test_alphabeta_game_path_keeps_depth_six() -> None:
     assert first is not None
     assert via_catalog == first
     assert first.square in legal_places(position)
+    assert first == Place(Square.parse("d3"))
     after = play(position, first)
     second = alphabeta.choose_move(after)
     assert second is not None
     assert second.square in legal_places(after)
-    alphabeta.choose_move(_position_from_rank8_rows(_CORNER_VS_TWO_FLIPS, Color.BLACK))
+    corner = alphabeta.choose_move(
+        _position_from_rank8_rows(_CORNER_VS_TWO_FLIPS, Color.BLACK)
+    )
+    assert corner is not None
+    assert corner.square in legal_places(
+        _position_from_rank8_rows(_CORNER_VS_TWO_FLIPS, Color.BLACK)
+    )
     assert alphabeta.SEARCH_DEPTH == snapshot == 6
     assert alphabeta.choose_move is not minimax.choose_move
-    at_four = alphabeta.choose_at_depth(position, 4)
-    assert at_four == minimax.choose_move(position)
     assert alphabeta.choose_move(position) == alphabeta.choose_at_depth(position, 6)
     after_d3 = play(position, Place(Square.parse("d3")))
-    depth_four = alphabeta.choose_at_depth(after_d3, 4)
     depth_six = alphabeta.choose_move(after_d3)
-    assert depth_four == minimax.choose_move(after_d3) == Place(Square.parse("e3"))
-    assert depth_six == Place(Square.parse("c5"))
-    assert depth_six != depth_four
+    assert depth_six is not None
+    assert depth_six.square in legal_places(after_d3)
+    assert depth_six == alphabeta.choose_at_depth(after_d3, 6)
 
 
 def test_alphabeta_does_not_move_when_no_legal_places() -> None:
@@ -1957,6 +2052,10 @@ def test_alphabeta_source_is_negamax_and_does_not_call_models() -> None:
     assert "SEARCH_DEPTH = 6" in source
     assert "def _negamax(" in source
     assert "-beta" in source and "-alpha" in source
+    assert "score_at" not in source
+    assert "position_table" not in source
+    assert "Mobility" in source
+    assert "Corner" in source
     roots = _imported_roots(source)
     assert roots.isdisjoint(_FORBIDDEN_IMPORT_ROOTS)
     assert "minimax" not in roots
@@ -2005,14 +2104,18 @@ def test_opening_book_lines_are_tiger_cow_mouse_and_fixed() -> None:
         ("f5", "f6", "e6", "d6", "c5"),
         ("f5", "f4", "e3", "f6", "d3"),
     )
-    snapshot = tuple(tuple(square.algebraic for square in line) for line in opening.BOOK_LINES)
+    snapshot = tuple(
+        tuple(square.algebraic for square in line) for line in opening.BOOK_LINES
+    )
     assert snapshot == expected
     assert isinstance(opening.BOOK_LINES, tuple)
     assert all(isinstance(line, tuple) for line in opening.BOOK_LINES)
     opening.choose_move(initial_position())
     opening.choose_move(_play_algebraic("f5"))
     opening.choose_move(_play_algebraic("f5", "d6", "c4"))
-    after = tuple(tuple(square.algebraic for square in line) for line in opening.BOOK_LINES)
+    after = tuple(
+        tuple(square.algebraic for square in line) for line in opening.BOOK_LINES
+    )
     assert after == snapshot == expected
     assert len(opening.BOOK_LINES) == 3
 
@@ -2044,9 +2147,15 @@ def test_opening_follows_each_canonical_line() -> None:
     assert opening.choose_move(_play_algebraic("f5", "d6")) == Place(Square.parse("c3"))
     assert opening.choose_move(_play_algebraic("f5", "f6")) == Place(Square.parse("e6"))
     assert opening.choose_move(_play_algebraic("f5", "f4")) == Place(Square.parse("e3"))
-    assert opening.choose_move(_play_algebraic("f5", "d6", "c3")) == Place(Square.parse("d3"))
-    assert opening.choose_move(_play_algebraic("f5", "f6", "e6")) == Place(Square.parse("d6"))
-    assert opening.choose_move(_play_algebraic("f5", "f4", "e3")) == Place(Square.parse("f6"))
+    assert opening.choose_move(_play_algebraic("f5", "d6", "c3")) == Place(
+        Square.parse("d3")
+    )
+    assert opening.choose_move(_play_algebraic("f5", "f6", "e6")) == Place(
+        Square.parse("d6")
+    )
+    assert opening.choose_move(_play_algebraic("f5", "f4", "e3")) == Place(
+        Square.parse("f6")
+    )
 
 
 def test_opening_symmetric_c4_first_move_stays_on_book() -> None:
@@ -2585,7 +2694,10 @@ def test_extra_genai_rejects_out_of_range_parameters(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     cases = (
-        ({"model": "vendor/chat", "name": "Chat", "temperature": float("nan")}, "temperature"),
+        (
+            {"model": "vendor/chat", "name": "Chat", "temperature": float("nan")},
+            "temperature",
+        ),
         ({"model": "vendor/chat", "name": "Chat", "top_p": -0.1}, "top_p"),
         ({"model": "vendor/chat", "name": "Chat", "max_tokens": 0}, "max_tokens"),
     )
@@ -2625,7 +2737,9 @@ def test_extra_genai_source_has_no_player_wizard() -> None:
             and isinstance(node.func, ast.Attribute)
             and node.func.attr in {"getenv", "putenv"}
         ):
-            raise AssertionError("chat_completions.py は環境変数から鍵を読んではいけない")
+            raise AssertionError(
+                "chat_completions.py は環境変数から鍵を読んではいけない"
+            )
         if isinstance(node, ast.Constant) and isinstance(node.value, str):
             lowered = node.value.lower()
             assert "ffothello.org" not in lowered
