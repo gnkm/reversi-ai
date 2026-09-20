@@ -1165,6 +1165,7 @@ def test_jev_stage5_record_has_paired_acceptance() -> None:
     for key in ("games", "win_rate", "mean_stone_diff", "paired", "accepted"):
         assert key in data, key
     assert data["paired"] is True
+    assert data.get("complete") is True
     assert isinstance(data["accepted"], bool)
     assert data["games"] == len(data["game_records"])
     assert data["games"] == 2 * len(data["starts"])

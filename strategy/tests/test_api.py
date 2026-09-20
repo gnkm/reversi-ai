@@ -13,7 +13,7 @@ from fastapi.testclient import TestClient
 
 from reversi.agents.catalog import items as catalog_items
 from reversi.agents.jev import SPECIMEN_ID as JEV_ID
-from reversi.agents.jev import ExternalModelError
+from reversi.agents.jev import ExternalModelError, stage1_config
 from reversi.agents.random_uniform import SPECIMEN_ID
 from reversi.api import create_app
 from reversi.api.schemas import (
@@ -359,14 +359,34 @@ def test_jev_failure_on_start_does_not_leave_partial_game(
 
     monkeypatch.setattr("reversi.agents.jev._call_openrouter", boom)
     client = TestClient(create_app(GameStore(db_path=tmp_path / "games.sqlite")))
+    with stage1_config("v2_as_is"):
+        response = client.post(
+            "/api/games",
+            json={"black": _JEV, "white": _HUMAN},
+        )
+        _problem(response, 422, "external_model_failed")
+    assert "sk-" not in response.text
+    listed = client.get("/api/catalog")
+    assert listed.status_code == 200
+
+
+def test_catalog_jev_default_starts_without_openrouter(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    def boom(_position, _legal):
+        raise ExternalModelError("試験用の失敗")
+
+    monkeypatch.setattr("reversi.agents.jev._call_openrouter", boom)
+    client = TestClient(create_app(GameStore(db_path=tmp_path / "games.sqlite")))
     response = client.post(
         "/api/games",
         json={"black": _JEV, "white": _HUMAN},
     )
-    _problem(response, 422, "external_model_failed")
-    assert "sk-" not in response.text
-    listed = client.get("/api/catalog")
-    assert listed.status_code == 200
+    assert response.status_code == 201
+    game = GameState.model_validate(response.json())
+    assert game.status == "in_progress"
+    assert game.board[3][3] in {"black", "white"}
 
 
 def test_jev_failure_after_human_move_marks_unplayable_without_adopting_model_move(
@@ -380,31 +400,32 @@ def test_jev_failure_after_human_move_marks_unplayable_without_adopting_model_mo
 
     monkeypatch.setattr("reversi.agents.jev._call_openrouter", illegal)
     client = TestClient(create_app(GameStore(db_path=tmp_path / "games.sqlite")))
-    game = _create(client, _HUMAN, _JEV)
-    before_board = game.board
-    legal = game.legal_moves[0]
-    applied = client.post(
-        f"/api/games/{game.id}/moves",
-        json={"type": "place", "square": legal},
-    )
-    assert applied.status_code == 200
-    payload = MoveApplied.model_validate(applied.json())
-    assert payload.applied is True
-    assert payload.game.status == "unplayable"
-    assert payload.game.continuation_possible is False
-    assert payload.game.unplayable_reason == "external_model_failed"
-    assert payload.game.result is None
-    file_i = ord(legal[0]) - ord("a")
-    rank_i = int(legal[1]) - 1
-    assert payload.game.board[rank_i][file_i] == "black"
-    assert payload.game.board != before_board
-    assert payload.game.board[0][0] == "empty"
+    with stage1_config("v2_as_is"):
+        game = _create(client, _HUMAN, _JEV)
+        before_board = game.board
+        legal = game.legal_moves[0]
+        applied = client.post(
+            f"/api/games/{game.id}/moves",
+            json={"type": "place", "square": legal},
+        )
+        assert applied.status_code == 200
+        payload = MoveApplied.model_validate(applied.json())
+        assert payload.applied is True
+        assert payload.game.status == "unplayable"
+        assert payload.game.continuation_possible is False
+        assert payload.game.unplayable_reason == "external_model_failed"
+        assert payload.game.result is None
+        file_i = ord(legal[0]) - ord("a")
+        rank_i = int(legal[1]) - 1
+        assert payload.game.board[rank_i][file_i] == "black"
+        assert payload.game.board != before_board
+        assert payload.game.board[0][0] == "empty"
 
-    rejected = client.post(
-        f"/api/games/{game.id}/moves",
-        json={"type": "place", "square": "d3"},
-    )
-    assert rejected.status_code == 409
+        rejected = client.post(
+            f"/api/games/{game.id}/moves",
+            json={"type": "place", "square": "d3"},
+        )
+        assert rejected.status_code == 409
     body = GameUnplayable.model_validate(rejected.json())
     assert body.applied is False
     assert body.code == "external_model_failed"
