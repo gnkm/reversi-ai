@@ -1,6 +1,7 @@
 # Podman Compose。web と strategy を同一 Pod で起動する。
 # 学習は train サービス。待ち受けせず `run` で一発起動する。
 # profile は付けない（podman-compose 1.6.0 の `run` が profile 付きサービスを見ない）。
+# 対局の up は web と strategy を明示し、train を載せない。
 # 公開はホストのループバックだけ。secret の中身は書かない。
 
 name: reversi-ai
@@ -45,7 +46,8 @@ services:
       dockerfile: strategy/Containerfile
       target: train
     # イメージに uv sync --frozen --no-dev --group train を焼く。実行時には sync しない。
-    # `up` では常時起動しない（即終了）。学習の入口は `run` が上書きする。
+    # 対局の up は web と strategy だけを対象にする。誤って train を up しても常時起動しない。
+    # 学習の入口は `run` が command を上書きする。
     volumes:
       - ./data:/data
       - ./models:/models

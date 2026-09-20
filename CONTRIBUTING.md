@@ -40,13 +40,13 @@ shall を変える PR は CODEOWNERS（`docs/srs.md`）のレビューを必須�
 対局の入口は運用者と同じである。
 
 ```bash
-podman-compose up --build
+podman-compose up --build web strategy
 ```
 
 ホットリロードが要るときだけ、別スタックを増やさずオーバーレイを足す。
 
 ```bash
-podman-compose -f compose.yaml -f compose.dev.yaml up --build
+podman-compose -f compose.yaml -f compose.dev.yaml up --build web strategy
 ```
 
 `compose.dev.yaml` はソースの bind mount と reload だけを足す。secret・公開ポート・サービス名は `compose.yaml` のままにする。配置上の正は [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) である（リポジトリにまだ無い場合は、実装時にその配置どおり置く）。

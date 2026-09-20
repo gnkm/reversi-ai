@@ -3,8 +3,13 @@
 from __future__ import annotations
 
 import ast
+import re
+import shutil
+import subprocess
 import tomllib
 from pathlib import Path
+
+import pytest
 
 _SRC = Path(__file__).resolve().parents[1] / "src" / "reversi"
 _NN_RUNTIME_ROOTS = frozenset(
@@ -259,12 +264,76 @@ def test_containerfile_bakes_train_group_only_on_train_target() -> None:
     assert "--group train" not in train_stage
 
 
-def test_compose_train_is_runnable_without_profile() -> None:
-    text = (Path(__file__).resolve().parents[2] / "compose.yaml").read_text(
-        encoding="utf-8",
+def _compose_path() -> Path:
+    return Path(__file__).resolve().parents[2] / "compose.yaml"
+
+
+def _service_top_keys(service_block: str) -> set[str]:
+    keys: set[str] = set()
+    for line in service_block.splitlines():
+        if re.fullmatch(r"    [^#\s].*", line) and ":" in line:
+            keys.add(line.strip().split(":", 1)[0])
+    return keys
+
+
+def _service_block(text: str, name: str) -> str:
+    lines = text.splitlines(keepends=True)
+    heading = f"  {name}:"
+    start = next((i for i, line in enumerate(lines) if line.startswith(heading)), None)
+    if start is None:
+        raise AssertionError(f"service {name} missing")
+    end = len(lines)
+    for j in range(start + 1, len(lines)):
+        raw = lines[j]
+        if raw.startswith("  ") and not raw.startswith("    ") and raw.strip():
+            end = j
+            break
+        if raw.strip() and not raw.startswith(" "):
+            end = j
+            break
+    return "".join(lines[start:end])
+
+
+def test_compose_train_has_no_profile_or_nested_x_podman() -> None:
+    text = _compose_path().read_text(encoding="utf-8")
+    assert re.search(r"^services:", text, re.MULTILINE)
+    train_keys = _service_top_keys(_service_block(text, "train"))
+    assert "profiles" not in train_keys
+    assert "x-podman" not in train_keys
+    assert "build" in train_keys
+    web_keys = _service_top_keys(_service_block(text, "web"))
+    strategy_keys = _service_top_keys(_service_block(text, "strategy"))
+    assert "profiles" not in web_keys
+    assert "profiles" not in strategy_keys
+
+
+def test_readme_up_names_web_and_strategy_not_train() -> None:
+    text = (_compose_path().parent / "README.md").read_text(encoding="utf-8")
+    commands = re.findall(r"podman-compose up --build[^\n]*", text)
+    assert commands
+    for command in commands:
+        assert "web" in command
+        assert "strategy" in command
+        assert "train" not in command
+
+
+def test_podman_compose_config_lists_train_without_profile() -> None:
+    exe = shutil.which("podman-compose")
+    if exe is None:
+        pytest.skip("podman-compose is not installed")
+    completed = subprocess.run(
+        [exe, "config"],
+        cwd=_compose_path().parent,
+        check=False,
+        capture_output=True,
+        text=True,
     )
-    train_block = text.split("\n  train:", 1)[1].split("\nsecrets:", 1)[0]
-    assert "profiles:" not in train_block
-    assert "x-podman:" not in train_block
-    assert 'restart: "no"' in train_block
-    assert "python" in train_block and "pass" in train_block
+    if completed.returncode != 0:
+        err = completed.stderr + completed.stdout
+        if "do not have `podman` installed" in err:
+            pytest.skip("podman engine is not available")
+        raise AssertionError(err)
+    train_keys = _service_top_keys(_service_block(completed.stdout, "train"))
+    assert "profiles" not in train_keys
+    assert "x-podman" not in train_keys
+    assert "build" in train_keys

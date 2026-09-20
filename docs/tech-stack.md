@@ -1,7 +1,7 @@
 ---
 title: 技術スタック
 product: Reversi Agents
-version: 0.2.15
+version: 0.2.16
 status: working
 date: 2026-09-20
 source: docs/srs.md
@@ -14,7 +14,7 @@ srs_version: 0.1.24
 | --- | --- |
 | 文書識別 | reversi-ai-tech-stack |
 | 対象ソフトウェア | Reversi Agents |
-| 版 | 0.2.15 |
+| 版 | 0.2.16 |
 | 状態 | 現行（設計。要求ではない） |
 | 日付 | 2026-09-20 |
 | 入力 | [`docs/srs.md`](srs.md) 0.1.24 |
@@ -438,7 +438,7 @@ OpenRouter の API キーは `podman secret create` でホストに置く。名�
 1. Podman がある個人 PC
 2. mkcert で `127.0.0.1` 用の証明書を `data/certs/` に置く
 3. 生成 AI を使うときだけ `podman secret create openrouter-api-key -` で API キーを渡す（標準入力。ファイルをリポジトリに置かない）
-4. `podman-compose up --build` で `https://127.0.0.1:<port>/` を出す
+4. `podman-compose up --build web strategy` で `https://127.0.0.1:<port>/` を出す
 5. （任意）WTHOR を `data/` に置き、学習用サービスで `podman-compose run --rm train python -m reversi.train.*` する。対局には再学習は不要
 
 資格情報が無い環境でも、生成 AI 以外の個体と対局エンジンは試験できる。pytest / Vitest / lint はホストでよい。ホストの `pnpm dev` を対局サービスの第二の正にしない。
@@ -463,6 +463,7 @@ OpenRouter の API キーは `podman secret create` でホストに置く。名�
 
 | 版 | 日付 | 内容 |
 | --- | --- | --- |
+| 0.2.16 | 2026-09-20 | 対局の `up` は `web` と `strategy` を明示する |
 | 0.2.15 | 2026-09-20 | 運用コマンド列は README、試験コマンドは CONTRIBUTING を正とする |
 | 0.2.14 | 2026-09-20 | `prompts/` は JSON と Markdown を置いてよい（Jev は JSON、Chat Completions は Markdown） |
 | 0.2.13 | 2026-09-20 | 機械学習 (LightGBM) を対局時ネイティブテキストで載せる（ONNX / pickle は使わない） |
