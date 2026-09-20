@@ -31,7 +31,7 @@ from reversi.agents.random_uniform import (
     choose_move,
 )
 from reversi.encode import VECTOR_SIZE
-from reversi.engine.board import Board, Color, Square, Stone, empty_board
+from reversi.engine.board import Board, Color, Square, Stone, all_squares, empty_board
 from reversi.engine.rules import (
     PassMove,
     Place,
@@ -508,20 +508,45 @@ def test_jev_source_uses_jev_model_and_skips_wthor() -> None:
             assert "openrouter_api_key" not in lowered
 
 
+def _jev_parsed(
+    *,
+    corner: float = 0.0,
+    mobility: float = 0.0,
+    position: float = 0.0,
+    material: float = 0.0,
+    stage: str = "midgame",
+) -> jev._Parsed:
+    return jev._Parsed(
+        noul={
+            "corner_priority": corner,
+            "mobility_priority": mobility,
+            "position_priority": position,
+        },
+        material=material,
+        stage={key: 1.0 if key == stage else 0.0 for key in ("opening", "midgame", "endgame")},
+    )
+
+
+def _disc_diff_after(position: Position, square: Square) -> int:
+    after = apply_place(position.board, square, position.side_to_move)
+    own = position.side_to_move.stone
+    opp = position.side_to_move.opponent.stone
+    total = 0
+    for cell in all_squares():
+        stone = after.stone_at(cell)
+        if stone is own:
+            total += 1
+        elif stone is opp:
+            total -= 1
+    return total
+
+
 def test_jev_combines_typed_answers_into_legal_place() -> None:
     position = initial_position()
     places = legal_places(position)
     spec = jev._load_spec()
     assert len(spec.questions) >= 2
-    parsed = jev._Parsed(
-        noul={
-            "corner_priority": 0.2,
-            "mobility_priority": 0.5,
-            "corner_danger": 0.1,
-        },
-        material=0.4,
-        stage={"opening": 1.0, "midgame": 0.0, "endgame": 0.0},
-    )
+    parsed = _jev_parsed(corner=0.2, mobility=0.5, position=0.1, material=0.4, stage="opening")
     square = jev._select_square(position, places, parsed, spec)
     assert square in places
     assert square == places[0]
@@ -533,18 +558,54 @@ def test_jev_composite_prefers_corner_when_priority_is_high() -> None:
     places = legal_places(position)
     assert Square.parse("a1") in places
     spec = jev._load_spec()
-    parsed = jev._Parsed(
-        noul={
-            "corner_priority": 1.0,
-            "mobility_priority": 0.0,
-            "corner_danger": 0.0,
-        },
-        material=0.0,
-        stage={"opening": 0.0, "midgame": 1.0, "endgame": 0.0},
-    )
+    parsed = _jev_parsed(corner=1.0, stage="midgame")
     square = jev._select_square(position, places, parsed, spec)
     assert square == Square.parse("a1")
     assert square in places
+    after_a1 = apply_place(position.board, Square.parse("a1"), Color.BLACK)
+    after_d2 = apply_place(position.board, Square.parse("d2"), Color.BLACK)
+    assert after_a1.stone_at(Square.parse("a1")) is Stone.BLACK
+    assert after_d2.stone_at(Square.parse("a1")) is Stone.EMPTY
+
+
+def test_jev_material_priority_picks_post_move_disc_lead() -> None:
+    position = _position_from_rank8_rows(_CORNER_VS_TWO_FLIPS, Color.BLACK)
+    places = legal_places(position)
+    a1 = Square.parse("a1")
+    d2 = Square.parse("d2")
+    assert a1 in places and d2 in places
+    assert _disc_diff_after(position, d2) > _disc_diff_after(position, a1)
+    spec = jev._load_spec()
+    square = jev._select_square(
+        position, places, _jev_parsed(material=1.0, stage="endgame"), spec
+    )
+    assert square == d2
+    assert square in places
+
+
+def test_jev_selection_depends_on_post_move_evaluation() -> None:
+    position = _position_from_rank8_rows(_CORNER_VS_TWO_FLIPS, Color.BLACK)
+    places = legal_places(position)
+    spec = jev._load_spec()
+    corner = jev._select_square(position, places, _jev_parsed(corner=1.0), spec)
+    material = jev._select_square(
+        position, places, _jev_parsed(material=1.0, stage="endgame"), spec
+    )
+    assert corner == Square.parse("a1")
+    assert material == Square.parse("d2")
+    assert corner != material
+    metrics = jev._after_metrics(position, places)
+    assert metrics[corner].corners > metrics[material].corners
+    assert metrics[material].material > metrics[corner].material
+    one_ply = {
+        square: (
+            1.0 if square in jev._CORNERS else 0.0,
+            float(len(flips_for(position.board, square, Color.BLACK))),
+        )
+        for square in places
+    }
+    assert one_ply[corner][0] == 1.0
+    assert one_ply[material][1] > one_ply[corner][1]
 
 
 def test_jev_questions_do_not_scale_with_legal_places() -> None:
@@ -559,18 +620,15 @@ def test_jev_questions_do_not_scale_with_legal_places() -> None:
     assert names.isdisjoint(square.algebraic for square in opening)
     assert names.isdisjoint(square.algebraic for square in one)
     assert "move" not in names
+    opening_state = jev._board_state(initial_position(), opening, spec)
+    one_state = jev._board_state(white_only, one, spec)
+    assert set(opening_state.keys()) == set(one_state.keys())
 
 
-def test_jev_does_not_penalize_x_or_c_when_corner_is_taken() -> None:
-    empty = empty_board()
-    assert jev._danger_flag(Square.parse("b2"), jev._X_SQUARES, empty) == 1.0
-    assert jev._danger_flag(Square.parse("a2"), jev._C_SQUARES, empty) == 1.0
-    own_corner = empty.replacing({Square.parse("a1"): Stone.BLACK})
-    assert jev._danger_flag(Square.parse("b2"), jev._X_SQUARES, own_corner) == 0.0
-    opp_corner = empty.replacing({Square.parse("a1"): Stone.WHITE})
-    assert jev._danger_flag(Square.parse("b2"), jev._X_SQUARES, opp_corner) == 0.0
-    assert jev._danger_flag(Square.parse("b1"), jev._C_SQUARES, opp_corner) == 0.0
-    assert jev._danger_flag(Square.parse("d3"), jev._X_SQUARES, empty) == 0.0
+def test_jev_source_does_not_delegate_to_minimax() -> None:
+    source = _module_source("jev.py")
+    assert "minimax" not in source
+    assert "choose_move" in source
 
 
 def test_jev_rejects_out_of_range_stage_probabilities() -> None:
@@ -578,7 +636,7 @@ def test_jev_rejects_out_of_range_stage_probabilities() -> None:
     answers = {
         "corner_priority": {"noul": 0.2},
         "mobility_priority": {"noul": 0.4},
-        "corner_danger": {"noul": 0.1},
+        "position_priority": {"noul": 0.1},
         "material_importance": {"score": 1.0},
         "stage": {
             "type": "choice",

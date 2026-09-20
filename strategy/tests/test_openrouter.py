@@ -14,8 +14,8 @@ import pytest
 from reversi.agents import chat_completions, extra_genai, jev
 from reversi.agents.prompt import PromptFileError, load_json, markdown_sections
 from reversi.api import openrouter_key
-from reversi.engine.board import Square
-from reversi.engine.rules import initial_position, legal_places
+from reversi.engine.board import Board, Color, Square, Stone
+from reversi.engine.rules import Position, apply_place, initial_position, legal_places
 
 _API_KEY = "sk-test-not-a-real-key"
 _ENV_KEY = "sk-env-must-not-be-used"
@@ -54,7 +54,7 @@ def _complete_answers(**overrides: object) -> dict[str, SimpleNamespace]:
     answers = {
         "corner_priority": SimpleNamespace(type="noul", noul=0.2),
         "mobility_priority": SimpleNamespace(type="noul", noul=0.4),
-        "corner_danger": SimpleNamespace(type="noul", noul=0.1),
+        "position_priority": SimpleNamespace(type="noul", noul=0.1),
         "material_importance": SimpleNamespace(type="score", score=1.0),
         "stage": SimpleNamespace(
             type="choice",
@@ -211,7 +211,7 @@ def test_jev_decisions_call_uses_https_and_model_id(
     assert set(questions) == {
         "corner_priority",
         "mobility_priority",
-        "corner_danger",
+        "position_priority",
         "material_importance",
         "stage",
     }
@@ -224,12 +224,91 @@ def test_jev_decisions_call_uses_https_and_model_id(
         lowered = question["instructions"].lower()
         assert "how many" not in lowered
         assert "count" not in lowered
+        assert "which square" not in lowered
+        assert "best move" not in lowered
+        assert "legal_places" not in lowered
     state = create["state"]
     assert isinstance(state, dict)
     assert "board[0][0] is a1" in str(state["origin"])
     assert "more discs" in str(state["objective"]).lower()
     assert "a1" not in questions["stage"]["instructions"]
     assert "Place a stone on" not in spec_text
+
+
+def _corner_vs_two_flips() -> Position:
+    rows = (
+        "........",
+        "........",
+        "........",
+        "...B....",
+        "...W....",
+        "...W....",
+        "........",
+        ".WB.....",
+    )
+    stone = {".": Stone.EMPTY, "B": Stone.BLACK, "W": Stone.WHITE}
+    cells = tuple(tuple(stone[ch] for ch in row) for row in reversed(rows))
+    return Position(Board(cells), Color.BLACK)
+
+
+def test_jev_fake_priority_answers_pick_legal_post_move_square(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    secret = tmp_path / "openrouter-api-key"
+    secret.write_text(_API_KEY, encoding="utf-8")
+    monkeypatch.setattr(jev, "SECRET_PATH", secret)
+    position = _corner_vs_two_flips()
+    places = legal_places(position)
+    assert Square.parse("a1") in places
+    assert Square.parse("d2") in places
+    after_a1 = apply_place(position.board, Square.parse("a1"), Color.BLACK)
+    after_d2 = apply_place(position.board, Square.parse("d2"), Color.BLACK)
+    assert after_a1.stone_at(Square.parse("a1")) is Stone.BLACK
+    assert after_d2.stone_at(Square.parse("a1")) is Stone.EMPTY
+
+    fake = _fake_openrouter(
+        _respond_with(
+            _complete_answers(
+                corner_priority=SimpleNamespace(type="noul", noul=1.0),
+                mobility_priority=SimpleNamespace(type="noul", noul=0.0),
+                position_priority=SimpleNamespace(type="noul", noul=0.0),
+                material_importance=SimpleNamespace(type="score", score=0.0),
+                stage=SimpleNamespace(
+                    type="choice",
+                    choice="midgame",
+                    probabilities={"opening": 0.0, "midgame": 1.0, "endgame": 0.0},
+                ),
+            )
+        )
+    )
+    monkeypatch.setattr(jev, "OpenRouter", fake)
+    corner_move = jev.choose_move(position)
+    assert corner_move is not None
+    assert corner_move.square == Square.parse("a1")
+    assert corner_move.square in places
+
+    fake_material = _fake_openrouter(
+        _respond_with(
+            _complete_answers(
+                corner_priority=SimpleNamespace(type="noul", noul=0.0),
+                mobility_priority=SimpleNamespace(type="noul", noul=0.0),
+                position_priority=SimpleNamespace(type="noul", noul=0.0),
+                material_importance=SimpleNamespace(type="score", score=2.0),
+                stage=SimpleNamespace(
+                    type="choice",
+                    choice="endgame",
+                    probabilities={"opening": 0.0, "midgame": 0.0, "endgame": 1.0},
+                ),
+            )
+        )
+    )
+    monkeypatch.setattr(jev, "OpenRouter", fake_material)
+    material_move = jev.choose_move(position)
+    assert material_move is not None
+    assert material_move.square == Square.parse("d2")
+    assert material_move.square in places
+    assert material_move.square != corner_move.square
 
 
 def test_jev_http_error_from_sdk_is_unplayable(
@@ -307,6 +386,10 @@ def test_jev_questions_do_not_ask_to_count() -> None:
         "enumerate",
         "number of legal",
         "len(",
+        "which square",
+        "best square",
+        "best move",
+        "legal_places",
         "反転数",
         "着手可能数",
         "数え",
