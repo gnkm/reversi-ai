@@ -18,6 +18,7 @@ SHORT_NAME = {
     "minimax": "ミニ",
     "opening": "定石",
     "ml": "ML",
+    "lgbm": "LGBM",
     "rl": "RL",
     "nn": "NN",
     "jev": "Jev",
@@ -141,6 +142,11 @@ def render(data: Mapping[str, object]) -> str:
         for row in ranked
     )
     bar_values = ", ".join(fmt_points(float(row["points"])) for row in ranked)
+    max_points = max(float(row["points"]) for row in ranked)
+    y_max = int(max_points) + (0 if max_points == int(max_points) else 1)
+    if y_max % 2:
+        y_max += 1
+    games_as_black = int(ranked[0]["games"]) // 2 if ranked else 0
 
     overall_rows = [
         [
@@ -215,7 +221,7 @@ def render(data: Mapping[str, object]) -> str:
             "xychart-beta",
             '    title "総当たりの勝ち点"',
             f"    x-axis [{bar_labels}]",
-            '    y-axis "勝ち点" 0 --> 16',
+            f'    y-axis "勝ち点" 0 --> {y_max}',
             f"    bar [{bar_values}]",
             "```",
             "",
@@ -228,7 +234,7 @@ def render(data: Mapping[str, object]) -> str:
             "",
             "## 先攻と後攻",
             "",
-            "各個体 8 局が先攻（黒）、8 局が後攻（白）。",
+            f"各個体 {games_as_black} 局が先攻（黒）、{games_as_black} 局が後攻（白）。",
             "",
             markdown_table(
                 ["個体", "先攻 勝-分-負", "先攻点", "後攻 勝-分-負", "後攻点"],
