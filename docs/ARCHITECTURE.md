@@ -1,7 +1,7 @@
 ---
 title: アーキテクチャ
 product: Reversi Agents
-version: 0.1.28
+version: 0.1.29
 status: working
 date: 2026-09-20
 source: docs/srs.md
@@ -16,7 +16,7 @@ tech_stack_version: 0.2.19
 | --- | --- |
 | 文書識別 | reversi-ai-architecture |
 | 対象ソフトウェア | Reversi Agents |
-| 版 | 0.1.28 |
+| 版 | 0.1.29 |
 | 状態 | 現行（設計。要求ではない） |
 | 日付 | 2026-09-20 |
 | 入力 | [`docs/srs.md`](srs.md) 0.1.24、[`docs/tech-stack.md`](tech-stack.md) 0.2.19 |
@@ -121,6 +121,8 @@ reversi-ai/
 │   │   ├── jev_stage2.py              # 対局ログ局面を αβ 正解で 3 方式計測する。CI では走らせない
 │   │   ├── jev-stage3.json            # Jev 段階 3（プロンプト 1 変更ずつのオフライン評価）の記録
 │   │   ├── jev_stage3.py              # 変更を 1 つずつ入れて平均損失を比べる。CI では走らせない
+│   │   ├── jev-stage4.json            # Jev 段階 4（絞り込みパラメータのオフライン格子）の記録
+│   │   ├── jev_stage4.py              # shortlist / margin / threshold を振る。CI では走らせない
 │   │   └── archive/                   # 過去の総当たり正本（現行と同じ形）
 │   └── source-of-truth/
 │       ├── 01-seed.md                 # シード。AI は編集禁止
@@ -422,7 +424,8 @@ web コンテナが Pod 内で `0.0.0.0:3000` を聞くのはよい。戦略コ�
 
 | 版 | 日付 | 内容 |
 | --- | --- | --- |
-| 0.1.28 | 2026-09-20 | ルールベース (αβ) の探索に Move Ordering を入れる |
+| 0.1.29 | 2026-09-20 | ルールベース (αβ) の探索に Move Ordering を入れる |
+| 0.1.28 | 2026-09-20 | Jev の絞り込みパラメータをオフラインで調整する記録を置く |
 | 0.1.27 | 2026-09-20 | Jev のプロンプトを 1 変更ずつオフライン評価する記録を置く |
 | 0.1.26 | 2026-09-20 | ルールベース (αβ) の葉を Mobility・Corner・石差の一次結合にする |
 | 0.1.25 | 2026-09-20 | 入力の tech-stack を 0.2.19 にし、ルールベース (αβ) を個体表へ反映する |

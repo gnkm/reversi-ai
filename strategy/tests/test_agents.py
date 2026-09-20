@@ -1087,6 +1087,71 @@ def test_jev_stage3_record_has_per_change_loss_and_holdout() -> None:
     assert [item.display_name for item in items()].count("生成 AI (Jev)") == 1
 
 
+def test_jev_stage4_record_has_grid_and_conclusion() -> None:
+    root = Path(__file__).resolve().parents[2] / "docs" / "benchmarks"
+    records = sorted(root.glob("jev-stage4*.json"))
+    assert records, "段階 4 の記録 JSON が docs/benchmarks/ に無い"
+    data = json.loads(records[-1].read_text(encoding="utf-8"))
+    rows = data["grid"]
+    assert rows, "格子が空"
+    zeros = [row for row in rows if row["margin"] == 0]
+    assert zeros, "margin=0 が無い"
+    baseline = data["baseline_mean_loss"]
+    for row in zeros:
+        assert row["mean_loss"] == baseline
+    assert data.get("margin_zero_mean_loss") == baseline
+    assert "beats_baseline" in data
+    if data["beats_baseline"]:
+        chosen = data["chosen"]
+        for key in ("shortlist_size", "margin", "confidence_threshold"):
+            assert key in chosen
+        assert data.get("return_to_stage3") is False
+        assert chosen["mean_loss"] < baseline
+        matched = [
+            row
+            for row in rows
+            if row["shortlist_size"] == chosen["shortlist_size"]
+            and row["margin"] == chosen["margin"]
+            and row["confidence_threshold"] == chosen["confidence_threshold"]
+        ]
+        assert matched
+        assert matched[0]["mean_loss"] == chosen["mean_loss"]
+    else:
+        assert data.get("return_to_stage3") is True
+        assert data.get("chosen") is None
+    spec = json.loads(jev.PROMPT_PATH.read_text(encoding="utf-8"))
+    selection = spec["selection"]
+    for key in ("shortlist_size", "margin", "confidence_threshold"):
+        assert key in selection
+    assert [item.display_name for item in items()].count("生成 AI (Jev)") == 1
+
+
+def test_jev_stage4_margin_zero_matches_code_best_on_recorded_positions() -> None:
+    root = Path(__file__).resolve().parents[2] / "docs" / "benchmarks"
+    records = sorted(root.glob("jev-stage4*.json"))
+    assert records, "段階 4 の記録 JSON が docs/benchmarks/ に無い"
+    data = json.loads(records[-1].read_text(encoding="utf-8"))
+    positions = data["positions"]
+    assert positions, "局面が無い"
+    spec = replace(jev._load_spec(), margin=0.0)
+    losses: list[int] = []
+    for row in positions:
+        position = _position_from_rank8_rows(tuple(row["board"]), Color(row["side_to_move"]))
+        places = legal_places(position)
+        focused = places[-1].algebraic
+        chosen = jev._select_square(
+            position, places, _jev_parsed(places, focused=focused), spec
+        )
+        stage = jev._stage_of(position.board, spec)
+        metrics = jev._after_metrics(position, places, spec)
+        scores = jev._code_scores(places, metrics, spec, stage)
+        code_best = jev._best_square(places, scores)
+        assert chosen == code_best
+        assert chosen.algebraic == row["code_best"]
+        losses.append(row["best_value"] - row["values"][chosen.algebraic])
+    assert sum(losses) / len(losses) == data["baseline_mean_loss"]
+
+
 def test_jev_gives_corner_newly_does_not_mark_all_when_opponent_already_has_corner() -> None:
     rows = (
         "........",
