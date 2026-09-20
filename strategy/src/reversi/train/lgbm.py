@@ -59,6 +59,8 @@ def _fit_booster(
         "max_depth": max_depth,
         "learning_rate": learning_rate,
         "min_data_in_leaf": _min_data_in_leaf(features.shape[0], min_data_in_leaf),
+        "min_data_in_bin": 1,
+        "feature_pre_filter": False,
         "seed": seed,
         "num_threads": 1,
         "force_col_wise": True,

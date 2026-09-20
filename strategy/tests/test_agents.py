@@ -1061,6 +1061,21 @@ def test_lgbm_default_model_plays_only_legal_moves_to_the_end() -> None:
     assert is_over(position)
 
 
+def test_lgbm_default_model_values_vary_across_positions() -> None:
+    from reversi.agents import lgbm
+
+    model = lgbm.load_model(lgbm.DEFAULT_MODEL_PATH)
+    start = initial_position()
+    after = play(start, Place(Square.parse("d3")))
+    later = play(after, Place(legal_places(after)[0]))
+    scores = {
+        round(lgbm.value_of(start.board, model), 8),
+        round(lgbm.value_of(after.board, model), 8),
+        round(lgbm.value_of(later.board, model), 8),
+    }
+    assert len(scores) >= 2
+
+
 def test_lgbm_source_does_not_import_nn_sklearn_joblib_or_pickle() -> None:
     source = _module_source("lgbm.py")
     roots = _imported_roots(source)
