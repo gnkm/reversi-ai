@@ -1,13 +1,13 @@
 ---
 title: アーキテクチャ
 product: Reversi Agents
-version: 0.1.7
+version: 0.1.8
 status: working
 date: 2026-09-20
 source: docs/srs.md
 srs_version: 0.1.22
 tech_stack: docs/tech-stack.md
-tech_stack_version: 0.2.11
+tech_stack_version: 0.2.12
 ---
 
 # アーキテクチャ
@@ -16,10 +16,10 @@ tech_stack_version: 0.2.11
 | --- | --- |
 | 文書識別 | reversi-ai-architecture |
 | 対象ソフトウェア | Reversi Agents |
-| 版 | 0.1.7 |
+| 版 | 0.1.8 |
 | 状態 | 現行（設計。要求ではない） |
 | 日付 | 2026-09-20 |
-| 入力 | [`docs/srs.md`](srs.md) 0.1.22、[`docs/tech-stack.md`](tech-stack.md) 0.2.11 |
+| 入力 | [`docs/srs.md`](srs.md) 0.1.22、[`docs/tech-stack.md`](tech-stack.md) 0.2.12 |
 
 本文書は**配置と層**の設計正本である。ソフトウェア要求の正本は [`docs/srs.md`](srs.md) であり、本文書は shall を追加・変更・撤回しない。言語・ライブラリ・コンテナの選定は [`docs/tech-stack.md`](tech-stack.md) を正とする。ディレクトリ名は tech-stack 2.3 と一致させ、ファイル単位の置き場と目的は本文書を正とする。
 
@@ -158,7 +158,7 @@ reversi-ai/
 │   │   ├── agents/                    # カタログ個体の着手。train を import しない
 │   │   │   ├── __init__.py
 │   │   │   ├── catalog.py             # 個体 ID・表示名・説明・カテゴリの登録
-│   │   │   ├── extra_genai.py         # data/genai.json から生成 AI 個体を足す
+│   │   │   ├── extra_genai.py         # data/config.toml から生成 AI 個体を足す
 │   │   │   ├── position_table.py      # FUN-025 の点数表。ミニマックスと定石外れが共有
 │   │   │   ├── random_uniform.py      # ランダム (一様)
 │   │   │   ├── most_flips.py          # ルールベース (最多取り)
@@ -170,7 +170,7 @@ reversi-ai/
 │   │   │   ├── nn.py                  # ニューラルネットワーク (棋譜)。ONNX CPU
 │   │   │   ├── prompt.py              # prompts/ の Markdown を読む
 │   │   │   ├── jev.py                 # 生成 AI (Jev)。Decisions API
-│   │   │   └── chat_completions.py    # 追加の生成 AI。Chat Completions
+│   │   │   └── chat_completions.py    # 追加の生成 AI。Chat Completions の構造化出力
 │   │   ├── api/                       # 内部 FastAPI。ブラウザからは到達させない
 │   │   │   ├── __init__.py
 │   │   │   ├── app.py                 # アプリ組み立てと待ち受け
@@ -202,7 +202,7 @@ reversi-ai/
 │
 ├── prompts/                           # 生成 AI の固定指示。戦略プロセスが対局時に読む
 │   ├── jev.md                         # 生成 AI (Jev) の Decisions 指示
-│   └── chat-completions.md            # 追加の生成 AI の Chat Completions 指示
+│   └── chat-completions.md            # 追加の生成 AI の Chat Completions 指示（構造化出力）
 │
 ├── e2e/                               # Playwright。対象はマシン上の Google Chrome
 │   ├── playwright.config.ts
@@ -211,7 +211,7 @@ reversi-ai/
 │
 └── data/                              # 運用者ローカル。Git 管理外
     ├── games.sqlite                   # 終局棋譜（SRS-DAT-004 の項目）
-    ├── genai.json                     # 追加する生成 AI のモデル ID と呼称
+    ├── config.toml                    # 追加する生成 AI のモデル名・呼称・パラメータ
     ├── wthor/                         # WTHOR 原本。読み取り専用。再配布しない
     └── certs/                         # mkcert の PEM。Hono へファイルとして渡す
 ```
@@ -298,9 +298,9 @@ reversi-ai/
 | `nn.py` | ニューラルネットワーク (棋譜) | `models/nn.onnx` を onnxruntime CPU で順伝播し、合法手へマスク |
 | `prompt.py` | （指示ファイル） | `prompts/` の Markdown を対局時に読む。欠落は継続不能 |
 | `jev.py` | 生成 AI (Jev) | `typesafe/jev-1.13` の Decisions API。指示は `prompts/jev.md`。合法手の外を採用しない |
-| `chat_completions.py` | 生成 AI (〈呼称〉) | 運用者が与えたテキスト生成モデル ID。固定の system は `prompts/chat-completions.md` |
+| `chat_completions.py` | 生成 AI (〈呼称〉) | 運用者が与えたテキスト生成モデル ID。固定の system は `prompts/chat-completions.md`。応答は JSON Schema を Pydantic で検証する |
 
-カテゴリ `random` は「ランダム」である。`position_table.py` は FUN-025 の点数表だけを持つ。`extra_genai.py` は `data/genai.json` を読む（対局者向けウィザードは置かない）。Jev の固定指示は `prompts/jev.md` に置き、`strategy/src` には埋め込まない。Markdown を変えてイメージを作り直すか、開発時の bind（`./prompts:/prompts`）を更新すると、次の着手呼出しからその指示を使う。
+カテゴリ `random` は「ランダム」である。`position_table.py` は FUN-025 の点数表だけを持つ。`extra_genai.py` は `data/config.toml` を読む（対局者向けウィザードは置かない）。Jev の固定指示は `prompts/jev.md` に置き、`strategy/src` には埋め込まない。Markdown を変えてイメージを作り直すか、開発時の bind（`./prompts:/prompts`）を更新すると、次の着手呼出しからその指示を使う。
 
 ### 4.5 `strategy` — `reversi.api`
 
@@ -352,7 +352,7 @@ TypeScript 側は Zod（`web/server/src/schemas.ts`）、Python 側は Pydantic�
 | `prompts/*.md` | 生成 AI の固定指示。戦略イメージへ COPY し、Compose では bind | 含める |
 | `data/games.sqlite` | 終局棋譜。`.wtb` ではない | 含めない |
 | `data/wthor/` | WTHOR 原本 | 含めない。再配布しない |
-| `data/genai.json` | 追加生成 AI のモデル ID と呼称 | 含めない |
+| `data/config.toml` | 追加生成 AI のモデル名・呼称・パラメータ | 含めない |
 | `data/certs/` | mkcert の証明書 | 含めない |
 | Podman secret `openrouter-api-key` | OpenRouter の API キー | リポジトリにも `.env` にも置かない |
 
@@ -455,6 +455,7 @@ Issue の検証欄と CI は、この節の生コマンドを使う。ラッパ�
 
 | 版 | 日付 | 内容 |
 | --- | --- | --- |
+| 0.1.8 | 2026-09-20 | 追加の生成 AI を `data/config.toml` と構造化出力に置き、自由文パースを既定にしない |
 | 0.1.7 | 2026-09-20 | 学習を `train` イメージに分け、対局用 strategy から torch を外す |
 | 0.1.6 | 2026-09-20 | 生成 AI の固定指示を `prompts/` に置き、strategy イメージが読む |
 | 0.1.5 | 2026-09-20 | 起動の正を `podman-compose` に揃え、文書表の日付をフロントマターと一致させる |
