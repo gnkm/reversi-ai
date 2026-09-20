@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import sys
-from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from collections.abc import Iterator, Mapping, Sequence
+from contextlib import contextmanager
+from dataclasses import dataclass, replace
 from math import isfinite
 from pathlib import Path
 from random import Random
@@ -43,24 +44,87 @@ _SIDE_KEYS = ("black", "white")
 _PLACE_FIELDS = ("kind", "takes_corner", "gives_corner", "opponent_places", "flips")
 _BOARD_CORNERS = frozenset({"a1", "h1", "a8", "h8"})
 
+STAGE1_CONFIG_NAMES = ("v1_constant", "v2_jev0", "v2_code0", "v2_as_is")
+STAGE1_CODE_ONLY = frozenset({"v1_constant", "v2_jev0"})
+DEFAULT_STAGE1_CONFIG = "v2_as_is"
+# 第 1 版（#71）の優先係数。答えは noul の中央 0.5 に固定し、コード評価だけを測る。
+_V1_CONSTANT_ANSWER = 0.5
+_V1_ANSWER_WEIGHTS = {
+    "corner_priority": 2.0,
+    "mobility_priority": 1.5,
+    "position_priority": 1.5,
+    "material_importance": 1.2,
+}
+_V1_METRIC_ANSWERS = {
+    "position": "position_priority",
+    "mobility": "mobility_priority",
+    "material": "material_importance",
+    "corners": "corner_priority",
+}
+
 __all__ = [
     "CATEGORY",
     "DECISIONS_SERVER",
     "DECISIONS_TIMEOUT_MS",
+    "DEFAULT_STAGE1_CONFIG",
     "DESCRIPTION",
     "DISPLAY_NAME",
     "MODEL_ID",
     "PROMPT_PATH",
     "SECRET_PATH",
     "SPECIMEN_ID",
+    "STAGE1_CODE_ONLY",
+    "STAGE1_CONFIG_NAMES",
     "ExternalModelError",
     "choose_move",
     "read_secret",
+    "select_stage1_baseline",
+    "stage1_config",
 ]
 
 
 class ExternalModelError(RuntimeError):
     """外部モデルの呼出し失敗。着手は採用しない。"""
+
+
+_active_stage1_config = DEFAULT_STAGE1_CONFIG
+
+
+@contextmanager
+def stage1_config(name: str) -> Iterator[str]:
+    """検証用の 4 構成切替。抜けたらカタログ既定（第 2 版そのまま）に戻す。"""
+    if name not in STAGE1_CONFIG_NAMES:
+        raise ValueError(f"未知の段階 1 構成です: {name}")
+    global _active_stage1_config
+    previous = _active_stage1_config
+    _active_stage1_config = name
+    try:
+        yield name
+    finally:
+        _active_stage1_config = previous
+
+
+def select_stage1_baseline(configs: Sequence[Mapping[str, Any]]) -> str:
+    """コードだけの構成のうち、勝ち点（なければ石差・勝数）が最も高いものを指名する。"""
+    code_only = [row for row in configs if row.get("name") in STAGE1_CODE_ONLY]
+    names = {row.get("name") for row in code_only}
+    if names != STAGE1_CODE_ONLY:
+        raise ValueError("基準線は v1_constant と v2_jev0 の記録から指名する")
+
+    def _rank(row: Mapping[str, Any]) -> tuple[float, float, float]:
+        points = row.get("points")
+        wins = row.get("wins")
+        stone_diff = row.get("stone_diff")
+        if points is None:
+            points = float(wins) if isinstance(wins, int | float) else 0.0
+        if stone_diff is None:
+            stone_diff = 0.0
+        if wins is None:
+            wins = 0.0
+        return (float(points), float(stone_diff), float(wins))
+
+    ranked = sorted(code_only, key=lambda row: (_rank(row), str(row["name"])))
+    return str(ranked[-1]["name"])
 
 
 @dataclass(frozen=True, slots=True)
@@ -549,11 +613,13 @@ def _candidate_log_line(
     spec: _Spec,
     stage: str,
     selected: bool,
+    code: float | None = None,
 ) -> str:
     probability = parsed.probabilities.get(square.algebraic, 0.0)
+    scored = _code_score(metrics, spec, stage) if code is None else code
     fields = (
         f"square={square.algebraic}",
-        f"code={_format_number(_code_score(metrics, spec, stage))}",
+        f"code={_format_number(scored)}",
         f"position={_format_number(metrics.position)}",
         f"mobility={_format_number(metrics.mobility)}",
         f"material={_format_number(metrics.material)}",
@@ -572,8 +638,10 @@ def _log_candidates(
     spec: _Spec,
     stage: str,
     selected: Square,
+    code_scores: Mapping[Square, float] | None = None,
 ) -> None:
     for square in places:
+        code = None if code_scores is None else code_scores[square]
         print(
             _candidate_log_line(
                 square,
@@ -582,6 +650,7 @@ def _log_candidates(
                 spec,
                 stage,
                 square == selected,
+                code,
             ),
             file=sys.stderr,
             flush=True,
@@ -613,8 +682,89 @@ def _legal_square(square: Square, places: Sequence[Square]) -> Square:
     return square
 
 
+def _normalize_map(raw: Mapping[Square, float]) -> dict[Square, float]:
+    values = tuple(raw.values())
+    lo = min(values)
+    span = max(values) - lo
+    if span == 0.0:
+        return dict.fromkeys(raw, 0.0)
+    return {square: (value - lo) / span for square, value in raw.items()}
+
+
+def _v1_normalized(
+    metrics: Mapping[Square, _Metrics],
+) -> dict[Square, _Metrics]:
+    position_n = _normalize_map({square: row.position for square, row in metrics.items()})
+    mobility_n = _normalize_map({square: row.mobility for square, row in metrics.items()})
+    material_n = _normalize_map({square: row.material for square, row in metrics.items()})
+    corners_n = _normalize_map({square: row.corners for square, row in metrics.items()})
+    return {
+        square: _Metrics(
+            position=position_n[square],
+            mobility=mobility_n[square],
+            material=material_n[square],
+            corners=corners_n[square],
+        )
+        for square in metrics
+    }
+
+
+def _v1_code_score(metrics: _Metrics, spec: _Spec, stage: str) -> float:
+    mix = spec.stage_weights[stage]
+    total = 0.0
+    for key in _METRIC_KEYS:
+        factor = 1.0 + _V1_ANSWER_WEIGHTS[_V1_METRIC_ANSWERS[key]] * _V1_CONSTANT_ANSWER
+        total += spec.metric_weights[key] * mix[key] * getattr(metrics, key) * factor
+    return total
+
+
+def _dummy_parsed(places: Sequence[Square]) -> _Parsed:
+    return _Parsed(
+        probabilities={square.algebraic: 0.0 for square in places},
+        confidence=1.0,
+    )
+
+
+def _select_square_v1(
+    position: Position,
+    places: Sequence[Square],
+    spec: _Spec,
+) -> Square:
+    stage = _stage_of(position.board, spec)
+    raw_metrics = _after_metrics(position, places, spec)
+    normalized = _v1_normalized(raw_metrics)
+    scores = {
+        square: _v1_code_score(normalized[square], spec, stage) for square in places
+    }
+    best_square = places[0]
+    best_score = scores[best_square]
+    for square in places[1:]:
+        score = scores[square]
+        if score > best_score:
+            best_score = score
+            best_square = square
+    _log_candidates(
+        places,
+        raw_metrics,
+        _dummy_parsed(places),
+        spec,
+        stage,
+        best_square,
+        scores,
+    )
+    return best_square
+
+
+def _spec_for_config(spec: _Spec, config: str) -> _Spec:
+    if config == "v2_jev0":
+        return replace(spec, w_jev=0.0)
+    if config == "v2_code0":
+        return replace(spec, w_code=0.0)
+    return spec
+
+
 def _call_openrouter(position: Position, places: Sequence[Square]) -> Square:
-    spec = _load_spec()
+    spec = _spec_for_config(_load_spec(), _active_stage1_config)
     key = read_secret()
     lines = _place_lines(position, places, spec)
     state = _decision_state(position, spec, lines)
@@ -640,6 +790,18 @@ def _call_openrouter(position: Position, places: Sequence[Square]) -> Square:
     return _legal_square(_select_square(position, places, parsed, spec), places)
 
 
+def _resolve_square(position: Position, places: Sequence[Square]) -> Square:
+    config = _active_stage1_config
+    spec = _load_spec()
+    if config == "v1_constant":
+        return _legal_square(_select_square_v1(position, places, spec), places)
+    if config == "v2_jev0":
+        zero_jev = _spec_for_config(spec, config)
+        parsed = _dummy_parsed(places)
+        return _legal_square(_select_square(position, places, parsed, zero_jev), places)
+    return _call_openrouter(position, places)
+
+
 def choose_move(position: Position, rng: Random | None = None) -> Place | None:
     """Jev が選んだ合法手。失敗時は着手を採用せず継続不能を表す。"""
     del rng
@@ -648,7 +810,7 @@ def choose_move(position: Position, rng: Random | None = None) -> Place | None:
         return None
     if len(places) == 1:
         return Place(places[0])
-    square = _call_openrouter(position, places)
+    square = _resolve_square(position, places)
     if square not in places:
         raise ExternalModelError("合法手の外です")
     return Place(square)
