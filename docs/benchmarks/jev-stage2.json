@@ -1,0 +1,599 @@
+{
+  "recorded_at": "2026-09-20 13:46",
+  "protocol": {
+    "positions_per_stage": 6,
+    "search_depth": 4,
+    "exact_empty": 8,
+    "blunder_loss": 50,
+    "confidence_edges": [
+      0.0,
+      0.2,
+      0.4,
+      0.6,
+      0.8,
+      1.0
+    ],
+    "label": "alphabeta",
+    "wthor": false,
+    "selection": {
+      "shortlist_size": 3,
+      "margin": 0.5,
+      "confidence_threshold": 0.3
+    },
+    "notes": [
+      "対局ログはカタログ個体同士の対局と、あれば data/games.sqlite から集めた。",
+      "合法手が 2 手以上の局面を序盤・中盤・終盤から偏りなくサンプリングした。",
+      "正解は手元の αβ（深さ 4。空きマスが 8 以下なら終局まで）の評価値。",
+      "WTHOR の手は正解に使っていない。",
+      "code_best はコード評価の最善手。jev_all は全合法手 Choice。shortlist は絞り込み。",
+      "confidence 区間は jev_all の答え。資格情報と課金が要る呼出しは CI に載せない。"
+    ]
+  },
+  "methods": [
+    {
+      "name": "code_best",
+      "n": 18,
+      "match_rate": 0.5,
+      "mean_loss": 20.055555555555557,
+      "blunder_rate": 0.16666666666666666
+    },
+    {
+      "name": "jev_all",
+      "n": 18,
+      "match_rate": 0.3888888888888889,
+      "mean_loss": 31.88888888888889,
+      "blunder_rate": 0.3333333333333333
+    },
+    {
+      "name": "shortlist",
+      "n": 18,
+      "match_rate": 0.5,
+      "mean_loss": 23.833333333333332,
+      "blunder_rate": 0.2222222222222222
+    }
+  ],
+  "confidence_bins": [
+    {
+      "lo": 0.0,
+      "hi": 0.2,
+      "n": 1,
+      "match_rate": 0.0,
+      "mean_loss": 2.0
+    },
+    {
+      "lo": 0.2,
+      "hi": 0.4,
+      "n": 4,
+      "match_rate": 0.25,
+      "mean_loss": 43.75
+    },
+    {
+      "lo": 0.4,
+      "hi": 0.6,
+      "n": 1,
+      "match_rate": 1.0,
+      "mean_loss": 0.0
+    },
+    {
+      "lo": 0.6,
+      "hi": 0.8,
+      "n": 2,
+      "match_rate": 1.0,
+      "mean_loss": 0.0
+    },
+    {
+      "lo": 0.8,
+      "hi": 1.0,
+      "n": 10,
+      "match_rate": 0.3,
+      "mean_loss": 39.7
+    }
+  ],
+  "positions": [
+    {
+      "stage": "opening",
+      "empties": 57,
+      "side_to_move": "white",
+      "board": [
+        "........",
+        "........",
+        "........",
+        "...BW...",
+        "...BBB..",
+        "...BW...",
+        "........",
+        "........"
+      ],
+      "best_value": -1,
+      "code_best": "c3",
+      "jev_all": "c3",
+      "shortlist": "c3",
+      "shortlist_keys": [
+        "c3",
+        "c5"
+      ],
+      "jev_all_confidence": 0.58,
+      "shortlist_confidence": 0.34,
+      "code_best_loss": 0,
+      "jev_all_loss": 0,
+      "shortlist_loss": 0
+    },
+    {
+      "stage": "opening",
+      "empties": 54,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "........",
+        "....WB..",
+        "...BW...",
+        "...WB...",
+        "..WBBB..",
+        "........",
+        "........"
+      ],
+      "best_value": 1,
+      "code_best": "c4",
+      "jev_all": "b2",
+      "shortlist": "c4",
+      "shortlist_keys": [
+        "c4",
+        "c5"
+      ],
+      "jev_all_confidence": 0.93,
+      "shortlist_confidence": 0.35,
+      "code_best_loss": 0,
+      "jev_all_loss": 55,
+      "shortlist_loss": 0
+    },
+    {
+      "stage": "opening",
+      "empties": 49,
+      "side_to_move": "white",
+      "board": [
+        "........",
+        "........",
+        "..B.B...",
+        "..WWBWW.",
+        "..WWB...",
+        "..WWWWW.",
+        "........",
+        "........"
+      ],
+      "best_value": -5,
+      "code_best": "e7",
+      "jev_all": "e7",
+      "shortlist": "e7",
+      "shortlist_keys": [
+        "e7",
+        "f6"
+      ],
+      "jev_all_confidence": 0.85,
+      "shortlist_confidence": 0.96,
+      "code_best_loss": 5,
+      "jev_all_loss": 5,
+      "shortlist_loss": 5
+    },
+    {
+      "stage": "opening",
+      "empties": 50,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "........",
+        "..WB.B..",
+        "..WBB...",
+        "..WWB...",
+        "..WWWWW.",
+        "........",
+        "........"
+      ],
+      "best_value": 0,
+      "code_best": "b5",
+      "jev_all": "b4",
+      "shortlist": "b4",
+      "shortlist_keys": [
+        "b5",
+        "d2",
+        "b4"
+      ],
+      "jev_all_confidence": 0.38,
+      "shortlist_confidence": 0.98,
+      "code_best_loss": 6,
+      "jev_all_loss": 4,
+      "shortlist_loss": 4
+    },
+    {
+      "stage": "opening",
+      "empties": 45,
+      "side_to_move": "white",
+      "board": [
+        "..W.....",
+        "..W.....",
+        "..WBBB..",
+        "..WBBB..",
+        "..WWBB..",
+        ".BBBBB..",
+        "........",
+        "........"
+      ],
+      "best_value": 14,
+      "code_best": "c2",
+      "jev_all": "b2",
+      "shortlist": "c2",
+      "shortlist_keys": [
+        "c2",
+        "d7",
+        "f2"
+      ],
+      "jev_all_confidence": 0.31,
+      "shortlist_confidence": 0.37,
+      "code_best_loss": 0,
+      "jev_all_loss": 53,
+      "shortlist_loss": 0
+    },
+    {
+      "stage": "opening",
+      "empties": 51,
+      "side_to_move": "white",
+      "board": [
+        "........",
+        "........",
+        "........",
+        "...BW...",
+        "..BBB...",
+        "WWWWWB..",
+        ".B......",
+        "B......."
+      ],
+      "best_value": -45,
+      "code_best": "d6",
+      "jev_all": "c5",
+      "shortlist": "c5",
+      "shortlist_keys": [
+        "d6",
+        "f5",
+        "c5"
+      ],
+      "jev_all_confidence": 0.86,
+      "shortlist_confidence": 0.75,
+      "code_best_loss": 2,
+      "jev_all_loss": 5,
+      "shortlist_loss": 5
+    },
+    {
+      "stage": "midgame",
+      "empties": 17,
+      "side_to_move": "white",
+      "board": [
+        "BBBBBBWB",
+        "B.WBBW.B",
+        "BBBBWBWB",
+        "BBBBBWWB",
+        "BBBBWWWB",
+        "BBWWWW..",
+        "...W.W..",
+        ".....W.."
+      ],
+      "best_value": -296,
+      "code_best": "a2",
+      "jev_all": "a2",
+      "shortlist": "a2",
+      "shortlist_keys": [
+        "a2",
+        "b7",
+        "g7"
+      ],
+      "jev_all_confidence": 0.8,
+      "shortlist_confidence": 0.86,
+      "code_best_loss": 75,
+      "jev_all_loss": 75,
+      "shortlist_loss": 75
+    },
+    {
+      "stage": "midgame",
+      "empties": 33,
+      "side_to_move": "white",
+      "board": [
+        "...W.BWB",
+        "..W.W.W.",
+        ".B.WWWWW",
+        "..BWW.W.",
+        "..WBWWWB",
+        "..WWB.W.",
+        ".....BWW",
+        "....B..."
+      ],
+      "best_value": -237,
+      "code_best": "f3",
+      "jev_all": "e8",
+      "shortlist": "e8",
+      "shortlist_keys": [
+        "f3",
+        "e8",
+        "c6"
+      ],
+      "jev_all_confidence": 0.26,
+      "shortlist_confidence": 0.34,
+      "code_best_loss": 2,
+      "jev_all_loss": 0,
+      "shortlist_loss": 0
+    },
+    {
+      "stage": "midgame",
+      "empties": 38,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "........",
+        "..B..B..",
+        "WWWWWW.B",
+        "W.WWWWB.",
+        "WWBWWB..",
+        ".W....B.",
+        "BW.....B"
+      ],
+      "best_value": 210,
+      "code_best": "b4",
+      "jev_all": "b4",
+      "shortlist": "b4",
+      "shortlist_keys": [
+        "b4"
+      ],
+      "jev_all_confidence": 0.97,
+      "shortlist_confidence": null,
+      "code_best_loss": 0,
+      "jev_all_loss": 0,
+      "shortlist_loss": 0
+    },
+    {
+      "stage": "midgame",
+      "empties": 40,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "........",
+        "..B..B..",
+        "WWWWWW..",
+        "W.WWWWW.",
+        "WWBWWB..",
+        ".B....B.",
+        "B......B"
+      ],
+      "best_value": 87,
+      "code_best": "b4",
+      "jev_all": "h5",
+      "shortlist": "b4",
+      "shortlist_keys": [
+        "b4",
+        "h5"
+      ],
+      "jev_all_confidence": 0.07,
+      "shortlist_confidence": 0.02,
+      "code_best_loss": 0,
+      "jev_all_loss": 2,
+      "shortlist_loss": 0
+    },
+    {
+      "stage": "midgame",
+      "empties": 34,
+      "side_to_move": "black",
+      "board": [
+        ".....B..",
+        ".....B..",
+        "..WWWB..",
+        "B.WWWB..",
+        "BWWWBB..",
+        "BBWWBBBB",
+        "..BW....",
+        "..WWW..."
+      ],
+      "best_value": 13,
+      "code_best": "b5",
+      "jev_all": "c7",
+      "shortlist": "b5",
+      "shortlist_keys": [
+        "b5",
+        "e2",
+        "e7"
+      ],
+      "jev_all_confidence": 0.97,
+      "shortlist_confidence": 0.8,
+      "code_best_loss": 7,
+      "jev_all_loss": 5,
+      "shortlist_loss": 7
+    },
+    {
+      "stage": "midgame",
+      "empties": 41,
+      "side_to_move": "white",
+      "board": [
+        "........",
+        "..W.W...",
+        "..W.W...",
+        "..WWWWW.",
+        "B.WWW...",
+        ".BBWBBBB",
+        "..B.....",
+        ".WB....."
+      ],
+      "best_value": -24,
+      "code_best": "d1",
+      "jev_all": "a2",
+      "shortlist": "a3",
+      "shortlist_keys": [
+        "d1",
+        "a3"
+      ],
+      "jev_all_confidence": 0.27,
+      "shortlist_confidence": 0.87,
+      "code_best_loss": 0,
+      "jev_all_loss": 118,
+      "shortlist_loss": 69
+    },
+    {
+      "stage": "endgame",
+      "empties": 6,
+      "side_to_move": "white",
+      "board": [
+        "BBBBBBBB",
+        "WWWWWBW.",
+        ".W.WBBBW",
+        "WWWWBBBB",
+        "W.WBWBBB",
+        "WWWWWBW.",
+        "WWBWWWWW",
+        "BBBBBBW."
+      ],
+      "best_value": -384,
+      "code_best": "h3",
+      "jev_all": "h3",
+      "shortlist": "h3",
+      "shortlist_keys": [
+        "h3"
+      ],
+      "jev_all_confidence": 0.8,
+      "shortlist_confidence": null,
+      "code_best_loss": 0,
+      "jev_all_loss": 0,
+      "shortlist_loss": 0
+    },
+    {
+      "stage": "endgame",
+      "empties": 7,
+      "side_to_move": "white",
+      "board": [
+        "..WWWWW.",
+        "B.BBBW..",
+        "BBBWWWWW",
+        "BBBBWBWW",
+        "BBBWBBWW",
+        "BBBBWBBW",
+        "BBBWWBW.",
+        "WWWWWWWW"
+      ],
+      "best_value": 412,
+      "code_best": "a8",
+      "jev_all": "a8",
+      "shortlist": "a8",
+      "shortlist_keys": [
+        "a8"
+      ],
+      "jev_all_confidence": 0.81,
+      "shortlist_confidence": null,
+      "code_best_loss": 154,
+      "jev_all_loss": 154,
+      "shortlist_loss": 154
+    },
+    {
+      "stage": "endgame",
+      "empties": 9,
+      "side_to_move": "white",
+      "board": [
+        "B.B..B.B",
+        ".BWWWWWW",
+        "BWBWWWWW",
+        "WWWBWWWW",
+        "WWWBBBBW",
+        "WWWBWBWW",
+        ".WWBBBBW",
+        "BW.B.B.B"
+      ],
+      "best_value": -441,
+      "code_best": "e1",
+      "jev_all": "e1",
+      "shortlist": "e1",
+      "shortlist_keys": [
+        "e1"
+      ],
+      "jev_all_confidence": 0.96,
+      "shortlist_confidence": null,
+      "code_best_loss": 98,
+      "jev_all_loss": 98,
+      "shortlist_loss": 98
+    },
+    {
+      "stage": "endgame",
+      "empties": 12,
+      "side_to_move": "black",
+      "board": [
+        ".BBBBB..",
+        "..BBBB.B",
+        "WWWBBWWB",
+        "WBBBBW.B",
+        "WWBWWWWB",
+        "WWWBWWWB",
+        "W.BWWW.W",
+        ".BBBBB.."
+      ],
+      "best_value": 184,
+      "code_best": "h1",
+      "jev_all": "h1",
+      "shortlist": "h1",
+      "shortlist_keys": [
+        "h1",
+        "g5"
+      ],
+      "jev_all_confidence": 0.73,
+      "shortlist_confidence": 0.74,
+      "code_best_loss": 0,
+      "jev_all_loss": 0,
+      "shortlist_loss": 0
+    },
+    {
+      "stage": "endgame",
+      "empties": 14,
+      "side_to_move": "white",
+      "board": [
+        "..BBBBWB",
+        "..WBBBW.",
+        ".W.WBBWW",
+        "WWWWBBW.",
+        "..WBWBWB",
+        "..BBWBW.",
+        "WWWWWWWW",
+        "BBBBBBW."
+      ],
+      "best_value": -524,
+      "code_best": "b8",
+      "jev_all": "b8",
+      "shortlist": "b8",
+      "shortlist_keys": [
+        "b8"
+      ],
+      "jev_all_confidence": 0.91,
+      "shortlist_confidence": null,
+      "code_best_loss": 0,
+      "jev_all_loss": 0,
+      "shortlist_loss": 0
+    },
+    {
+      "stage": "endgame",
+      "empties": 5,
+      "side_to_move": "black",
+      "board": [
+        "BBBBBBBB",
+        "WWWWWBW.",
+        ".W.WWBBW",
+        "WWWWBWBW",
+        "W.WBWBWW",
+        "WWWWWBWW",
+        "WWBWWWWW",
+        "BBBBBBW."
+      ],
+      "best_value": 384,
+      "code_best": "c6",
+      "jev_all": "h1",
+      "shortlist": "c6",
+      "shortlist_keys": [
+        "c6",
+        "a6"
+      ],
+      "jev_all_confidence": 0.67,
+      "shortlist_confidence": 0.53,
+      "code_best_loss": 12,
+      "jev_all_loss": 0,
+      "shortlist_loss": 12
+    }
+  ]
+}

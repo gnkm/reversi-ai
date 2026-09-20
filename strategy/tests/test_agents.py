@@ -6,6 +6,7 @@ import ast
 import json
 import re
 from collections.abc import Sequence
+from dataclasses import replace
 from pathlib import Path
 from random import Random
 from types import SimpleNamespace
@@ -555,6 +556,84 @@ def test_jev_combines_choice_and_code_into_legal_place() -> None:
     assert square == Square.parse("d3")
 
 
+def test_jev_margin_zero_matches_code_best_despite_fake_choice() -> None:
+    position = initial_position()
+    places = legal_places(position)
+    spec = replace(jev._load_spec(), margin=0.0)
+    stage = jev._stage_of(position.board, spec)
+    metrics = jev._after_metrics(position, places, spec)
+    scores = jev._code_scores(places, metrics, spec, stage)
+    code_best = jev._best_square(places, scores)
+    focused = places[1].algebraic
+    assert focused != code_best.algebraic
+    square = jev._select_square(
+        position, places, _jev_parsed(places, focused=focused), spec
+    )
+    assert square == code_best
+    again = jev._select_square(position, places, _jev_parsed(places), spec)
+    assert again == code_best == Square.parse("d3")
+
+
+def test_jev_choice_keys_are_shortlist_only() -> None:
+    position = initial_position()
+    places = legal_places(position)
+    spec = jev._load_spec()
+    stage = jev._stage_of(position.board, spec)
+    metrics = jev._after_metrics(position, places, spec)
+    scores = jev._code_scores(places, metrics, spec, stage)
+    _best, shortlist = jev._shortlist(places, scores, spec)
+    assert len(shortlist) >= 2
+    assert len(shortlist) <= spec.shortlist_size
+    assert set(shortlist) < set(places)
+    lines = jev._place_lines(position, shortlist, spec)
+    questions = jev._decision_questions(spec, lines)
+    criteria = questions[spec.question_id]["criteria"]
+    assert set(criteria) == {square.algebraic for square in shortlist}
+    assert Square.parse("e6") in places
+    assert "e6" not in criteria
+
+
+def test_jev_low_confidence_returns_code_best() -> None:
+    position = initial_position()
+    places = legal_places(position)
+    spec = jev._load_spec()
+    stage = jev._stage_of(position.board, spec)
+    metrics = jev._after_metrics(position, places, spec)
+    scores = jev._code_scores(places, metrics, spec, stage)
+    code_best = jev._best_square(places, scores)
+    _best, shortlist = jev._shortlist(places, scores, spec)
+    other = next(square for square in shortlist if square != code_best)
+    high = jev._select_square(
+        position, places, _jev_parsed(places, focused=other.algebraic), spec
+    )
+    low = jev._select_square(
+        position,
+        places,
+        _jev_parsed(places, focused=other.algebraic, confidence=0.0),
+        spec,
+    )
+    assert high == other
+    assert low == code_best
+    assert spec.confidence_threshold > 0.0
+
+
+def test_jev_spec_drops_synthesis_weights() -> None:
+    spec = json.loads(jev.PROMPT_PATH.read_text(encoding="utf-8"))
+    selection = spec["selection"]
+    for key in ("shortlist_size", "margin", "confidence_threshold"):
+        assert key in selection
+    weights = spec.get("weights", {})
+    assert "jev" not in weights
+    assert "confidence" not in weights
+    assert "code" not in weights
+    loaded = jev._load_spec()
+    assert not hasattr(loaded, "w_jev")
+    assert not hasattr(loaded, "w_confidence")
+    source = _module_source("jev.py")
+    assert "w_jev" not in source
+    assert "_combined_score" not in source
+
+
 def test_jev_choice_probability_on_corner_picks_that_square() -> None:
     position = _position_from_rank8_rows(_CORNER_VS_TWO_FLIPS, Color.BLACK)
     places = legal_places(position)
@@ -570,18 +649,23 @@ def test_jev_choice_probability_on_corner_picks_that_square() -> None:
     assert after_d2.stone_at(Square.parse("a1")) is Stone.EMPTY
 
 
-def test_jev_choice_probability_can_override_code_eval() -> None:
+def test_jev_choice_outside_shortlist_does_not_override_code_best() -> None:
     position = _position_from_rank8_rows(_CORNER_VS_TWO_FLIPS, Color.BLACK)
     places = legal_places(position)
     a1 = Square.parse("a1")
     d2 = Square.parse("d2")
     assert a1 in places and d2 in places
     spec = jev._load_spec()
+    stage = jev._stage_of(position.board, spec)
+    metrics = jev._after_metrics(position, places, spec)
+    scores = jev._code_scores(places, metrics, spec, stage)
+    _best, shortlist = jev._shortlist(places, scores, spec)
+    assert a1 in shortlist
+    assert d2 not in shortlist
     even = jev._select_square(position, places, _jev_parsed(places), spec)
     focused = jev._select_square(position, places, _jev_parsed(places, focused="d2"), spec)
     assert even == a1
-    assert focused == d2
-    metrics = jev._after_metrics(position, places, spec)
+    assert focused == a1
     assert metrics[d2].material > metrics[a1].material
     assert len(flips_for(position.board, d2, Color.BLACK)) > len(
         flips_for(position.board, a1, Color.BLACK)
@@ -717,9 +801,9 @@ def test_jev_incomplete_probabilities_are_unplayable() -> None:
 
 def test_jev_missing_probabilities_use_choice() -> None:
     spec = jev._load_spec()
-    position = _position_from_rank8_rows(_CORNER_VS_TWO_FLIPS, Color.BLACK)
+    position = initial_position()
     places = legal_places(position)
-    chosen = Square.parse("d2")
+    chosen = Square.parse("c4")
     answers = {
         spec.question_id: {
             "type": "choice",
@@ -728,6 +812,7 @@ def test_jev_missing_probabilities_use_choice() -> None:
         }
     }
     parsed = jev._answers_from_response(SimpleNamespace(answers=answers), spec, places)
+    assert parsed.choice == chosen.algebraic
     assert jev._select_square(position, places, parsed, spec) == chosen
 
 
@@ -830,14 +915,17 @@ def test_jev_stage1_configs_switch_without_adding_catalog_names(
     spec = jev._load_spec()
     code0 = jev._spec_for_config(spec, "v2_code0")
     as_is = jev._spec_for_config(spec, "v2_as_is")
-    assert code0.w_code == 0.0 and code0.w_jev == spec.w_jev
-    assert as_is.w_code == spec.w_code and as_is.w_jev == spec.w_jev
+    assert code0.shortlist_size == 64
+    assert code0.margin > spec.margin
+    assert code0.confidence_threshold == 0.0
+    assert as_is.shortlist_size == spec.shortlist_size
+    assert as_is.margin == spec.margin
     assert jev._select_square(
         position, places, _jev_parsed(places, focused="d2"), code0
     ) == d2
     assert jev._select_square(
         position, places, _jev_parsed(places, focused="d2"), as_is
-    ) == d2
+    ) == a1
     assert jev._select_square(position, places, _jev_parsed(places), as_is) == a1
 
     names = [item.display_name for item in items()]
@@ -921,6 +1009,23 @@ def test_jev_stage1_record_names_code_only_baseline() -> None:
     for row in configs:
         assert "wins" in row or "stone_diff" in row or "points" in row
     assert jev.select_stage1_baseline(configs) == data["baseline"]
+    assert [item.display_name for item in items()].count("生成 AI (Jev)") == 1
+
+
+def test_jev_stage2_record_has_three_methods_and_confidence_bins() -> None:
+    root = Path(__file__).resolve().parents[2] / "docs" / "benchmarks"
+    records = sorted(root.glob("jev-stage2*.json"))
+    assert records, "段階 2 のオフライン評価 JSON が docs/benchmarks/ に無い"
+    data = json.loads(records[-1].read_text(encoding="utf-8"))
+    methods = {row["name"] for row in data["methods"]}
+    assert {"code_best", "jev_all", "shortlist"} <= methods
+    for row in data["methods"]:
+        for key in ("match_rate", "mean_loss", "blunder_rate"):
+            assert key in row
+    assert "confidence_bins" in data
+    assert data["confidence_bins"]
+    for row in data["confidence_bins"]:
+        assert "match_rate" in row and "mean_loss" in row
     assert [item.display_name for item in items()].count("生成 AI (Jev)") == 1
 
 

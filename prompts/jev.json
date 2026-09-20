@@ -108,10 +108,12 @@
       "many": [6, 64]
     }
   },
+  "selection": {
+    "shortlist_size": 3,
+    "margin": 0.5,
+    "confidence_threshold": 0.3
+  },
   "weights": {
-    "jev": 4.0,
-    "code": 1.0,
-    "confidence": 1.0,
     "metrics": {
       "position": 2.0,
       "mobility": 1.5,

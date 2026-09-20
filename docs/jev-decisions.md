@@ -1,7 +1,7 @@
 ---
 title: Jev Decisions（Choice）
 product: Reversi Agents
-version: 0.1.0
+version: 0.1.1
 status: working
 date: 2026-09-20
 source: docs/srs.md
@@ -16,7 +16,7 @@ tech_stack: docs/tech-stack.md
 | --- | --- |
 | 文書識別 | reversi-ai-jev-decisions |
 | 対象ソフトウェア | Reversi Agents |
-| 版 | 0.1.0 |
+| 版 | 0.1.1 |
 | 状態 | 現行（設計。要求ではない） |
 | 日付 | 2026-09-20 |
 | 入力 | [`docs/srs.md`](srs.md) 0.1.24、[`docs/ARCHITECTURE.md`](ARCHITECTURE.md)、[`docs/tech-stack.md`](tech-stack.md) |
@@ -37,7 +37,7 @@ tech_stack: docs/tech-stack.md
 
 `questions` は ID をキーにした map。本個体の質問は 1 本。`type` は `"choice"`。`instructions` は `prompts/jev.json` の固定文字列で、合法手数では変えない。
 
-Choice の `criteria` は **選択肢 ID → 説明のオブジェクト** である。Score の `criteria` は段階の配列なので混ぜない。本個体の選択肢 ID は代数記法の合法マスである。対局中に増えるのはこのキーと、それに対応する言葉だけである。
+Choice の `criteria` は **選択肢 ID → 説明のオブジェクト** である。Score の `criteria` は段階の配列なので混ぜない。本個体の選択肢 ID は代数記法のマスであり、コード評価で残した shortlist に限る。全合法手をキーにしない。対局中に増えるのはこのキーと、それに対応する言葉だけである。
 
 質問 ID はコード用でありモデルには送られない。モデルに見えるのは `instructions` と、criteria のキーおよび説明である。本個体では criteria の説明を `state.places` と同じ言葉にする。
 
@@ -93,13 +93,14 @@ SDK では `probabilities` と `confidence` は省略可。
 
 ## 4 本個体での受理
 
-- `probabilities` が Mapping なのに合法手キーが欠けている、または全ゼロなら合成不能とする。欠けを 0 埋めしてコード評価だけで指す代替経路は置かない
+- `probabilities` が Mapping なのに shortlist キーが欠けている、または全ゼロなら合成不能とする。欠けを 0 埋めしてコード評価だけで指す代替経路は置かない
 - `probabilities` が無いときは、合法な `choice` から one-hot する
-- `confidence` が無いときは 1.0 として合成する
-- `choice` が合法手の外なら採用しない
+- `confidence` が無いときは 1.0 とする
+- `choice` が shortlist の外なら採用しない
+- `confidence` が `confidence_threshold` 未満ならコードの最善手を指す
 - 呼出し失敗・指示ファイルの欠落・合成不能は対局状態を部分適用しない（SRS-FUN-020）
 
-着手は Choice の `probabilities`（および confidence）と、コードの着手後 1 手評価を `prompts/jev.json` の重みで合成して 1 マス選ぶ。合成の役割分担は [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) 4.4。
+着手は、コード評価で残した shortlist の中から Choice の `choice`（無ければ確率最大）を採る。加算合成（`weights.jev` / `weights.confidence`）では決めない。役割分担は [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) 4.4。
 
 ## 5 出典（参照。正本ではない）
 
@@ -113,4 +114,5 @@ SDK では `probabilities` と `confidence` は省略可。
 
 | 版 | 日付 | 内容 |
 | --- | --- | --- |
+| 0.1.1 | 2026-09-20 | Choice のキーを shortlist に限り、加算合成をやめる |
 | 0.1.0 | 2026-09-20 | OpenRouter Decisions の Choice の形を独立文書にする |
