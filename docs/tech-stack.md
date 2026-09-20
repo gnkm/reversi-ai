@@ -1,7 +1,7 @@
 ---
 title: 技術スタック
 product: Reversi Agents
-version: 0.2.12
+version: 0.2.13
 status: working
 date: 2026-09-20
 source: docs/srs.md
@@ -14,7 +14,7 @@ srs_version: 0.1.24
 | --- | --- |
 | 文書識別 | reversi-ai-tech-stack |
 | 対象ソフトウェア | Reversi Agents |
-| 版 | 0.2.12 |
+| 版 | 0.2.13 |
 | 状態 | 現行（設計。要求ではない） |
 | 日付 | 2026-09-20 |
 | 入力 | [`docs/srs.md`](srs.md) 0.1.24 |
@@ -56,7 +56,7 @@ srs_version: 0.1.24
 | 対局エンジン | Python の純関数（戦略プロセス内） | 合法手・裏返し・パス・終局・公式スコア。対局と学習で同一実装 |
 | 学習 | 同じ Python パッケージ。学習用イメージ | ML・RL・NN。対局時エンジンを自己対局と棋譜再生に使う。torch は学習イメージだけ |
 | 永続化 | SQLite（Python の `sqlite3`） | 終局棋譜。アカウント表は作らない |
-| 生成 AI | OpenRouter 公式 Python SDK（戦略プロセスのみ） | Jev は Decisions API。追加のテキスト生成モデルは Chat Completions |
+| 生成 AI | OpenRouter 公式 Python SDK（戦略プロセスのみ） | Jev は Decisions API。追加のテキスト生成モデルは Chat Completions の構造化出力 |
 | ML の学習と対局時 | Ridge は scikit-learn で学習し係数 JSON の積和。LightGBM はネイティブテキストを対局時に読む（NN ランタイムを使わない） | WTHOR + 永続化対局 |
 | RL の学習と対局時 | NumPy の線形 TD 等。対局時も同じ重み。NN も OpenRouter も使わない | 自己対局 |
 | NN の学習と対局時 | PyTorch（CPU）で学習し ONNX へ。対局時は onnxruntime（CPU、Python） | 教師あり |
@@ -128,7 +128,7 @@ compose.yaml         Podman Compose。secret の中身は書かない
 compose.dev.yaml     開発用オーバーレイ。bind mount と reload だけ
 models/              学習成果物（小さい JSON / LightGBM テキスト / ONNX。原本棋譜は置かない）
 prompts/             生成 AI の固定指示（Markdown。戦略プロセスが対局時に読む）
-data/                運用者ローカル。WTHOR 原本と SQLite。Git 管理外
+data/                運用者ローカル。WTHOR 原本と SQLite、追加生成 AI の config.toml。Git 管理外
 ```
 
 画面実装は別 URL でよい（SRS-INT-UI-011 の設計事項）。Vite では `/` をカタログ、`/game` を盤面とする。
@@ -188,7 +188,7 @@ Hono は盤の合法手計算を持たない。人間の着手指定は戦略プ
 | 強化学習 (自己対局) | 線形関数近似の重み。NN 推論も OpenRouter も使わない | NumPy。同じエンジンで自己対局。WTHOR を使わない |
 | ニューラルネットワーク (棋譜) | ONNX の順伝播のみ（CPU、onnxruntime） | PyTorch CPU。WTHOR + 永続化対局 |
 | 生成 AI (Jev) | OpenRouter Decisions API。`typesafe/jev-1.13` | なし。WTHOR を見ない |
-| 生成 AI (呼称) の追加 | Chat Completions。運用者が与えたテキスト生成モデル ID | なし |
+| 生成 AI (呼称) の追加 | Chat Completions の構造化出力。運用者が与えたテキスト生成モデル ID | なし |
 
 線形モデルと NN をファイル種別で分ける（JSON 対 ONNX）。LightGBM 個体はネイティブテキスト（`models/lgbm.txt`）とし、ONNX 経由にしない。ML / RL の対局経路に onnxruntime も PyTorch も載せない。これが SRS-FUN-029 / 030 の検査で見える担保である。scikit-learn の公式 persistence は pickle / joblib / ONNX であり、係数 JSON は公式形式ではない。対局用成果物のスキーマは本ソフトウェアが定義し、学習スクリプトが `coef_` 等を書き出す。チェックポイントに joblib を使ってよいが、対局の ML / RL / LightGBM 個体は joblib を読まない。
 
@@ -198,7 +198,7 @@ NN の層数・ユニット数は要求ではない。16 GiB・GPU 無しに収�
 
 WTHOR の `.wtb` は Python で読み、8×8 以外は捨てる（SRS-DAT-003）。原本ファイルを静的配信しない。運用者は `data/` に置く。対局サービスは WTHOR 原本を HTTP で出さない。
 
-生成 AI 個体の追加（SRS-FUN-023）は、初版では Git 管理外の設定ファイル（モデル識別子と呼称）とする。対局者向けウィザードは要求ではない。表示名は `生成 AI (〈呼称〉)` でカタログ内一意。
+生成 AI 個体の追加（SRS-FUN-023）は、初版では Git 管理外の `config.toml`（モデル名・呼称・パラメータ）とする。プロンプト本文は `prompts/` の独立ファイルから読む。対局者向けウィザードは要求ではない。表示名は `生成 AI (〈呼称〉)` でカタログ内一意。応答は JSON Schema を Pydantic で検証し、自由文の先頭トークン抽出を既定にしない。
 
 ### 3.6 永続化: SQLite
 
@@ -218,7 +218,7 @@ WTHOR 原本（`.wtb` 等）は学習の入力として `data/` に置き、読�
 
 Jev はテキスト生成モデルではない。呼出しは Decisions API（`POST /api/alpha/decisions`、モデル ID `typesafe/jev-1.13`）。入力は局面と質問、出力は構造化決定である。失敗時は部分適用せず、利用者に継続不能を提示する（SRS-FUN-020）。合法手集合の外を採用しない。
 
-追加の生成 AI 個体（SRS-FUN-023）の既定経路は Chat Completions（`POST https://openrouter.ai/api/v1/chat/completions`）とする。OpenRouter 公式 Quickstart / API Reference は、テキスト生成の入口をこのエンドポイントとし、プロバイダ差を正規化している。Claude・GPT・Gemini など新しいテキスト生成モデルは、カタログに載っている slug を `model` に入れるだけで足りる。Chat Completions を legacy とする公式記述は、調査日 2026-09-19 時点ではない。
+追加の生成 AI 個体（SRS-FUN-023）の既定経路は Chat Completions（`POST https://openrouter.ai/api/v1/chat/completions`）とする。OpenRouter 公式 Quickstart / API Reference は、テキスト生成の入口をこのエンドポイントとし、プロバイダ差を正規化している。Claude・GPT・Gemini など新しいテキスト生成モデルは、カタログに載っている slug を `model` に入れるだけで足りる。Chat Completions を legacy とする公式記述は、調査日 2026-09-19 時点ではない。応答は `response_format` の JSON Schema とし、Pydantic で検証する。自由文の先頭トークン抽出を既定にしない。
 
 Responses API（`POST /api/v1/responses`）と Anthropic Messages 形式（`POST /api/v1/messages`）も併存する。着手選択（局面を渡し、合法手の識別子を返す）には Chat Completions で足りる。Responses が要るのは apply_patch や shell などサーバツール側であり、初版の対局には使わない。画像生成・埋め込み・動画・TTS/STT は別 API であり、合法手選択の生成 AI 個体の対象外とする。Jev と同様の構造化決定モデルを追加する場合は Decisions API を使う（Chat Completions を既定にしない）。
 
@@ -331,6 +331,7 @@ OpenRouter の API キーは `podman secret create` でホストに置く。名�
 | 案 | 結果 | 理由 |
 | --- | --- | --- |
 | 追加のテキスト生成は Chat Completions。Jev は Decisions | 採用 | 公式のテキスト生成入口。新しいチャットモデルは slug 差し替え |
+| 追加モデルの応答は JSON Schema + Pydantic | 採用 | 合法手の識別子を検証できる。自由文の先頭トークン抽出を既定にしない |
 | 追加モデルもすべて Decisions API | 不採用 | Decisions は Jev 系の構造化決定向け。Claude / GPT のモデルページは Chat Completions を第一に案内する |
 | 追加モデルの既定を Responses API にする | 見送り | OpenAI Responses 互換として併記されるが、Chat Completions の後継ではない。着手選択に必須の機能は無い |
 | 追加モデルの既定を Messages API にする | 見送り | Anthropic 形式の別口。正規化済みの Chat Completions で足りる |
@@ -462,7 +463,8 @@ OpenRouter の API キーは `podman secret create` でホストに置く。名�
 
 | 版 | 日付 | 内容 |
 | --- | --- | --- |
-| 0.2.12 | 2026-09-20 | 機械学習 (LightGBM) を対局時ネイティブテキストで載せる（ONNX / pickle は使わない） |
+| 0.2.13 | 2026-09-20 | 機械学習 (LightGBM) を対局時ネイティブテキストで載せる（ONNX / pickle は使わない） |
+| 0.2.12 | 2026-09-20 | 追加の生成 AI を `config.toml` と Chat Completions の構造化出力（Pydantic）とする |
 | 0.2.11 | 2026-09-20 | 学習を `train` イメージに分け、対局用 strategy から torch を外す |
 | 0.2.10 | 2026-09-20 | 生成 AI の固定指示を置く `prompts/` をリポジトリ配置に足す |
 | 0.2.9 | 2026-09-20 | 起動の正を Python の `podman-compose` とする（プラグインの `podman compose` は使わない） |

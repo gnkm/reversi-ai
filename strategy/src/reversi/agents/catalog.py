@@ -113,7 +113,7 @@ JEV = CatalogItem(
     description=jev.DESCRIPTION,
 )
 
-# 一覧と着手関数は同じ登録から作る。追加の生成 AI は data/genai.json から足す。
+# 一覧と着手関数は同じ登録から作る。追加の生成 AI は data/config.toml から足す。
 _BUILTIN: tuple[tuple[CatalogItem, Chooser], ...] = (
     (RANDOM_UNIFORM, random_uniform.choose_move),
     (MOST_FLIPS, most_flips.choose_move),
