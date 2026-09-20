@@ -51,9 +51,13 @@ op item get 'OpenRouter API Key - reversi' --field '認証情報' --reveal | pod
 
 ## 起動する
 
+対局と学習の運用コマンドの正本はこの README です。試験・lint・E2E は [CONTRIBUTING.md](CONTRIBUTING.md)、配置と層は [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) です。
+
 ```bash
-podman-compose up --build
+podman-compose up --build web strategy
 ```
+
+学習用の `train` は上げません。学習し直す手順は後述です。
 
 Google Chrome で次を開きます。
 
@@ -184,7 +188,7 @@ podman-compose run --rm train python -m reversi.train.nn \
 
 ```bash
 podman-compose down
-podman-compose up --build
+podman-compose up --build web strategy
 ```
 
 ## 他の生成 AI を足す（任意）

@@ -1,13 +1,13 @@
 ---
 title: アーキテクチャ
 product: Reversi Agents
-version: 0.1.12
+version: 0.1.14
 status: working
 date: 2026-09-20
 source: docs/srs.md
 srs_version: 0.1.24
 tech_stack: docs/tech-stack.md
-tech_stack_version: 0.2.14
+tech_stack_version: 0.2.16
 ---
 
 # アーキテクチャ
@@ -16,10 +16,10 @@ tech_stack_version: 0.2.14
 | --- | --- |
 | 文書識別 | reversi-ai-architecture |
 | 対象ソフトウェア | Reversi Agents |
-| 版 | 0.1.12 |
+| 版 | 0.1.14 |
 | 状態 | 現行（設計。要求ではない） |
 | 日付 | 2026-09-20 |
-| 入力 | [`docs/srs.md`](srs.md) 0.1.24、[`docs/tech-stack.md`](tech-stack.md) 0.2.14 |
+| 入力 | [`docs/srs.md`](srs.md) 0.1.24、[`docs/tech-stack.md`](tech-stack.md) 0.2.16 |
 
 本文書は**配置と層**の設計正本である。ソフトウェア要求の正本は [`docs/srs.md`](srs.md) であり、本文書は shall を追加・変更・撤回しない。言語・ライブラリ・コンテナの選定は [`docs/tech-stack.md`](tech-stack.md) を正とする。ディレクトリ名は tech-stack 2.3 と一致させ、ファイル単位の置き場と目的は本文書を正とする。
 
@@ -61,7 +61,7 @@ flowchart LR
 | --- | --- | --- |
 | `web` コンテナ（Hono） | ホスト `127.0.0.1` のみ HTTPS | UI 配信、Origin 照合、SSE、戦略プロセスへ中継 |
 | `strategy` コンテナ（FastAPI） | Pod 内のみ。ホストへ出さない | 規則、全エージェントの着手、進行中 1 局、終局の永続化、OpenRouter。torch は入れない |
-| 学習（`podman-compose run --rm train`） | 待ち受けしない。`up` の対象外 | 学習用イメージ（`train` グループを焼く）。ML / LightGBM / RL / NN の書き出し |
+| 学習（`podman-compose run --rm train`） | 待ち受けしない。`up` の常時起動対象外 | 学習用イメージ（`train` グループを焼く）。ML / LightGBM / RL / NN の書き出し |
 
 同時対局は 1。進行中の局は戦略プロセスのメモリ上。終局だけ SQLite へ書く。
 
@@ -91,9 +91,9 @@ web/ui ──HTTP──► web/server ──HTTP──► reversi.api ──► 
 
 ```
 reversi-ai/
-├── README.md                          # 製品の入口。CI バッジを置く
+├── README.md                          # 製品の入口。運用コマンドの正本。CI バッジを置く
 ├── AGENTS.md                          # エージェント作業ルール（要求正本・編集禁止）
-├── CONTRIBUTING.md                    # Issue / PR / ブランチ / コミット規約
+├── CONTRIBUTING.md                    # Issue / PR / ブランチ / コミット規約。試験・lint・E2E の正本
 ├── LICENSE
 ├── compose.yaml                       # Podman Compose。同一 Pod に web と strategy。学習は train
 ├── compose.dev.yaml                   # 開発用オーバーレイ。bind mount と reload だけを足す
@@ -385,91 +385,33 @@ tech-stack 第 5 節に加え、配置として次を置かない。
 
 動かすもの（対局・学習）は Podman。測るもの（pytest、Vitest、Biome、Ruff、lefthook）はホスト。根拠は [`docs/tech-stack.md`](tech-stack.md) 3.11 と 4.8。
 
-対局の `CMD` は `python -m reversi.api` / `node` である。学習は待ち受けせず、`podman-compose run --rm train python -m reversi.train.*` で入口を指定する。コンソールスクリプトやルートの pnpm から Python を叩く入口は置かない。起動の正は Python の `podman-compose` である。プラグインの `podman compose`（docker-compose）は `secrets.external` を扱えず使わない。
+運用コマンド（準備、`up` / `down`、学習の一発起動、成果物を読ませる再起動）の正本は [`README.md`](../README.md) である。試験・lint・E2E の正本は [`CONTRIBUTING.md`](../CONTRIBUTING.md) である。本文書は配置と待ち受けの契約だけを書く。
 
-### 8.1 一度だけ
+起動の実装は Python の `podman-compose` である。プラグインの `podman compose`（docker-compose）は `secrets.external` を扱えず使わない。コンソールスクリプトやルートの pnpm から Python を叩く入口は置かない。ホストの `uv run` を学習の正にしない。実行時に `uv sync` しない。
 
-```bash
-mkcert -install
-mkdir -p data/certs
-mkcert -cert-file data/certs/cert.pem -key-file data/certs/key.pem 127.0.0.1
-podman secret create openrouter-api-key -
-```
+### 8.1 対局 Pod
 
-生成 AI 以外の対局と試験に、secret は不要である。
-
-### 8.2 対局サービス
-
-運用者も開発者も同じ入口である。
-
-```bash
-podman-compose up --build
-```
-
-ブラウザは `https://127.0.0.1:<compose が付けるポート>/`。停止は `podman-compose down`。
-
-| サービス | 入口 | 待ち受け |
+| サービス | 入口（`CMD`） | 待ち受け |
 | --- | --- | --- |
 | `web` | ビルド済み UI を出す Hono（`node`） | コンテナ内は `0.0.0.0`。ホストへは `127.0.0.1` のみ |
 | `strategy` | `python -m reversi.api` | Pod 内のみ。ホストへ公開しない。コンテナ内は `8000` でよい |
 
-`train` は `up` では起動しない（8.3）。
+`train` は対局の `up` に載せない（コマンド列の正は README。`web` と `strategy` を明示する）。学習は待ち受けせず、`podman-compose run --rm train python -m reversi.train.*` で入口を指定する。
 
 web コンテナが Pod 内で `0.0.0.0:3000` を聞くのはよい。戦略コンテナが Pod 内で `0.0.0.0:8000` を聞くのもよい。禁止するのはホストへの `0.0.0.0` である。
 
-ホットリロードが要るときだけ、別スタックを増やさずオーバーレイを足す。
+ホットリロードは別スタックを増やさず `compose.dev.yaml` のオーバーレイだけを足す。secret・公開ポート・サービス名は `compose.yaml` のままにする。コマンド列は CONTRIBUTING。
 
-```bash
-podman-compose -f compose.yaml -f compose.dev.yaml up --build
-```
+### 8.2 学習イメージ
 
-`compose.dev.yaml` はソースの bind mount と reload だけを足す。secret・公開ポート・サービス名は `compose.yaml` のままにする。
-
-### 8.3 学習
-
-学習用イメージ（`strategy/Containerfile` の `train` ターゲット。`uv sync --frozen --no-dev --group train` を焼く）を、待ち受けせず一発起動する。`podman-compose up` の常時起動対象にしない。ホストの `uv run` を正にしない。実行時に `uv sync --group train` しない。対局用 `strategy` に torch は入れない。
-
-```bash
-podman-compose run --rm train python -m reversi.train.ml \
-  --wthor /data/wthor --games /data/games.sqlite --out /models/ml.json
-
-podman-compose run --rm train python -m reversi.train.lgbm \
-  --wthor /data/wthor --games /data/games.sqlite --out /models/lgbm.txt
-
-podman-compose run --rm train python -m reversi.train.rl \
-  --out /models/rl.json
-
-podman-compose run --rm train python -m reversi.train.nn \
-  --wthor /data/wthor --games /data/games.sqlite --out /models/nn.onnx
-```
-
-書き出した成果物を既に動いている対局プロセスが読むなら、strategy の再起動が要る。再学習なしでも初版カタログは動く。
-
-### 8.4 試験と検査（ホスト）
-
-```bash
-uv run --directory strategy pytest
-uv run --directory strategy lint-imports
-uv run --directory strategy xenon --max-absolute C --max-modules B --max-average A src
-uv run --directory strategy ruff check src tests
-pnpm test
-pnpm exec biome check web
-pnpm exec depcruise --config .dependency-cruiser.cjs web
-```
-
-E2E はアプリを Podman で上げ、Playwright はホストの Google Chrome で `https://127.0.0.1` を叩く。
-
-```bash
-podman-compose up --build --wait
-pnpm exec playwright test --project=chrome
-```
-
-Issue の検証欄と CI は、この節の生コマンドを使う。ラッパを増やさない。
+学習用イメージは `strategy/Containerfile` の `train` ターゲットである。`uv sync --frozen --no-dev --group train` を焼く。対局用 `strategy` に torch は入れない。再学習なしでも初版カタログは動く。書き出した成果物を既に動いている対局が読むなら、README のとおり再起動する。
 
 ## 9 改訂履歴
 
 | 版 | 日付 | 内容 |
 | --- | --- | --- |
+| 0.1.14 | 2026-09-20 | 対局の `up` は `web` と `strategy` を明示し、`train` を載せない |
+| 0.1.13 | 2026-09-20 | 運用コマンド列の正を README へ委譲し、第 8 節は待ち受けと `CMD` と `train` を `up` に載せないことに限る |
 | 0.1.12 | 2026-09-20 | Jev は原子質問を 1 呼出しで送り、`jev.py` が typed answers とコード特徴を合成する |
 | 0.1.11 | 2026-09-20 | カタログをカード選択にし、盤面を盤中心の横並びに揃える |
 | 0.1.10 | 2026-09-20 | 機械学習 (LightGBM) をカタログに載せ、ネイティブテキスト成果物を `models/lgbm.txt` とする |
