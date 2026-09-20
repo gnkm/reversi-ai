@@ -2115,6 +2115,7 @@ def test_catalog_lists_alphabeta() -> None:
     assert "深さ 6" in item.description
     assert "Mobility" in item.description
     assert "Corner" in item.description
+    assert "Move Ordering" in item.description
     assert "点数表" not in item.description
     assert item.specimen_id != minimax_item.specimen_id
     assert item.display_name != minimax_item.display_name
@@ -2255,6 +2256,9 @@ def test_alphabeta_source_is_negamax_and_does_not_call_models() -> None:
     assert "position_table" not in source
     assert "Mobility" in source
     assert "Corner" in source
+    assert "def ordered_places(" in source
+    assert "_X_SQUARES" in source
+    assert "_C_SQUARES" in source
     roots = _imported_roots(source)
     assert roots.isdisjoint(_FORBIDDEN_IMPORT_ROOTS)
     assert "minimax" not in roots
@@ -2273,6 +2277,64 @@ def test_alphabeta_source_is_negamax_and_does_not_call_models() -> None:
             assert "ffothello.org" not in lowered
             assert ".wtb" not in lowered
             assert "openrouter.ai" not in lowered
+
+
+# a1（角）と a2（C）と b2（空き角に対する X）がともに合法。
+_CORNER_AND_X = (
+    "........",
+    "........",
+    "........",
+    "B...BB..",
+    "W...WW..",
+    "W.......",
+    "..WB....",
+    ".WB.....",
+)
+
+
+def test_alphabeta_orders_corner_before_x() -> None:
+    position = _position_from_rank8_rows(_CORNER_AND_X, Color.BLACK)
+    names = [square.algebraic for square in alphabeta.ordered_places(position)]
+    assert "a1" in names
+    assert "a2" in names
+    assert "b2" in names
+    assert names[0] == "a1"
+    assert names.index("a1") < names.index("a2") < names.index("b2")
+    assert names[-1] == "b2"
+    unordered = [square.algebraic for square in legal_places(position)]
+    assert unordered.index("a1") < unordered.index("b2")
+    assert names != unordered
+
+
+def test_alphabeta_ordering_keeps_root_and_cuts_nodes() -> None:
+    position = _position_from_rank8_rows(_CORNER_AND_X, Color.BLACK)
+    places = {square.algebraic for square in legal_places(position)}
+    assert "a1" in places and "b2" in places
+    ordered_place, ordered_value, ordered_nodes = alphabeta.search_stats(
+        position, alphabeta.SEARCH_DEPTH, order=True
+    )
+    unordered_place, unordered_value, unordered_nodes = alphabeta.search_stats(
+        position, alphabeta.SEARCH_DEPTH, order=False
+    )
+    assert ordered_place is not None
+    assert ordered_place == unordered_place
+    assert ordered_value == unordered_value
+    assert ordered_place.square in legal_places(position)
+    assert ordered_nodes <= unordered_nodes
+    assert ordered_nodes < unordered_nodes
+
+
+def test_alphabeta_root_tiebreak_is_coordinate_not_ordering() -> None:
+    position = initial_position()
+    ordered_place, ordered_value, _nodes = alphabeta.search_stats(
+        position, alphabeta.SEARCH_DEPTH, order=True
+    )
+    unordered_place, unordered_value, _unordered_nodes = alphabeta.search_stats(
+        position, alphabeta.SEARCH_DEPTH, order=False
+    )
+    assert ordered_place == unordered_place == Place(Square.parse("d3"))
+    assert ordered_value == unordered_value
+    assert alphabeta.choose_move(position) == ordered_place
 
 
 def _play_algebraic(*names: str) -> Position:
