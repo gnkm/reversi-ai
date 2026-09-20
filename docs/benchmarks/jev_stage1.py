@@ -120,7 +120,7 @@ def _ensure_output(path: Path) -> None:
         raise SystemExit(f"出力先を書けません: {path}") from exc
 
 
-def _load_games(path: Path) -> list[dict[str, Any]]:
+def _load_games(path: Path, opponents: Sequence[str]) -> list[dict[str, Any]]:
     if not path.is_file():
         return []
     try:
@@ -129,13 +129,33 @@ def _load_games(path: Path) -> list[dict[str, Any]]:
         return []
     if not isinstance(loaded, dict):
         return []
-    games = loaded.get("games")
-    if not isinstance(games, list):
+    games_raw = loaded.get("games")
+    if not isinstance(games_raw, list):
         return []
     restored: list[dict[str, Any]] = []
-    for item in games:
+    for item in games_raw:
         if isinstance(item, dict) and {"config", "opponent", "jev_color"} <= set(item):
             restored.append(item)
+    if not restored:
+        return []
+    protocol = loaded.get("protocol")
+    stored: list[str] = []
+    if isinstance(protocol, dict):
+        raw_opponents = protocol.get("opponents")
+        if isinstance(raw_opponents, list) and all(isinstance(name, str) for name in raw_opponents):
+            stored = list(raw_opponents)
+        if protocol.get("both_colors") not in (True, None):
+            raise SystemExit(
+                "既存の記録は先後入れ替え無しです。別の --output を指定してください。"
+            )
+    if not stored:
+        stored = list(dict.fromkeys(str(game["opponent"]) for game in restored))
+    if stored != list(opponents):
+        raise SystemExit(
+            "既存の記録の対戦相手が今回と違います。"
+            f"記録={stored} 今回={list(opponents)}。"
+            "別の --output を指定してください。"
+        )
     return restored
 
 
@@ -289,11 +309,15 @@ def main() -> int:
     if needs_model and not jev.SECRET_PATH.is_file():
         raise SystemExit("OpenRouter の資格情報が無く、jev: 0 以外の構成を対局できない")
     opponents = tuple(args.opponents)
-    games = _load_games(output)
+    games = _load_games(output, opponents)
 
     def _save() -> None:
+        names: list[str] = []
+        for name in list(configs) + [str(game.get("config", "")) for game in games]:
+            if name and name not in names:
+                names.append(name)
         rows = []
-        for name in configs:
+        for name in names:
             played = [game for game in games if game.get("config") == name]
             if played:
                 rows.append(_summarize(name, played))
