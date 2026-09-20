@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from random import Random
 
 from reversi.agents import (
+    alphabeta,
     extra_genai,
     jev,
     lgbm,
@@ -25,6 +26,7 @@ Chooser = Callable[[Position, Random | None], Place | None]
 
 
 __all__ = [
+    "ALPHABETA",
     "JEV",
     "LGBM",
     "MINIMAX",
@@ -76,6 +78,12 @@ MINIMAX = CatalogItem(
     display_name=minimax.DISPLAY_NAME,
     description=minimax.DESCRIPTION,
 )
+ALPHABETA = CatalogItem(
+    specimen_id=alphabeta.SPECIMEN_ID,
+    category=alphabeta.CATEGORY,
+    display_name=alphabeta.DISPLAY_NAME,
+    description=alphabeta.DESCRIPTION,
+)
 OPENING = CatalogItem(
     specimen_id=opening.SPECIMEN_ID,
     category=opening.CATEGORY,
@@ -119,6 +127,7 @@ _BUILTIN: tuple[tuple[CatalogItem, Chooser], ...] = (
     (MOST_FLIPS, most_flips.choose_move),
     (POSITIONAL, positional.choose_move),
     (MINIMAX, minimax.choose_move),
+    (ALPHABETA, alphabeta.choose_move),
     (OPENING, opening.choose_move),
     (ML, ml.choose_move),
     (LGBM, lgbm.choose_move),
