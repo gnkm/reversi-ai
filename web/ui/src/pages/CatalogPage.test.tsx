@@ -77,6 +77,7 @@ describe("buildCreateGameRequest", () => {
     ).toEqual({
       black: { kind: "specimen", specimen_id: "opening" },
       white: { kind: "specimen", specimen_id: "opening" },
+      move_interval_seconds: 1,
     });
   });
 });
@@ -157,8 +158,8 @@ describe("CatalogPage", () => {
     expect((input as HTMLInputElement).value).toBe("1");
   });
 
-  it("着手間隔を変えるとそのミリ秒が対局開始へ渡る", async () => {
-    const intervals: number[] = [];
+  it("着手間隔を変えるとその秒数が開始 API へ渡る", async () => {
+    const bodies: unknown[] = [];
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -170,16 +171,11 @@ describe("CatalogPage", () => {
         }
         expect(url.endsWith("/api/games")).toBe(true);
         expect(init?.method).toBe("POST");
+        bodies.push(JSON.parse(String(init?.body)));
         return new Response(JSON.stringify(OPENING), { status: 201 });
       }),
     );
-    render(
-      <CatalogPage
-        onStarted={(_game, _items, moveIntervalMs) => {
-          intervals.push(moveIntervalMs);
-        }}
-      />,
-    );
+    render(<CatalogPage onStarted={() => undefined} />);
     await screen.findByRole("heading", { name: "ランダム (一様)" });
     fireEvent.click(
       screen.getByRole("radio", { name: "エージェント対エージェント" }),
@@ -188,6 +184,14 @@ describe("CatalogPage", () => {
       target: { value: "2" },
     });
     fireEvent.click(screen.getByRole("button", { name: "対局を開始" }));
-    await waitFor(() => expect(intervals).toEqual([2000]));
+    await waitFor(() =>
+      expect(bodies).toEqual([
+        {
+          black: { kind: "specimen", specimen_id: "random_uniform" },
+          white: { kind: "specimen", specimen_id: "random_uniform" },
+          move_interval_seconds: 2,
+        },
+      ]),
+    );
   });
 });

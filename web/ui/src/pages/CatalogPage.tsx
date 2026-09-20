@@ -5,7 +5,6 @@ import {
   DEFAULT_AGENT_MOVE_INTERVAL_SECONDS,
   MAX_AGENT_MOVE_INTERVAL_SECONDS,
   MIN_AGENT_MOVE_INTERVAL_SECONDS,
-  moveIntervalMsFromSeconds,
   parseMoveIntervalSeconds,
 } from "../moveInterval.ts";
 import type {
@@ -17,11 +16,7 @@ import type {
 } from "../types.ts";
 
 type CatalogPageProps = {
-  onStarted: (
-    game: GameState,
-    items: readonly CatalogItem[],
-    moveIntervalMs: number,
-  ) => void;
+  onStarted: (game: GameState, items: readonly CatalogItem[]) => void;
 };
 
 export function buildCreateGameRequest(input: {
@@ -30,11 +25,14 @@ export function buildCreateGameRequest(input: {
   opponentId: string;
   blackId: string;
   whiteId: string;
+  moveIntervalSeconds?: number;
 }): CreateGameRequest {
   if (input.mode === "agent_vs_agent") {
     return {
       black: { kind: "specimen", specimen_id: input.blackId },
       white: { kind: "specimen", specimen_id: input.whiteId },
+      move_interval_seconds:
+        input.moveIntervalSeconds ?? DEFAULT_AGENT_MOVE_INTERVAL_SECONDS,
     };
   }
   const human = { kind: "human" as const };
@@ -97,13 +95,10 @@ export function CatalogPage({ onStarted }: CatalogPageProps) {
           opponentId,
           blackId,
           whiteId,
+          moveIntervalSeconds: parseMoveIntervalSeconds(intervalSeconds),
         }),
       );
-      onStarted(
-        game,
-        items,
-        moveIntervalMsFromSeconds(parseMoveIntervalSeconds(intervalSeconds)),
-      );
+      onStarted(game, items);
     } catch {
       setStartError("対局を開始できませんでした。");
     } finally {

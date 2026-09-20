@@ -23,6 +23,7 @@ export type PlayerSpec = HumanPlayer | SpecimenPlayer;
 export type CreateGameRequest = {
   black: PlayerSpec;
   white: PlayerSpec;
+  move_interval_seconds?: number;
 };
 
 export type PlaceMove = {

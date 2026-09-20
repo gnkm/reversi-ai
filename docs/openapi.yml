@@ -410,6 +410,12 @@ components:
           $ref: "#/components/schemas/PlayerSpec"
         white:
           $ref: "#/components/schemas/PlayerSpec"
+        move_interval_seconds:
+          type: number
+          minimum: 0
+          description: |
+            エージェント対エージェントで、1 手を盤へ適用してから次の 1 手を
+            適用するまでの下限（秒）。省略時は待たない。ウェブ UI の未設定は 1。
     BoardRow:
       type: array
       minItems: 8
