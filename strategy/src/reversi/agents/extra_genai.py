@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import tomllib
 from collections.abc import Mapping
 from dataclasses import dataclass, field
@@ -67,6 +68,12 @@ def _require_text(raw: Mapping[str, object], key: str) -> str:
     return value.strip()
 
 
+def _in_range(value: float, low: float, high: float | None) -> bool:
+    if value < low:
+        return False
+    return True if high is None else value <= high
+
+
 def _optional_number(raw: Mapping[str, object], key: str) -> float | int | None:
     if key not in raw:
         return None
@@ -74,6 +81,14 @@ def _optional_number(raw: Mapping[str, object], key: str) -> float | int | None:
     allowed = _OPTIONAL_NUMBERS[key]
     if isinstance(value, bool) or not isinstance(value, allowed):
         raise ConfigError(f"{key} の型が不正です")
+    if isinstance(value, float) and not math.isfinite(value):
+        raise ConfigError(f"{key} は有限でなければなりません")
+    if key == "temperature" and not _in_range(float(value), 0.0, 2.0):
+        raise ConfigError("temperature は 0 以上 2 以下でなければなりません")
+    if key == "top_p" and not _in_range(float(value), 0.0, 1.0):
+        raise ConfigError("top_p は 0 以上 1 以下でなければなりません")
+    if key == "max_tokens" and not _in_range(int(value), 1, None):
+        raise ConfigError("max_tokens は 1 以上でなければなりません")
     return value
 
 
@@ -127,10 +142,17 @@ def _ensure_unique(extras: tuple[ExtraSpecimen, ...]) -> None:
         raise ConfigError("個体 ID はカタログ内で一意でなければなりません")
 
 
+def _reject_legacy_json(config_path: Path) -> None:
+    legacy = config_path.with_name("genai.json")
+    if legacy.is_file():
+        raise ConfigError("genai.json は使えません。config.toml に移してください")
+
+
 def load(path: Path | None = None) -> tuple[ExtraSpecimen, ...]:
     """設定が無ければ空。対局者向けの作成画面は持たない。"""
     target = CONFIG_PATH if path is None else path
     if not target.is_file():
+        _reject_legacy_json(target)
         return ()
     try:
         with target.open("rb") as handle:

@@ -1686,6 +1686,40 @@ def test_extra_genai_empty_toml_does_not_add_specimens(
     assert all(not item.specimen_id.startswith("genai:") for item in items())
 
 
+def test_extra_genai_legacy_json_without_toml_is_config_error(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    leftover = tmp_path / "genai.json"
+    leftover.write_text(
+        '[{"model_id": "vendor/old", "name": "Old"}]',
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(extra_genai, "CONFIG_PATH", tmp_path / "config.toml")
+    with pytest.raises(extra_genai.ConfigError, match="config.toml に移して"):
+        extra_genai.load()
+    listed = items()
+    assert get(jev.SPECIMEN_ID) in listed
+    assert all(not item.specimen_id.startswith("genai:") for item in listed)
+
+
+def test_extra_genai_rejects_out_of_range_parameters(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cases = (
+        ({"model": "vendor/chat", "name": "Chat", "temperature": float("nan")}, "temperature"),
+        ({"model": "vendor/chat", "name": "Chat", "top_p": -0.1}, "top_p"),
+        ({"model": "vendor/chat", "name": "Chat", "max_tokens": 0}, "max_tokens"),
+    )
+    for entry, key in cases:
+        config = _write_extra_genai(tmp_path / f"{key}.toml", [entry])
+        monkeypatch.setattr(extra_genai, "CONFIG_PATH", config)
+        with pytest.raises(extra_genai.ConfigError, match=key):
+            extra_genai.load()
+        assert all(not item.specimen_id.startswith("genai:") for item in items())
+
+
 def test_extra_genai_source_has_no_player_wizard() -> None:
     extra_source = _module_source("extra_genai.py")
     chat_source = _module_source("chat_completions.py")
