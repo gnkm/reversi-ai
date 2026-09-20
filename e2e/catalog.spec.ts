@@ -26,6 +26,13 @@ test("カタログ一覧（日本語）から盤面へ移れる", async ({ page 
     page.getByText(/自分の手番の合法手を等確率で 1 つ選ぶ/),
   ).toBeVisible();
 
+  await expect(page.locator("select")).toHaveCount(0);
+  await page
+    .getByRole("button", { name: "ルールベース (ミニマックス)" })
+    .click();
+  await expect(
+    page.getByText("あなた・黒 vs ルールベース (ミニマックス)"),
+  ).toBeVisible();
   const start = page.getByRole("button", { name: "対局を開始" });
   await expect(start).toBeEnabled();
   await start.click();

@@ -59,7 +59,7 @@ export function App() {
       <main className="page">
         <h1>盤面</h1>
         <p>進行中の対局がありません。</p>
-        <button type="button" onClick={showCatalog}>
+        <button type="button" className="btn-primary" onClick={showCatalog}>
           カタログへ戻る
         </button>
       </main>
