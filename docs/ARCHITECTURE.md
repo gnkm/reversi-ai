@@ -1,13 +1,13 @@
 ---
 title: アーキテクチャ
 product: Reversi Agents
-version: 0.1.24
+version: 0.1.25
 status: working
 date: 2026-09-20
 source: docs/srs.md
 srs_version: 0.1.24
 tech_stack: docs/tech-stack.md
-tech_stack_version: 0.2.18
+tech_stack_version: 0.2.19
 ---
 
 # アーキテクチャ
@@ -16,10 +16,10 @@ tech_stack_version: 0.2.18
 | --- | --- |
 | 文書識別 | reversi-ai-architecture |
 | 対象ソフトウェア | Reversi Agents |
-| 版 | 0.1.24 |
+| 版 | 0.1.25 |
 | 状態 | 現行（設計。要求ではない） |
 | 日付 | 2026-09-20 |
-| 入力 | [`docs/srs.md`](srs.md) 0.1.24、[`docs/tech-stack.md`](tech-stack.md) 0.2.18 |
+| 入力 | [`docs/srs.md`](srs.md) 0.1.24、[`docs/tech-stack.md`](tech-stack.md) 0.2.19 |
 
 本文書は**配置と層**の設計正本である。ソフトウェア要求の正本は [`docs/srs.md`](srs.md) であり、本文書は shall を追加・変更・撤回しない。言語・ライブラリ・コンテナの選定は [`docs/tech-stack.md`](tech-stack.md) を正とする。ディレクトリ名は tech-stack 2.3 と一致させ、ファイル単位の置き場と目的は本文書を正とする。
 
@@ -420,6 +420,7 @@ web コンテナが Pod 内で `0.0.0.0:3000` を聞くのはよい。戦略コ�
 
 | 版 | 日付 | 内容 |
 | --- | --- | --- |
+| 0.1.25 | 2026-09-20 | 入力の tech-stack を 0.2.19 にし、ルールベース (αβ) を個体表へ反映する |
 | 0.1.24 | 2026-09-20 | ルールベース (αβ) をカタログに載せ、深さ 6 の Negamax で着手する |
 | 0.1.23 | 2026-09-20 | Jev はコードが絞った候補を Choice で選び、局面単位のオフライン評価を置く |
 | 0.1.22 | 2026-09-20 | Jev の成績低下切り分け用に 4 構成切替と段階 1 記録を置く |
