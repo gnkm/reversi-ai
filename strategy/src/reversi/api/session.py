@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import sqlite3
+import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from random import Random
@@ -54,6 +56,26 @@ from reversi.engine.rules import (
 from reversi.engine.score import official_score, stone_counts
 
 _MAX_AUTO_PLIES = 128
+
+
+def remaining_autoplay_wait(
+    last_applied_at: float | None,
+    now: float,
+    interval_seconds: float,
+) -> float:
+    """直前の適用からの経過が間隔に足りないとき、追加で待つ秒数。"""
+    if last_applied_at is None or interval_seconds <= 0:
+        return 0.0
+    return max(0.0, interval_seconds - (now - last_applied_at))
+
+
+def _autoplay_interval_seconds(
+    request: CreateGameRequest,
+    both_specimens: bool,
+) -> float:
+    if not both_specimens or request.move_interval_seconds is None:
+        return 0.0
+    return request.move_interval_seconds
 
 
 @dataclass
@@ -255,11 +277,16 @@ class GameStore:
         self,
         rng: Random | None = None,
         db_path: Path | None = DEFAULT_DB_PATH,
+        monotonic: Callable[[], float] = time.monotonic,
+        sleep: Callable[[float], None] = time.sleep,
     ) -> None:
         self._rng = rng
         self._db_path = db_path
+        self._monotonic = monotonic
+        self._sleep = sleep
         self._lock = Lock()
         self._game: Game | None = None
+        self._applied: list[GameState] = []
         self._autoplay_thread: Thread | None = None
 
     def _persist_finished(self, game: Game) -> None:
@@ -315,6 +342,7 @@ class GameStore:
                 _record_move(game, PassMove(type="pass"), choice)
             else:
                 _record_move(game, _from_engine_place(choice), choice)
+            self._applied.append(to_game_state(game))
             if is_over(game.position):
                 try:
                     self._persist_finished(game)
@@ -329,8 +357,14 @@ class GameStore:
             if game is None:
                 return
             game.unplayable_reason = "external_model_failed"
+            self._applied.append(to_game_state(game))
 
-    def _autoplay_step(self, game_id: str) -> bool:
+    def _autoplay_step(
+        self,
+        game_id: str,
+        last_applied_at: float | None,
+        interval_seconds: float,
+    ) -> bool:
         """標本の 1 手を進める。続けてよいとき True。着手決定中はロックしない。"""
         plan = self._autoplay_plan(game_id)
         if plan is None:
@@ -346,16 +380,24 @@ class GameStore:
             return False
         if choice is None:
             return False
+        remaining = remaining_autoplay_wait(
+            last_applied_at,
+            self._monotonic(),
+            interval_seconds,
+        )
+        if remaining > 0:
+            self._sleep(remaining)
         return self._commit_autoplay_move(plan, choice)
 
-    def _run_autoplay(self, game_id: str) -> None:
-        while self._autoplay_step(game_id):
-            pass
+    def _run_autoplay(self, game_id: str, interval_seconds: float) -> None:
+        last_applied_at: float | None = None
+        while self._autoplay_step(game_id, last_applied_at, interval_seconds):
+            last_applied_at = self._monotonic()
 
-    def _start_autoplay(self, game_id: str) -> None:
+    def _start_autoplay(self, game_id: str, interval_seconds: float) -> None:
         self._autoplay_thread = Thread(
             target=self._run_autoplay,
-            args=(game_id,),
+            args=(game_id, interval_seconds),
             daemon=True,
         )
         self._autoplay_thread.start()
@@ -383,10 +425,12 @@ class GameStore:
             request.white,
         )
         if both_specimens:
+            interval = _autoplay_interval_seconds(request, both_specimens)
             with self._lock:
                 self._game = game
                 opening = to_game_state(game)
-            self._start_autoplay(game.id)
+                self._applied = [opening]
+            self._start_autoplay(game.id, interval)
             return opening
         advance_specimens(game, self._rng)
         if game.unplayable_reason is not None:
@@ -394,6 +438,7 @@ class GameStore:
         with self._lock:
             self._persist_finished(game)
             self._game = game
+            self._applied = [to_game_state(game)]
         return to_game_state(game)
 
     def play_move(self, game_id: str, move: Move) -> GameState:

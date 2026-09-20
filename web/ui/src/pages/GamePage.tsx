@@ -6,10 +6,6 @@ import {
   subscribeGameEvents,
 } from "../api.ts";
 import { Board } from "../components/Board.tsx";
-import {
-  createMovePresenter,
-  DEFAULT_AGENT_MOVE_INTERVAL_MS,
-} from "../moveInterval.ts";
 import type { GameState, PlayerSpec } from "../types.ts";
 
 type GamePageProps = {
@@ -17,7 +13,6 @@ type GamePageProps = {
   specimenNames: ReadonlyMap<string, string>;
   onGame: (game: GameState) => void;
   onBack: () => void;
-  moveIntervalMs?: number;
 };
 
 export function isHumanTurn(game: GameState): boolean {
@@ -87,7 +82,6 @@ export function GamePage({
   specimenNames,
   onGame,
   onBack,
-  moveIntervalMs = DEFAULT_AGENT_MOVE_INTERVAL_MS,
 }: GamePageProps) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -96,8 +90,6 @@ export function GamePage({
   );
   const onGameRef = useRef(onGame);
   onGameRef.current = onGame;
-  const gameRef = useRef(game);
-  gameRef.current = game;
   const humanTurn = isHumanTurn(game);
   const vsAgents =
     game.black.kind === "specimen" && game.white.kind === "specimen";
@@ -107,20 +99,19 @@ export function GamePage({
     if (!vsAgents || finished) {
       return;
     }
-    const presenter = createMovePresenter(
+    const stop = subscribeGameEvents(
+      game.id,
       (next) => {
         onGameRef.current(next);
       },
-      { intervalMs: moveIntervalMs, initial: gameRef.current },
+      (code) => {
+        setStreamError(code);
+      },
     );
-    const stop = subscribeGameEvents(game.id, presenter.enqueue, (code) => {
-      setStreamError(code);
-    });
     return () => {
-      presenter.dispose();
       stop();
     };
-  }, [vsAgents, finished, game.id, moveIntervalMs]);
+  }, [vsAgents, finished, game.id]);
 
   async function submitMove(move: Parameters<typeof playMove>[1]) {
     if (!humanTurn || busy) {

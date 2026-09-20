@@ -76,6 +76,7 @@ PlayerSpec = Annotated[
 class CreateGameRequest(_Strict):
     black: PlayerSpec
     white: PlayerSpec
+    move_interval_seconds: float | None = Field(default=None, ge=0)
 
 
 class PlaceMove(_Strict):

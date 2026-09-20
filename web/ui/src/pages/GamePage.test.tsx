@@ -95,7 +95,7 @@ class FakeEventSource {
   }
 }
 
-function renderAgents(moveIntervalMs = 0) {
+function renderAgents() {
   const opening = game({
     black: { kind: "specimen", specimen_id: "random_uniform" },
     white: { kind: "specimen", specimen_id: "random_uniform" },
@@ -108,7 +108,6 @@ function renderAgents(moveIntervalMs = 0) {
       specimenNames={names}
       onGame={(next) => seen.push(next)}
       onBack={() => undefined}
-      moveIntervalMs={moveIntervalMs}
     />,
   );
   return { opening, seen };
@@ -290,25 +289,12 @@ describe("GamePage", () => {
     ).toBeTruthy();
   });
 
-  it("着手間隔の未変更時は 1 秒待ってから次の着手（パスを含む）を提示する", () => {
-    vi.useFakeTimers();
+  it("着手間隔はサーバ側のため SSE の着手（パスを含む）は届いた順に省略せず提示する", () => {
     vi.stubGlobal("EventSource", FakeEventSource);
-    const opening = game({
+    const { seen } = renderAgents();
+    const moved = game({
       black: { kind: "specimen", specimen_id: "random_uniform" },
       white: { kind: "specimen", specimen_id: "random_uniform" },
-      legal_moves: ["c4", "d3", "e6", "f5"],
-    });
-    const seen: GameState[] = [];
-    render(
-      <GamePage
-        game={opening}
-        specimenNames={names}
-        onGame={(next) => seen.push(next)}
-        onBack={() => undefined}
-      />,
-    );
-    const moved = game({
-      ...opening,
       last_move: { type: "place", square: "f5" },
       official_score: { black: 4, white: 1 },
     });
@@ -321,19 +307,12 @@ describe("GamePage", () => {
       move: moved.last_move,
       game: moved,
     });
-    expect(seen).toEqual([]);
-    vi.advanceTimersByTime(999);
-    expect(seen).toEqual([]);
-    vi.advanceTimersByTime(1);
     expect(seen).toEqual([moved]);
     FakeEventSource.instances[0]?.emit("move_applied", {
       type: "move_applied",
       move: passed.last_move,
       game: passed,
     });
-    vi.advanceTimersByTime(999);
-    expect(seen).toEqual([moved]);
-    vi.advanceTimersByTime(1);
     expect(seen).toEqual([moved, passed]);
   });
 
