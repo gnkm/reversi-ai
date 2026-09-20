@@ -110,7 +110,7 @@ def search_stats(
 
 
 def ordered_places(position: Position) -> tuple[Square, ...]:
-    """合法手を Move Ordering の優先で並べる。同順位は a1…h8。"""
+    """合法手を Move Ordering の優先で並べる。同一分類では相手の合法手数、a1…h8 の順。"""
     places = legal_places(position)
     if len(places) <= 1:
         return places
