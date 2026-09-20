@@ -102,10 +102,8 @@ def _negamax(
     for move in legal_moves(position):
         child = play(position, move)
         child_value = -_negamax(child, ply + 1, root_color, -beta, -alpha, limit)
-        if child_value > value:
-            value = child_value
-        if value > alpha:
-            alpha = value
+        value = max(value, child_value)
+        alpha = max(alpha, value)
         if alpha >= beta:
             break
     return value
