@@ -1,7 +1,7 @@
 {
-  "recorded_at": "2026-09-20 20:46",
+  "recorded_at": "2026-09-20 19:13",
   "git": {
-    "models_commit": "02dc6acb24632abf196098fc5a7c7c4cb8ee2f39",
+    "models_commit": "35de788630d438c03bee85f98641f5e0a720fe8c",
     "blobs": {
       "models/ml.json": "45540cfdf7051c7d9d2f4d8da42378bfd65a7a8c",
       "models/lgbm.txt": "ee559b7126aa861dd2e16ae898216caf906257c4",
@@ -25,7 +25,7 @@
       "ランダム (一様) と生成 AI (Jev) は非決定的なので、同じ重みでも再実行で勝敗は変わりうる。",
       "新しい対局開始は進行中の 1 局を置き換えるため、局は順次実行した。",
       "この記録は git.blobs の学習成果物に対するスナップショットである。現行の models/ と blob が異なれば成績は一致しない。",
-      "生成 AI (Jev) はコードが言葉にした合法手を Choice で選び、着手後評価と合成する。"
+      "生成 AI (Jev) は優先を答え、着手後の位置評価・モビリティ・石差・角差はコードが付ける。"
     ]
   },
   "specimens": [
@@ -86,185 +86,185 @@
       "specimen_id": "minimax",
       "display_name": "ルールベース (ミニマックス)",
       "games": 18,
-      "wins": 17,
+      "wins": 18,
       "draws": 0,
-      "losses": 1,
-      "points": 17.0,
-      "stones_for": 748,
-      "stones_against": 404,
-      "stone_diff": 344,
+      "losses": 0,
+      "points": 18.0,
+      "stones_for": 743,
+      "stones_against": 409,
+      "stone_diff": 334,
       "as_black": {
-        "wins": 8,
+        "wins": 9,
         "draws": 0,
-        "losses": 1,
-        "points": 8.0,
-        "stones_for": 372,
-        "stones_against": 204,
-        "stone_diff": 168
+        "losses": 0,
+        "points": 9.0,
+        "stones_for": 370,
+        "stones_against": 206,
+        "stone_diff": 164
       },
       "as_white": {
         "wins": 9,
         "draws": 0,
         "losses": 0,
         "points": 9.0,
-        "stones_for": 376,
-        "stones_against": 200,
-        "stone_diff": 176
+        "stones_for": 373,
+        "stones_against": 203,
+        "stone_diff": 170
       }
     },
     {
       "rank": 2,
-      "specimen_id": "opening",
-      "display_name": "ルールベース (定石)",
+      "specimen_id": "jev",
+      "display_name": "生成 AI (Jev)",
       "games": 18,
-      "wins": 12,
-      "draws": 2,
+      "wins": 14,
+      "draws": 0,
       "losses": 4,
-      "points": 13.0,
-      "stones_for": 641,
-      "stones_against": 511,
-      "stone_diff": 130,
+      "points": 14.0,
+      "stones_for": 765,
+      "stones_against": 387,
+      "stone_diff": 378,
       "as_black": {
-        "wins": 8,
+        "wins": 7,
         "draws": 0,
-        "losses": 1,
-        "points": 8.0,
-        "stones_for": 362,
-        "stones_against": 214,
-        "stone_diff": 148
+        "losses": 2,
+        "points": 7.0,
+        "stones_for": 400,
+        "stones_against": 176,
+        "stone_diff": 224
       },
       "as_white": {
-        "wins": 4,
-        "draws": 2,
-        "losses": 3,
-        "points": 5.0,
-        "stones_for": 279,
-        "stones_against": 297,
-        "stone_diff": -18
+        "wins": 7,
+        "draws": 0,
+        "losses": 2,
+        "points": 7.0,
+        "stones_for": 365,
+        "stones_against": 211,
+        "stone_diff": 154
       }
     },
     {
       "rank": 3,
-      "specimen_id": "rl",
-      "display_name": "強化学習 (自己対局)",
+      "specimen_id": "opening",
+      "display_name": "ルールベース (定石)",
       "games": 18,
       "wins": 11,
       "draws": 1,
       "losses": 6,
       "points": 11.5,
-      "stones_for": 664,
-      "stones_against": 488,
-      "stone_diff": 176,
+      "stones_for": 604,
+      "stones_against": 548,
+      "stone_diff": 56,
       "as_black": {
-        "wins": 5,
-        "draws": 1,
-        "losses": 3,
-        "points": 5.5,
-        "stones_for": 306,
-        "stones_against": 270,
-        "stone_diff": 36
+        "wins": 7,
+        "draws": 0,
+        "losses": 2,
+        "points": 7.0,
+        "stones_for": 341,
+        "stones_against": 235,
+        "stone_diff": 106
       },
       "as_white": {
-        "wins": 6,
-        "draws": 0,
-        "losses": 3,
-        "points": 6.0,
-        "stones_for": 358,
-        "stones_against": 218,
-        "stone_diff": 140
+        "wins": 4,
+        "draws": 1,
+        "losses": 4,
+        "points": 4.5,
+        "stones_for": 263,
+        "stones_against": 313,
+        "stone_diff": -50
       }
     },
     {
       "rank": 4,
-      "specimen_id": "positional",
-      "display_name": "ルールベース (位置評価)",
+      "specimen_id": "rl",
+      "display_name": "強化学習 (自己対局)",
       "games": 18,
       "wins": 10,
-      "draws": 2,
-      "losses": 6,
-      "points": 11.0,
-      "stones_for": 582,
-      "stones_against": 570,
-      "stone_diff": 12,
+      "draws": 1,
+      "losses": 7,
+      "points": 10.5,
+      "stones_for": 584,
+      "stones_against": 568,
+      "stone_diff": 16,
       "as_black": {
+        "wins": 4,
+        "draws": 1,
+        "losses": 4,
+        "points": 4.5,
+        "stones_for": 270,
+        "stones_against": 306,
+        "stone_diff": -36
+      },
+      "as_white": {
         "wins": 6,
         "draws": 0,
         "losses": 3,
         "points": 6.0,
-        "stones_for": 312,
-        "stones_against": 264,
-        "stone_diff": 48
-      },
-      "as_white": {
-        "wins": 4,
-        "draws": 2,
-        "losses": 3,
-        "points": 5.0,
-        "stones_for": 270,
-        "stones_against": 306,
-        "stone_diff": -36
+        "stones_for": 314,
+        "stones_against": 262,
+        "stone_diff": 52
       }
     },
     {
       "rank": 5,
-      "specimen_id": "most_flips",
-      "display_name": "ルールベース (最多取り)",
+      "specimen_id": "positional",
+      "display_name": "ルールベース (位置評価)",
       "games": 18,
       "wins": 9,
-      "draws": 0,
-      "losses": 9,
-      "points": 9.0,
-      "stones_for": 663,
-      "stones_against": 489,
-      "stone_diff": 174,
+      "draws": 1,
+      "losses": 8,
+      "points": 9.5,
+      "stones_for": 544,
+      "stones_against": 608,
+      "stone_diff": -64,
       "as_black": {
-        "wins": 6,
+        "wins": 5,
         "draws": 0,
-        "losses": 3,
-        "points": 6.0,
-        "stones_for": 416,
-        "stones_against": 160,
-        "stone_diff": 256
+        "losses": 4,
+        "points": 5.0,
+        "stones_for": 288,
+        "stones_against": 288,
+        "stone_diff": 0
       },
       "as_white": {
-        "wins": 3,
-        "draws": 0,
-        "losses": 6,
-        "points": 3.0,
-        "stones_for": 247,
-        "stones_against": 329,
-        "stone_diff": -82
+        "wins": 4,
+        "draws": 1,
+        "losses": 4,
+        "points": 4.5,
+        "stones_for": 256,
+        "stones_against": 320,
+        "stone_diff": -64
       }
     },
     {
       "rank": 6,
-      "specimen_id": "jev",
-      "display_name": "生成 AI (Jev)",
+      "specimen_id": "most_flips",
+      "display_name": "ルールベース (最多取り)",
       "games": 18,
-      "wins": 6,
-      "draws": 2,
-      "losses": 10,
+      "wins": 7,
+      "draws": 0,
+      "losses": 11,
       "points": 7.0,
-      "stones_for": 494,
-      "stones_against": 658,
-      "stone_diff": -164,
+      "stones_for": 637,
+      "stones_against": 515,
+      "stone_diff": 122,
       "as_black": {
-        "wins": 3,
-        "draws": 2,
+        "wins": 5,
+        "draws": 0,
         "losses": 4,
-        "points": 4.0,
-        "stones_for": 294,
-        "stones_against": 282,
-        "stone_diff": 12
+        "points": 5.0,
+        "stones_for": 383,
+        "stones_against": 193,
+        "stone_diff": 190
       },
       "as_white": {
-        "wins": 3,
+        "wins": 2,
         "draws": 0,
-        "losses": 6,
-        "points": 3.0,
-        "stones_for": 200,
-        "stones_against": 376,
-        "stone_diff": -176
+        "losses": 7,
+        "points": 2.0,
+        "stones_for": 254,
+        "stones_against": 322,
+        "stone_diff": -68
       }
     },
     {
@@ -276,26 +276,26 @@
       "draws": 0,
       "losses": 12,
       "points": 6.0,
-      "stones_for": 528,
-      "stones_against": 624,
-      "stone_diff": -96,
+      "stones_for": 491,
+      "stones_against": 661,
+      "stone_diff": -170,
       "as_black": {
-        "wins": 1,
+        "wins": 2,
         "draws": 0,
-        "losses": 8,
-        "points": 1.0,
-        "stones_for": 233,
-        "stones_against": 343,
-        "stone_diff": -110
+        "losses": 7,
+        "points": 2.0,
+        "stones_for": 228,
+        "stones_against": 348,
+        "stone_diff": -120
       },
       "as_white": {
-        "wins": 5,
+        "wins": 4,
         "draws": 0,
-        "losses": 4,
-        "points": 5.0,
-        "stones_for": 295,
-        "stones_against": 281,
-        "stone_diff": 14
+        "losses": 5,
+        "points": 4.0,
+        "stones_for": 263,
+        "stones_against": 313,
+        "stone_diff": -50
       }
     },
     {
@@ -303,65 +303,34 @@
       "specimen_id": "nn",
       "display_name": "ニューラルネットワーク (棋譜)",
       "games": 18,
-      "wins": 6,
+      "wins": 5,
       "draws": 0,
-      "losses": 12,
-      "points": 6.0,
-      "stones_for": 501,
-      "stones_against": 651,
-      "stone_diff": -150,
+      "losses": 13,
+      "points": 5.0,
+      "stones_for": 469,
+      "stones_against": 683,
+      "stone_diff": -214,
       "as_black": {
         "wins": 2,
         "draws": 0,
         "losses": 7,
         "points": 2.0,
-        "stones_for": 253,
-        "stones_against": 323,
-        "stone_diff": -70
+        "stones_for": 243,
+        "stones_against": 333,
+        "stone_diff": -90
       },
       "as_white": {
-        "wins": 4,
+        "wins": 3,
         "draws": 0,
-        "losses": 5,
-        "points": 4.0,
-        "stones_for": 248,
-        "stones_against": 328,
-        "stone_diff": -80
+        "losses": 6,
+        "points": 3.0,
+        "stones_for": 226,
+        "stones_against": 350,
+        "stone_diff": -124
       }
     },
     {
       "rank": 9,
-      "specimen_id": "random_uniform",
-      "display_name": "ランダム (一様)",
-      "games": 18,
-      "wins": 5,
-      "draws": 0,
-      "losses": 13,
-      "points": 5.0,
-      "stones_for": 509,
-      "stones_against": 643,
-      "stone_diff": -134,
-      "as_black": {
-        "wins": 1,
-        "draws": 0,
-        "losses": 8,
-        "points": 1.0,
-        "stones_for": 224,
-        "stones_against": 352,
-        "stone_diff": -128
-      },
-      "as_white": {
-        "wins": 4,
-        "draws": 0,
-        "losses": 5,
-        "points": 4.0,
-        "stones_for": 285,
-        "stones_against": 291,
-        "stone_diff": -6
-      }
-    },
-    {
-      "rank": 10,
       "specimen_id": "lgbm",
       "display_name": "機械学習 (LightGBM)",
       "games": 18,
@@ -369,26 +338,57 @@
       "draws": 1,
       "losses": 13,
       "points": 4.5,
-      "stones_for": 430,
-      "stones_against": 722,
-      "stone_diff": -292,
+      "stones_for": 459,
+      "stones_against": 693,
+      "stone_diff": -234,
       "as_black": {
         "wins": 1,
         "draws": 1,
         "losses": 7,
         "points": 1.5,
-        "stones_for": 215,
-        "stones_against": 361,
-        "stone_diff": -146
+        "stones_for": 217,
+        "stones_against": 359,
+        "stone_diff": -142
       },
       "as_white": {
         "wins": 3,
         "draws": 0,
         "losses": 6,
         "points": 3.0,
-        "stones_for": 215,
-        "stones_against": 361,
-        "stone_diff": -146
+        "stones_for": 242,
+        "stones_against": 334,
+        "stone_diff": -92
+      }
+    },
+    {
+      "rank": 10,
+      "specimen_id": "random_uniform",
+      "display_name": "ランダム (一様)",
+      "games": 18,
+      "wins": 4,
+      "draws": 0,
+      "losses": 14,
+      "points": 4.0,
+      "stones_for": 464,
+      "stones_against": 688,
+      "stone_diff": -224,
+      "as_black": {
+        "wins": 1,
+        "draws": 0,
+        "losses": 8,
+        "points": 1.0,
+        "stones_for": 203,
+        "stones_against": 373,
+        "stone_diff": -170
+      },
+      "as_white": {
+        "wins": 3,
+        "draws": 0,
+        "losses": 6,
+        "points": 3.0,
+        "stones_for": 261,
+        "stones_against": 315,
+        "stone_diff": -54
       }
     }
   ],
@@ -398,110 +398,110 @@
       "white": "most_flips",
       "winner": "white",
       "official_score": {
-        "black": 28,
-        "white": 36
+        "black": 3,
+        "white": 61
       },
       "status": "completed",
-      "game_id": "3e9c83cc-217b-430f-bea4-2ca0e25bd12f"
+      "game_id": "f9f03882-6152-4f95-973c-9f2fc27020e5"
     },
     {
       "black": "random_uniform",
       "white": "positional",
       "winner": "white",
       "official_score": {
-        "black": 23,
-        "white": 41
+        "black": 15,
+        "white": 49
       },
       "status": "completed",
-      "game_id": "b8f77409-5d55-48b2-afc9-16748243b8fe"
+      "game_id": "89a4c47d-2a8f-4619-81bc-3648280ca772"
     },
     {
       "black": "random_uniform",
       "white": "minimax",
       "winner": "white",
       "official_score": {
-        "black": 27,
-        "white": 37
+        "black": 22,
+        "white": 42
       },
       "status": "completed",
-      "game_id": "e3b6ac38-c7b0-409a-8b08-e4d42c1e4c41"
+      "game_id": "9df2f780-34a6-4ba9-a3ee-ecf8a7bce9a1"
     },
     {
       "black": "random_uniform",
       "white": "opening",
       "winner": "white",
       "official_score": {
-        "black": 31,
-        "white": 33
+        "black": 25,
+        "white": 39
       },
       "status": "completed",
-      "game_id": "fdf89370-06dd-43e1-b7bf-0173e8b6d985"
+      "game_id": "051b729c-7259-47f4-93ee-6120a79c0d5d"
     },
     {
       "black": "random_uniform",
       "white": "ml",
       "winner": "white",
       "official_score": {
-        "black": 16,
-        "white": 48
+        "black": 18,
+        "white": 46
       },
       "status": "completed",
-      "game_id": "8ea9e13f-76e6-4acb-a7ea-20aa59a1eee2"
+      "game_id": "47b91381-4f0b-406c-a65e-cbf8bbf1d954"
     },
     {
       "black": "random_uniform",
       "white": "lgbm",
       "winner": "white",
       "official_score": {
-        "black": 28,
-        "white": 36
+        "black": 22,
+        "white": 42
       },
       "status": "completed",
-      "game_id": "2393f0d3-c7db-479a-850f-7c5ee8ae7851"
+      "game_id": "8f71989c-1185-4375-9543-86a5181ca752"
     },
     {
       "black": "random_uniform",
       "white": "rl",
       "winner": "white",
       "official_score": {
-        "black": 8,
-        "white": 56
+        "black": 31,
+        "white": 33
       },
       "status": "completed",
-      "game_id": "ba6b1933-2aba-409a-b27a-8c1461f90c18"
+      "game_id": "713caaf8-c562-4685-aaf9-3d7cd5eecc12"
     },
     {
       "black": "random_uniform",
       "white": "nn",
-      "winner": "white",
+      "winner": "black",
       "official_score": {
-        "black": 26,
-        "white": 38
+        "black": 42,
+        "white": 22
       },
       "status": "completed",
-      "game_id": "cae3baed-e8d4-4242-b9d7-a7b7e024c2ad"
+      "game_id": "a2f34de7-e869-4880-9d84-93e97dfab857"
     },
     {
       "black": "random_uniform",
       "white": "jev",
-      "winner": "black",
+      "winner": "white",
       "official_score": {
-        "black": 37,
-        "white": 27
+        "black": 25,
+        "white": 39
       },
       "status": "completed",
-      "game_id": "c97150ea-f19a-4583-a442-869c70d19ac2"
+      "game_id": "768079fd-6e9c-4e27-9bf0-3ff44510ee5a"
     },
     {
       "black": "most_flips",
       "white": "random_uniform",
       "winner": "black",
       "official_score": {
-        "black": 36,
-        "white": 28
+        "black": 34,
+        "white": 30
       },
       "status": "completed",
-      "game_id": "7181f4c2-2c77-46f4-b03c-cbbc117bd06b"
+      "game_id": "4f5e839c-71e6-4a17-aa93-3b775280ca5c"
     },
     {
       "black": "most_flips",
@@ -512,7 +512,7 @@
         "white": 0
       },
       "status": "completed",
-      "game_id": "618b7b3f-47a6-43a9-80a0-5ee19810fec6"
+      "game_id": "44de5031-8e75-4512-a17e-4649042d01af"
     },
     {
       "black": "most_flips",
@@ -523,7 +523,7 @@
         "white": 41
       },
       "status": "completed",
-      "game_id": "fed7d144-4bd8-4c6a-90f2-7ad13db94800"
+      "game_id": "3cb92509-195c-4207-b52b-0ab3ba9d733a"
     },
     {
       "black": "most_flips",
@@ -534,7 +534,7 @@
         "white": 0
       },
       "status": "completed",
-      "game_id": "9bc31b8d-bb4f-43cf-8117-d392fcf8fe74"
+      "game_id": "63da49b9-4b83-4266-9456-c7a679d01292"
     },
     {
       "black": "most_flips",
@@ -545,7 +545,7 @@
         "white": 4
       },
       "status": "completed",
-      "game_id": "2f69ccfc-cbe6-4566-8005-072f33a52da2"
+      "game_id": "a30d5c92-b535-40bc-847b-e7b181203c35"
     },
     {
       "black": "most_flips",
@@ -556,7 +556,7 @@
         "white": 0
       },
       "status": "completed",
-      "game_id": "4f9fe55d-7aa7-42e4-8479-5be0933e27a7"
+      "game_id": "1a93f16c-26e2-4dd5-a921-e18874d93fda"
     },
     {
       "black": "most_flips",
@@ -567,7 +567,7 @@
         "white": 51
       },
       "status": "completed",
-      "game_id": "0a276b3f-38a2-45f0-89c3-ac90678cd3a0"
+      "game_id": "f74a2b78-dd5a-486b-8e5c-42ffe897508b"
     },
     {
       "black": "most_flips",
@@ -578,29 +578,29 @@
         "white": 33
       },
       "status": "completed",
-      "game_id": "4cec1642-a70e-4845-b32a-f9d3b8ea1784"
+      "game_id": "40882178-63d3-4ebc-8e42-afbd6ab78069"
     },
     {
       "black": "most_flips",
       "white": "jev",
-      "winner": "black",
+      "winner": "white",
       "official_score": {
-        "black": 61,
-        "white": 3
+        "black": 30,
+        "white": 34
       },
       "status": "completed",
-      "game_id": "30e75b97-3f13-4956-9793-7ebcdd650322"
+      "game_id": "1d232b7e-55ab-407f-985c-191f8fb07a53"
     },
     {
       "black": "positional",
       "white": "random_uniform",
-      "winner": "black",
+      "winner": "white",
       "official_score": {
-        "black": 35,
-        "white": 29
+        "black": 27,
+        "white": 37
       },
       "status": "completed",
-      "game_id": "0d62319a-f2d6-42b7-891f-1045b0edc617"
+      "game_id": "2d64f759-8352-4140-ad23-b8ecb3e81f46"
     },
     {
       "black": "positional",
@@ -611,7 +611,7 @@
         "white": 24
       },
       "status": "completed",
-      "game_id": "bb7a9d9a-c4f9-4777-9ab2-1fd08a42ace4"
+      "game_id": "8abcdca8-c82c-4631-a187-716e1b6e6d06"
     },
     {
       "black": "positional",
@@ -622,7 +622,7 @@
         "white": 39
       },
       "status": "completed",
-      "game_id": "22830997-1f60-45f6-9a40-743ee66b4531"
+      "game_id": "e497db88-7cb7-4413-954b-7b7dfd4b556c"
     },
     {
       "black": "positional",
@@ -633,7 +633,7 @@
         "white": 31
       },
       "status": "completed",
-      "game_id": "220cec68-040d-411a-b3e9-c5ebdcc965e8"
+      "game_id": "85685a03-b9bf-470c-9d22-829844b40b5a"
     },
     {
       "black": "positional",
@@ -644,7 +644,7 @@
         "white": 37
       },
       "status": "completed",
-      "game_id": "0c4db9ee-9e15-46a1-a985-c61f4a13d222"
+      "game_id": "89d6e8cd-bf34-49d8-b1c9-c04af3ccb527"
     },
     {
       "black": "positional",
@@ -655,7 +655,7 @@
         "white": 25
       },
       "status": "completed",
-      "game_id": "2430bf35-9e30-418d-a1cf-fe54d92ff6a0"
+      "game_id": "e3bcf0d2-724c-4ebf-9dde-2ce97e8c22e9"
     },
     {
       "black": "positional",
@@ -666,7 +666,7 @@
         "white": 38
       },
       "status": "completed",
-      "game_id": "c81a8218-6854-46e1-9c00-5eb981a0057c"
+      "game_id": "2e38fbf6-2a43-4e54-a06b-15eee4a95948"
     },
     {
       "black": "positional",
@@ -677,29 +677,29 @@
         "white": 29
       },
       "status": "completed",
-      "game_id": "a2dea6ff-6d41-4253-9b2f-a7de12a3452f"
+      "game_id": "a29f4a0f-68ca-4cc8-ae18-84ce9b23cf07"
     },
     {
       "black": "positional",
       "white": "jev",
       "winner": "black",
       "official_score": {
-        "black": 52,
-        "white": 12
+        "black": 36,
+        "white": 28
       },
       "status": "completed",
-      "game_id": "160c75a6-f409-4b51-b4f7-88ce3d7bbe37"
+      "game_id": "8bf45e3f-fb68-443c-bc58-d086f2cfc0f4"
     },
     {
       "black": "minimax",
       "white": "random_uniform",
-      "winner": "white",
+      "winner": "black",
       "official_score": {
-        "black": 30,
-        "white": 34
+        "black": 45,
+        "white": 19
       },
       "status": "completed",
-      "game_id": "d16dad8c-1fab-45fe-bbbf-4300a888bd30"
+      "game_id": "1349dc68-0bce-4a72-b303-89a4fd3b8d10"
     },
     {
       "black": "minimax",
@@ -710,7 +710,7 @@
         "white": 24
       },
       "status": "completed",
-      "game_id": "fa962e67-ac9a-4fc3-8ede-c8a7d5fbb3bd"
+      "game_id": "322694f7-1e48-40a9-b4ff-c019526c50f8"
     },
     {
       "black": "minimax",
@@ -721,7 +721,7 @@
         "white": 25
       },
       "status": "completed",
-      "game_id": "45c21c7d-4829-4d73-bc0a-9bc1b513ca8b"
+      "game_id": "0567f38d-31a2-4dec-b6fe-bd3cdb5b7436"
     },
     {
       "black": "minimax",
@@ -732,7 +732,7 @@
         "white": 18
       },
       "status": "completed",
-      "game_id": "92662d7d-0efe-45dc-be10-6665af5be02d"
+      "game_id": "afa8a5e0-d336-4e5f-bdb7-f47a0fdb9872"
     },
     {
       "black": "minimax",
@@ -743,7 +743,7 @@
         "white": 30
       },
       "status": "completed",
-      "game_id": "52717517-7c8b-4df5-9209-73abb0c2f4ec"
+      "game_id": "c9f33e83-1a32-4ae5-aaab-1003d91be173"
     },
     {
       "black": "minimax",
@@ -754,7 +754,7 @@
         "white": 29
       },
       "status": "completed",
-      "game_id": "53e09bde-4d2d-499c-ab48-b76fd69cf6fe"
+      "game_id": "870325c6-42df-4286-884f-58eb514ecc63"
     },
     {
       "black": "minimax",
@@ -765,7 +765,7 @@
         "white": 20
       },
       "status": "completed",
-      "game_id": "0deab795-4883-4620-b3f8-a290e56bd6c5"
+      "game_id": "72870669-16b2-4ea3-b730-b6ad37ff2e81"
     },
     {
       "black": "minimax",
@@ -776,29 +776,29 @@
         "white": 11
       },
       "status": "completed",
-      "game_id": "698ebe34-4631-4b6f-a145-442e9e15c047"
+      "game_id": "b1da808d-4f75-45ce-87cf-a272164d878d"
     },
     {
       "black": "minimax",
       "white": "jev",
       "winner": "black",
       "official_score": {
-        "black": 51,
-        "white": 13
+        "black": 34,
+        "white": 30
       },
       "status": "completed",
-      "game_id": "b8e1ccd1-046c-401b-ac83-4b1455cbc893"
+      "game_id": "ac25c339-f476-4c7f-bcc6-e7bd08f3c8a4"
     },
     {
       "black": "opening",
       "white": "random_uniform",
       "winner": "black",
       "official_score": {
-        "black": 33,
-        "white": 31
+        "black": 38,
+        "white": 26
       },
       "status": "completed",
-      "game_id": "2660407b-cab8-4bcc-83e7-6136f47f1a94"
+      "game_id": "924cab19-f469-4498-8184-994f19aafe87"
     },
     {
       "black": "opening",
@@ -809,7 +809,7 @@
         "white": 19
       },
       "status": "completed",
-      "game_id": "b74d8b60-ee11-4ba5-af84-8dac4ee29669"
+      "game_id": "a2344b18-c2c2-44e6-92e8-96a0a46d40b6"
     },
     {
       "black": "opening",
@@ -820,7 +820,7 @@
         "white": 19
       },
       "status": "completed",
-      "game_id": "3cf29ec9-c7d1-4d9c-96ee-383f930a34c3"
+      "game_id": "8bb7f6eb-9fa2-4ccb-8d88-d4db23e8a6e8"
     },
     {
       "black": "opening",
@@ -831,7 +831,7 @@
         "white": 41
       },
       "status": "completed",
-      "game_id": "dff380fd-4fe0-4e8c-a6bd-815c9e648034"
+      "game_id": "d94df59b-286f-42cf-9120-df2abf0455ef"
     },
     {
       "black": "opening",
@@ -842,7 +842,7 @@
         "white": 31
       },
       "status": "completed",
-      "game_id": "d4a43d14-8504-4c53-90b4-aa45602cdc9c"
+      "game_id": "9cf919e0-d75f-47b5-a727-4e4c9acf0c56"
     },
     {
       "black": "opening",
@@ -853,7 +853,7 @@
         "white": 17
       },
       "status": "completed",
-      "game_id": "be9efd54-2505-43a8-83cd-f63adf5cd9d3"
+      "game_id": "1008e7ca-d361-4210-8a7a-58ea8315f73d"
     },
     {
       "black": "opening",
@@ -864,7 +864,7 @@
         "white": 13
       },
       "status": "completed",
-      "game_id": "a9b149a8-df5c-4845-bad7-29ff23ba432d"
+      "game_id": "ff4c3b1c-3b28-42f3-bc2f-2776ff50b776"
     },
     {
       "black": "opening",
@@ -875,29 +875,29 @@
         "white": 24
       },
       "status": "completed",
-      "game_id": "467e3f5d-e0d1-4bcf-a826-e05719843acf"
+      "game_id": "6e0e5505-f93f-4b8f-95c9-81c04e64e2fc"
     },
     {
       "black": "opening",
       "white": "jev",
-      "winner": "black",
+      "winner": "white",
       "official_score": {
-        "black": 45,
-        "white": 19
+        "black": 19,
+        "white": 45
       },
       "status": "completed",
-      "game_id": "e2fa262f-f84c-4c0b-a5d5-ee7eedffa6c1"
+      "game_id": "6122004a-f7b5-4cd6-b0bb-7fd767d98290"
     },
     {
       "black": "ml",
       "white": "random_uniform",
-      "winner": "white",
+      "winner": "black",
       "official_score": {
-        "black": 31,
-        "white": 33
+        "black": 43,
+        "white": 21
       },
       "status": "completed",
-      "game_id": "6e1f4180-ecae-48f3-b287-7e2a9a185317"
+      "game_id": "1d0c0491-63c3-4521-bdfb-88a2db604f19"
     },
     {
       "black": "ml",
@@ -908,7 +908,7 @@
         "white": 17
       },
       "status": "completed",
-      "game_id": "a4d09089-dabb-4975-a24c-241afd275dd1"
+      "game_id": "399c30aa-35d9-44ab-a0b3-70413ec05e46"
     },
     {
       "black": "ml",
@@ -919,7 +919,7 @@
         "white": 35
       },
       "status": "completed",
-      "game_id": "28f54321-bf91-41d1-a2d1-0663d4258e59"
+      "game_id": "920875b8-cdeb-40f4-9922-1d0cbb1a8d38"
     },
     {
       "black": "ml",
@@ -930,7 +930,7 @@
         "white": 37
       },
       "status": "completed",
-      "game_id": "24b5a4d7-9258-40de-b8ba-80a8bc4703a2"
+      "game_id": "a39fbb8d-9249-4789-9688-14d410dd1c90"
     },
     {
       "black": "ml",
@@ -941,7 +941,7 @@
         "white": 47
       },
       "status": "completed",
-      "game_id": "f2eba58f-ab7b-48e8-bbcd-f6860e0da62d"
+      "game_id": "2467b165-67e5-454f-98bf-6aae023de0fd"
     },
     {
       "black": "ml",
@@ -952,7 +952,7 @@
         "white": 45
       },
       "status": "completed",
-      "game_id": "b6e5da8a-3892-498c-a214-b09478a00a0b"
+      "game_id": "4d3d07c1-7a6f-445c-8f3c-0c506f5ca56b"
     },
     {
       "black": "ml",
@@ -963,7 +963,7 @@
         "white": 54
       },
       "status": "completed",
-      "game_id": "5d80f8cd-5460-4c04-a6de-9f29327e7f62"
+      "game_id": "e17072e3-e912-4921-854f-a5bb1dacbdda"
     },
     {
       "black": "ml",
@@ -974,29 +974,29 @@
         "white": 34
       },
       "status": "completed",
-      "game_id": "adfa44a8-b9cf-41a4-88fa-b6633f328eee"
+      "game_id": "d746cdf0-c71b-48d7-93bf-7d0686e9c0c6"
     },
     {
       "black": "ml",
       "white": "jev",
       "winner": "white",
       "official_score": {
-        "black": 23,
-        "white": 41
+        "black": 6,
+        "white": 58
       },
       "status": "completed",
-      "game_id": "249c25ef-8f81-40da-95be-42cf028f0f10"
+      "game_id": "08c6dcf1-ee4f-418a-a333-c530d072036c"
     },
     {
       "black": "lgbm",
       "white": "random_uniform",
       "winner": "white",
       "official_score": {
-        "black": 22,
-        "white": 42
+        "black": 28,
+        "white": 36
       },
       "status": "completed",
-      "game_id": "134edd19-bbb5-4757-b8c1-0da6831489fa"
+      "game_id": "dc549998-8c93-416d-8fe1-368d380d372a"
     },
     {
       "black": "lgbm",
@@ -1007,7 +1007,7 @@
         "white": 38
       },
       "status": "completed",
-      "game_id": "f8f0c0b4-25c3-4f48-b64c-247ab83bc48e"
+      "game_id": "bdfd5b40-e7c6-4ff2-9037-8ac434b3ad09"
     },
     {
       "black": "lgbm",
@@ -1018,7 +1018,7 @@
         "white": 46
       },
       "status": "completed",
-      "game_id": "80781a12-98f6-4b85-b006-9e7f9fa2830d"
+      "game_id": "77d03f5a-5c4a-424f-aa85-43ce26016765"
     },
     {
       "black": "lgbm",
@@ -1029,7 +1029,7 @@
         "white": 42
       },
       "status": "completed",
-      "game_id": "c5a65fd5-f337-47ca-b9be-4ed72d27e269"
+      "game_id": "599100fe-d1ba-49b6-9944-52fa787b7ba4"
     },
     {
       "black": "lgbm",
@@ -1040,7 +1040,7 @@
         "white": 32
       },
       "status": "completed",
-      "game_id": "f1132f61-77d8-4a98-ae5d-4ef1ea2b04d6"
+      "game_id": "97e62a80-0db6-404f-b7bb-e755f55867b1"
     },
     {
       "black": "lgbm",
@@ -1051,7 +1051,7 @@
         "white": 30
       },
       "status": "completed",
-      "game_id": "b33fc694-4822-4f74-8bf0-4fc1a9a5be11"
+      "game_id": "75b06302-9eaf-4f19-aacf-2d155a1eb4bf"
     },
     {
       "black": "lgbm",
@@ -1062,7 +1062,7 @@
         "white": 56
       },
       "status": "completed",
-      "game_id": "6f5d0b94-6d9d-4159-82bb-9c62ce2c31e7"
+      "game_id": "e192d864-e77f-4ee4-bcae-4f2548cc2edc"
     },
     {
       "black": "lgbm",
@@ -1073,18 +1073,18 @@
         "white": 34
       },
       "status": "completed",
-      "game_id": "fc18fb44-fca1-4ff3-bf79-dae670e4d600"
+      "game_id": "a9a49c81-2a9e-4ae7-88ff-413622a77566"
     },
     {
       "black": "lgbm",
       "white": "jev",
       "winner": "white",
       "official_score": {
-        "black": 23,
-        "white": 41
+        "black": 19,
+        "white": 45
       },
       "status": "completed",
-      "game_id": "95b3b12b-9ca6-4a63-aa31-59c2b9f970b3"
+      "game_id": "51bd1a7a-651b-4666-836e-f9cbb08cf20f"
     },
     {
       "black": "rl",
@@ -1095,7 +1095,7 @@
         "white": 29
       },
       "status": "completed",
-      "game_id": "a24ee380-fe41-45dd-9192-68f56131485a"
+      "game_id": "41f8fcb8-c1fc-4aa7-b553-a9c94aec8cf4"
     },
     {
       "black": "rl",
@@ -1106,7 +1106,7 @@
         "white": 22
       },
       "status": "completed",
-      "game_id": "b64b1057-dfa6-4178-96d2-08c9165e9c5e"
+      "game_id": "ef7178c5-5849-4497-9431-69f26660d15c"
     },
     {
       "black": "rl",
@@ -1117,7 +1117,7 @@
         "white": 32
       },
       "status": "completed",
-      "game_id": "edf12f4e-6c0f-4a97-a2a0-5a2b5f6767ff"
+      "game_id": "c108f0f7-a07f-4c9f-b020-8d6c4f3ccbfb"
     },
     {
       "black": "rl",
@@ -1128,7 +1128,7 @@
         "white": 41
       },
       "status": "completed",
-      "game_id": "51e5dfd5-2836-4a47-9b56-e1708b3f6947"
+      "game_id": "944b5d73-b408-4505-b8dd-e6811f8cf702"
     },
     {
       "black": "rl",
@@ -1139,7 +1139,7 @@
         "white": 46
       },
       "status": "completed",
-      "game_id": "10865c8d-b3e4-4a26-ab9c-d5880681db7a"
+      "game_id": "a9aa1284-40fc-4340-a348-ce193f1a2ba6"
     },
     {
       "black": "rl",
@@ -1150,7 +1150,7 @@
         "white": 48
       },
       "status": "completed",
-      "game_id": "abe2cbe4-adbe-4468-9145-045f911799ef"
+      "game_id": "dcec4137-f811-4230-af1d-1b171f690b9a"
     },
     {
       "black": "rl",
@@ -1161,7 +1161,7 @@
         "white": 24
       },
       "status": "completed",
-      "game_id": "2ed933c7-a3df-494a-9e3a-fe8ccf724782"
+      "game_id": "c2b5eacc-f948-4715-84e1-c268f0af88e8"
     },
     {
       "black": "rl",
@@ -1172,29 +1172,29 @@
         "white": 21
       },
       "status": "completed",
-      "game_id": "8538a4bc-fba1-4f44-adcb-5683caf0362f"
+      "game_id": "2fdfc6a1-7911-40b8-8572-88d1dd667905"
     },
     {
       "black": "rl",
       "white": "jev",
-      "winner": "black",
+      "winner": "white",
       "official_score": {
-        "black": 57,
-        "white": 7
+        "black": 21,
+        "white": 43
       },
       "status": "completed",
-      "game_id": "5f52853d-4eae-45c8-9d33-a9cedb86fb70"
+      "game_id": "0df6a0fb-bb2e-42a0-9fad-3fac146df5b7"
     },
     {
       "black": "nn",
       "white": "random_uniform",
       "winner": "black",
       "official_score": {
-        "black": 39,
-        "white": 25
+        "black": 35,
+        "white": 29
       },
       "status": "completed",
-      "game_id": "0afbf11a-eac2-4dd4-ac33-0fc8c2fab65b"
+      "game_id": "2d93a5d9-88ec-4952-9aca-57cdc5270384"
     },
     {
       "black": "nn",
@@ -1205,7 +1205,7 @@
         "white": 24
       },
       "status": "completed",
-      "game_id": "573bff00-a83b-4ec0-b2f2-3fd7a821dfe7"
+      "game_id": "428ef957-51ac-46d0-a4b2-a63aa66553c9"
     },
     {
       "black": "nn",
@@ -1216,7 +1216,7 @@
         "white": 40
       },
       "status": "completed",
-      "game_id": "90c57082-88e8-4a01-99b6-d214135193e7"
+      "game_id": "9190f55e-b011-4107-b214-c786ead510cd"
     },
     {
       "black": "nn",
@@ -1227,7 +1227,7 @@
         "white": 46
       },
       "status": "completed",
-      "game_id": "f0cbe17d-8d1d-47a9-99dd-d68258e91cc0"
+      "game_id": "40e6d565-6182-433c-aeb7-353bd9d6b8f2"
     },
     {
       "black": "nn",
@@ -1238,7 +1238,7 @@
         "white": 40
       },
       "status": "completed",
-      "game_id": "f238c61d-1625-4b35-91ce-5f189c4ba883"
+      "game_id": "3f64922e-d1e6-4b9a-82cc-180b0a91206e"
     },
     {
       "black": "nn",
@@ -1249,7 +1249,7 @@
         "white": 33
       },
       "status": "completed",
-      "game_id": "31c5a191-9fdf-4c6a-9917-d9a5189a5e14"
+      "game_id": "0d786a8b-e46a-4e77-a7c6-6a0f98fd032a"
     },
     {
       "black": "nn",
@@ -1260,7 +1260,7 @@
         "white": 34
       },
       "status": "completed",
-      "game_id": "a3f6f6a9-ce28-4644-8448-61896715e263"
+      "game_id": "3dd5449e-403a-47db-a6d0-68088b3bb38a"
     },
     {
       "black": "nn",
@@ -1271,18 +1271,18 @@
         "white": 44
       },
       "status": "completed",
-      "game_id": "cb20e241-eaaa-4086-9182-8d1ed50e7f59"
+      "game_id": "89a71471-1476-43c9-ab94-c4b848f81d37"
     },
     {
       "black": "nn",
       "white": "jev",
       "winner": "white",
       "official_score": {
-        "black": 27,
-        "white": 37
+        "black": 21,
+        "white": 43
       },
       "status": "completed",
-      "game_id": "0b6699ed-8fda-4366-bb1a-4d725f4b9f56"
+      "game_id": "551e3cd2-51da-4010-89de-8f8ea0b575b8"
     },
     {
       "black": "jev",
@@ -1293,95 +1293,95 @@
         "white": 34
       },
       "status": "completed",
-      "game_id": "1953c708-eafc-4d72-a5c6-18cab1f9e742"
+      "game_id": "446dad7b-5989-4a9e-b4b0-71951407f761"
     },
     {
       "black": "jev",
       "white": "most_flips",
-      "winner": "white",
+      "winner": "black",
       "official_score": {
-        "black": 21,
-        "white": 43
+        "black": 39,
+        "white": 25
       },
       "status": "completed",
-      "game_id": "f2defb06-d550-44ab-84cf-02f26e2ff978"
+      "game_id": "3d835034-971f-484f-b9e7-557aa52d7cbb"
     },
     {
       "black": "jev",
       "white": "positional",
-      "winner": "draw",
+      "winner": "black",
       "official_score": {
-        "black": 32,
-        "white": 32
+        "black": 54,
+        "white": 10
       },
       "status": "completed",
-      "game_id": "220cc230-9738-4b52-a770-3676967f10ee"
+      "game_id": "cde5ae23-9d20-4e18-99d2-13bae3f53597"
     },
     {
       "black": "jev",
       "white": "minimax",
       "winner": "white",
       "official_score": {
-        "black": 12,
-        "white": 52
+        "black": 20,
+        "white": 44
       },
       "status": "completed",
-      "game_id": "0df4d6b9-892a-4138-b16a-9fb01b9f046e"
+      "game_id": "b1f09ebb-1d33-4584-9f18-72c7af4bcd42"
     },
     {
       "black": "jev",
       "white": "opening",
-      "winner": "draw",
+      "winner": "black",
       "official_score": {
-        "black": 32,
-        "white": 32
+        "black": 54,
+        "white": 10
       },
       "status": "completed",
-      "game_id": "266e83f2-441b-40d8-8d4a-e154e1633ee1"
+      "game_id": "fbc66c9a-de90-4784-8032-123211137b1d"
     },
     {
       "black": "jev",
       "white": "ml",
-      "winner": "white",
+      "winner": "black",
       "official_score": {
-        "black": 30,
-        "white": 34
+        "black": 60,
+        "white": 4
       },
       "status": "completed",
-      "game_id": "91fb45b1-929d-4285-9de8-53a98967c1e3"
+      "game_id": "194d0098-890b-4a9a-bfaf-d394674e7498"
     },
     {
       "black": "jev",
       "white": "lgbm",
       "winner": "black",
       "official_score": {
-        "black": 59,
-        "white": 5
+        "black": 38,
+        "white": 26
       },
       "status": "completed",
-      "game_id": "12dff123-5bdc-41e3-a980-a6fc842b8116"
+      "game_id": "a242677d-b4ed-48c7-8ff3-8f98bcbeb24d"
     },
     {
       "black": "jev",
       "white": "rl",
       "winner": "black",
       "official_score": {
-        "black": 38,
-        "white": 26
+        "black": 59,
+        "white": 5
       },
       "status": "completed",
-      "game_id": "a3022285-3076-436d-acf4-9402c9a9cdd7"
+      "game_id": "59273de0-5ee0-4c31-8d27-d0be06c0cd67"
     },
     {
       "black": "jev",
       "white": "nn",
       "winner": "black",
       "official_score": {
-        "black": 40,
-        "white": 24
+        "black": 46,
+        "white": 18
       },
       "status": "completed",
-      "game_id": "0ca09b3e-b9e6-44b4-b96e-465414d27bee"
+      "game_id": "541ee70c-a932-46cc-ad7a-492ee5f5cba9"
     }
   ]
 }
