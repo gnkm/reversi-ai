@@ -1,11 +1,11 @@
 ---
 title: アーキテクチャ
 product: Reversi Agents
-version: 0.1.40
+version: 0.1.41
 status: working
 date: 2026-09-21
 source: docs/srs.md
-srs_version: 0.1.24
+srs_version: 0.1.25
 tech_stack: docs/tech-stack.md
 tech_stack_version: 0.2.20
 ---
@@ -16,10 +16,10 @@ tech_stack_version: 0.2.20
 | --- | --- |
 | 文書識別 | reversi-ai-architecture |
 | 対象ソフトウェア | Reversi Agents |
-| 版 | 0.1.40 |
+| 版 | 0.1.41 |
 | 状態 | 現行（設計。要求ではない） |
 | 日付 | 2026-09-21 |
-| 入力 | [`docs/srs.md`](srs.md) 0.1.24、[`docs/tech-stack.md`](tech-stack.md) 0.2.20 |
+| 入力 | [`docs/srs.md`](srs.md) 0.1.25、[`docs/tech-stack.md`](tech-stack.md) 0.2.20 |
 
 本文書は**配置と層**の設計正本である。ソフトウェア要求の正本は [`docs/srs.md`](srs.md) であり、本文書は shall を追加・変更・撤回しない。言語・ライブラリ・コンテナの選定は [`docs/tech-stack.md`](tech-stack.md) を正とする。ディレクトリ名は tech-stack 2.3 と一致させ、ファイル単位の置き場と目的は本文書を正とする。
 
@@ -110,6 +110,18 @@ reversi-ai/
 │   ├── ARCHITECTURE.md                # 本ファイル。配置と層
 │   ├── jev-decisions.md               # 生成 AI (Jev) が使う Decisions Choice の形
 │   ├── openapi.yml                    # 対局 API の契約（OpenAPI 3.1）
+│   ├── catalog/
+│   │   ├── random_uniform.md          # ランダム (一様) の着手解説
+│   │   ├── most_flips.md              # ルールベース (最多取り) の着手解説
+│   │   ├── positional.md              # ルールベース (位置評価) の着手解説
+│   │   ├── minimax.md                 # ルールベース (ミニマックス) の着手解説
+│   │   ├── alphabeta.md               # ルールベース (αβ) の着手解説
+│   │   ├── opening.md                 # ルールベース (定石) の着手解説
+│   │   ├── ml.md                      # 機械学習 (棋譜) の着手解説
+│   │   ├── lgbm.md                    # 機械学習 (LightGBM) の着手解説
+│   │   ├── rl.md                      # 強化学習 (自己対局) の着手解説
+│   │   ├── nn.md                      # ニューラルネットワーク (棋譜) の着手解説
+│   │   └── jev.md                     # 生成 AI (Jev) の着手解説
 │   ├── benchmarks/
 │   │   ├── round-robin.json           # 総当たり基準結果。最新の数値の正本
 │   │   ├── round-robin.md             # 最新の GitHub 閲覧用。JSON から生成
@@ -431,6 +443,7 @@ web コンテナが Pod 内で `0.0.0.0:3000` を聞くのはよい。戦略コ�
 
 | 版 | 日付 | 内容 |
 | --- | --- | --- |
+| 0.1.41 | 2026-09-21 | 組込み個体の着手解説を `docs/catalog/` に置く |
 | 0.1.40 | 2026-09-21 | カタログ総当たりを起動済み対局 API へ問い合わせる `round_robin.py` を置く |
 | 0.1.39 | 2026-09-21 | ルールベース (αβ) の終盤完全読みを外し、ミニマックスと同じ探索深さに揃える |
 | 0.1.38 | 2026-09-21 | ルールベース (αβ) の対局深さを 4 にし、ミニマックスと同じ探索深さにする |

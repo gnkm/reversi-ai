@@ -143,21 +143,21 @@ curl -sk https://127.0.0.1:3000/api/games \
 
 ## カタログのエージェント
 
-初版で選べる相手は次のとおりです。方針の詳細は、カタログ画面の説明文を見てください。
+初版で選べる相手は次のとおりです。方針の詳細は [docs/catalog/](docs/catalog/) の解説 Markdown を見てください。カタログ画面の説明文は短い要約です。
 
-| 表示名 | 概要 |
-| --- | --- |
-| ランダム (一様) | 合法手を等確率で選ぶ |
-| ルールベース (最多取り) | いちばん多く裏返す手を選ぶ |
-| ルールベース (位置評価) | マスの点数合計がいちばん高い手を選ぶ |
-| ルールベース (ミニマックス) | 先を読んで位置評価する |
-| ルールベース (αβ) | 深さ 4 の Negamax。葉は Mobility・角・石差 |
-| ルールベース (定石) | 短い定石に乗り、外れたら位置評価する |
-| 機械学習 (棋譜) | 対局前に学習したモデルで着手する |
-| 機械学習 (LightGBM) | 対局前に LightGBM で学習したモデルで着手する |
-| 強化学習 (自己対局) | 自己対局で得た方針で着手する |
-| ニューラルネットワーク (棋譜) | 対局前に学習したネットワークで着手する |
-| 生成 AI (Jev) | OpenRouter 上の Jev が合法手から選ぶ |
+| 表示名 | 概要 | 解説 |
+| --- | --- | --- |
+| ランダム (一様) | 合法手を等確率で選ぶ | [docs/catalog/random_uniform.md](docs/catalog/random_uniform.md) |
+| ルールベース (最多取り) | いちばん多く裏返す手を選ぶ | [docs/catalog/most_flips.md](docs/catalog/most_flips.md) |
+| ルールベース (位置評価) | マスの点数合計がいちばん高い手を選ぶ | [docs/catalog/positional.md](docs/catalog/positional.md) |
+| ルールベース (ミニマックス) | 先を読んで位置評価する | [docs/catalog/minimax.md](docs/catalog/minimax.md) |
+| ルールベース (αβ) | 深さ 4 の Negamax。葉は Mobility・角・石差 | [docs/catalog/alphabeta.md](docs/catalog/alphabeta.md) |
+| ルールベース (定石) | 短い定石に乗り、外れたら位置評価する | [docs/catalog/opening.md](docs/catalog/opening.md) |
+| 機械学習 (棋譜) | 対局前に学習したモデルで着手する | [docs/catalog/ml.md](docs/catalog/ml.md) |
+| 機械学習 (LightGBM) | 対局前に LightGBM で学習したモデルで着手する | [docs/catalog/lgbm.md](docs/catalog/lgbm.md) |
+| 強化学習 (自己対局) | 自己対局で得た方針で着手する | [docs/catalog/rl.md](docs/catalog/rl.md) |
+| ニューラルネットワーク (棋譜) | 対局前に学習したネットワークで着手する | [docs/catalog/nn.md](docs/catalog/nn.md) |
+| 生成 AI (Jev) | OpenRouter 上の Jev が合法手から選ぶ | [docs/catalog/jev.md](docs/catalog/jev.md) |
 
 学習し直さなくても、これらの相手とは対局できます。自分で学習し直す手順は次節です。基準の総当たり結果は [docs/benchmarks/round-robin.md](docs/benchmarks/round-robin.md) です（数値の正本は JSON）。勝ち点の推移は [docs/benchmarks/history.md](docs/benchmarks/history.md) です。その成績は JSON の `git.blobs` が指す学習成果物に対する記録であり、いまの `models/` と blob が異なれば一致しません。取り直すときは、対局サービスを起動したうえで次を実行します。
 
