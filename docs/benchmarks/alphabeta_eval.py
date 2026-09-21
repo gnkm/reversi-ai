@@ -331,7 +331,7 @@ def _payload(
             "acceptance_win_rate": ACCEPT_WIN_RATE,
             "notes": [
                 "開始局面は初形から 4/6/8 手を一様乱択で進めた組。各局面で先後を入れ替える。",
-                "候補はカタログの「ルールベース (αβ)」（深さ 6、空きマス 10 以下は終盤完全読み）。",
+                "候補はカタログの「ルールベース (αβ)」（深さ 4、空きマス 10 以下は終盤完全読み）。",
                 "比較対象は既存の「ルールベース (ミニマックス)」（深さ 4、位置評価表）。AI-B / AI-C は置かない。",
                 "勝敗は公式スコア。石数差は盤上の石数（αβ − ミニマックス）。",
                 "探索局面数と思考時間は αβ の各着手（search_stats）の平均と最大。",
@@ -411,8 +411,8 @@ def main() -> int:
     workers = args.workers if args.workers > 0 else min(4, cpu)
     output = args.output
     _ensure_output(output)
-    if alphabeta.SEARCH_DEPTH != 6:
-        raise SystemExit("αβ の深さは 6 のままであること")
+    if alphabeta.SEARCH_DEPTH != 4:
+        raise SystemExit("αβ の深さは 4 のままであること")
     if minimax.SEARCH_DEPTH != 4:
         raise SystemExit("ミニマックスの深さは 4 のままであること")
     progress = _load_progress(output)

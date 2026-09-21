@@ -1,4 +1,4 @@
-"""深さ 6 の Negamax（αβ）。Transposition Table（Zobrist）。空きマスが少なければ終盤完全読み。"""
+"""深さ 4 の Negamax（αβ）。Transposition Table（Zobrist）。空きマスが少なければ終盤完全読み。"""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ SPECIMEN_ID = "alphabeta"
 CATEGORY = "rule_based"
 DISPLAY_NAME = "ルールベース (αβ)"
 DESCRIPTION = (
-    "深さ 6 の Negamax 形式のアルファベータ探索で合法手を選ぶ。"
+    "深さ 4 の Negamax 形式のアルファベータ探索で合法手を選ぶ。"
     "探索前に合法手を Move Ordering で並べる（角、相手の合法手を減らす手、安全な辺、通常、C、X）。"
     "同じ局面へ別手順で到達したときは Transposition Table（Zobrist ハッシュ）で再探索を省く。"
     "葉の評価は Mobility 差・Corner 差・X/C・Frontier 差・石数差の一次結合である。"
@@ -29,7 +29,7 @@ DESCRIPTION = (
     "葉は最終石数差（自分 − 相手）である。対局中にこの閾値も深さも変えない。"
     "対局中に学習済みモデルも OpenRouter も呼ばない。"
 )
-SEARCH_DEPTH = 6
+SEARCH_DEPTH = 4
 ENDGAME_EMPTY = 10
 
 # score = 50×Mobility差 + 1000×Corner差 − 150×X差 − 80×C差 − 10×Frontier差 + W×石数差。
@@ -124,7 +124,7 @@ def leaf_score(board: Board, color: Color) -> int:
 
 
 def choose_move(position: Position, rng: Random | None = None) -> Place | None:
-    """深さ 6 の Negamax で合法手を選ぶ。空きマスが少なければ終盤完全読み。同点は a1…h8。"""
+    """深さ 4 の Negamax で合法手を選ぶ。空きマスが少なければ終盤完全読み。同点は a1…h8。"""
     del rng
     return choose_at_depth(position, SEARCH_DEPTH)
 

@@ -1,13 +1,13 @@
 ---
 title: アーキテクチャ
 product: Reversi Agents
-version: 0.1.37
+version: 0.1.38
 status: working
 date: 2026-09-21
 source: docs/srs.md
 srs_version: 0.1.24
 tech_stack: docs/tech-stack.md
-tech_stack_version: 0.2.19
+tech_stack_version: 0.2.20
 ---
 
 # アーキテクチャ
@@ -16,10 +16,10 @@ tech_stack_version: 0.2.19
 | --- | --- |
 | 文書識別 | reversi-ai-architecture |
 | 対象ソフトウェア | Reversi Agents |
-| 版 | 0.1.37 |
+| 版 | 0.1.38 |
 | 状態 | 現行（設計。要求ではない） |
 | 日付 | 2026-09-21 |
-| 入力 | [`docs/srs.md`](srs.md) 0.1.24、[`docs/tech-stack.md`](tech-stack.md) 0.2.19 |
+| 入力 | [`docs/srs.md`](srs.md) 0.1.24、[`docs/tech-stack.md`](tech-stack.md) 0.2.20 |
 
 本文書は**配置と層**の設計正本である。ソフトウェア要求の正本は [`docs/srs.md`](srs.md) であり、本文書は shall を追加・変更・撤回しない。言語・ライブラリ・コンテナの選定は [`docs/tech-stack.md`](tech-stack.md) を正とする。ディレクトリ名は tech-stack 2.3 と一致させ、ファイル単位の置き場と目的は本文書を正とする。
 
@@ -183,7 +183,7 @@ reversi-ai/
 │   │   │   ├── most_flips.py          # ルールベース (最多取り)
 │   │   │   ├── positional.py          # ルールベース (位置評価)
 │   │   │   ├── minimax.py             # ルールベース (ミニマックス) 深さ 4
-│   │   │   ├── alphabeta.py           # ルールベース (αβ) 深さ 6。Move Ordering。Transposition Table（Zobrist ハッシュ）。空きマス 10 以下は終盤完全読み（葉は最終石数差）。葉は Mobility・Corner・X/C・Frontier・石差。W は空きマス（Game Phase）
+│   │   │   ├── alphabeta.py           # ルールベース (αβ) 深さ 4。Move Ordering。Transposition Table（Zobrist ハッシュ）。空きマス 10 以下は終盤完全読み（葉は最終石数差）。葉は Mobility・Corner・X/C・Frontier・石差。W は空きマス（Game Phase）
 │   │   │   ├── opening.py             # ルールベース (定石) 虎・牛・鼠
 │   │   │   ├── ml.py                  # 機械学習 (棋譜)。係数 JSON の積和のみ
 │   │   │   ├── lgbm.py                # 機械学習 (LightGBM)。ネイティブテキストを読む
@@ -319,7 +319,7 @@ reversi-ai/
 | `most_flips.py` | ルールベース (最多取り) | 裏返す相手石が最大の手 |
 | `positional.py` | ルールベース (位置評価) | 着手直後の自石点数合計が最大の手 |
 | `minimax.py` | ルールベース (ミニマックス) | 深さ 4。葉は位置評価表の差。アルファベータは同一の葉評価になる範囲で可 |
-| `alphabeta.py` | ルールベース (αβ) | 深さ 6 の Negamax 形式の αβ。探索前に合法手を Move Ordering（角、相手手数、安全な辺、通常、C、X。角が空なら X / C は後ろ）。同じ局面へ別手順で到達したときは Transposition Table（Zobrist ハッシュ。キーは盤面+手番。値は評価値・残り深さ・Bound）で再探索を省く。表は 1 着手の根探索が終わったら捨て、対局をまたいで残さない。大きさは制限しない（dict）。同じキーなら上書きする。Zobrist 乱数は `alphabeta.py` に固定シードで置く。対局エンジンは 8×8 配列のままである。葉は Mobility 差・Corner 差・X/C・Frontier 差・石数差の一次結合。石数の重みは空きマス数（Game Phase）で変える。空きマスが 10 以下ならヒューリスティックを使わず終局まで完全読みし、葉は最終石数差（自分 − 相手。公式スコアの空マス加算はしない）。閾値は対局中に変えない。完全読み中も Move Ordering と Transposition Table を使う。空きマスが閾値を超えるときは深さ 6 と Phase 4 の葉評価のままである。ルールベース (ミニマックス) には終盤完全読みを入れない。根の同点は a1…h8 であり探索順ではタイブレークしない。対局中に深さを変えない |
+| `alphabeta.py` | ルールベース (αβ) | 深さ 4 の Negamax 形式の αβ。探索前に合法手を Move Ordering（角、相手手数、安全な辺、通常、C、X。角が空なら X / C は後ろ）。同じ局面へ別手順で到達したときは Transposition Table（Zobrist ハッシュ。キーは盤面+手番。値は評価値・残り深さ・Bound）で再探索を省く。表は 1 着手の根探索が終わったら捨て、対局をまたいで残さない。大きさは制限しない（dict）。同じキーなら上書きする。Zobrist 乱数は `alphabeta.py` に固定シードで置く。対局エンジンは 8×8 配列のままである。葉は Mobility 差・Corner 差・X/C・Frontier 差・石数差の一次結合。石数の重みは空きマス数（Game Phase）で変える。空きマスが 10 以下ならヒューリスティックを使わず終局まで完全読みし、葉は最終石数差（自分 − 相手。公式スコアの空マス加算はしない）。閾値は対局中に変えない。完全読み中も Move Ordering と Transposition Table を使う。空きマスが閾値を超えるときは深さ 4 と Phase 4 の葉評価のままである。ルールベース (ミニマックス) には終盤完全読みを入れない。根の同点は a1…h8 であり探索順ではタイブレークしない。対局中に深さを変えない。ミニマックス個体と同じ探索深さにし、アルゴリズムと葉評価の差が見えるようにする |
 | `opening.py` | ルールベース (定石) | 虎・牛・鼠の 3 列と 8 対称。外れは位置評価 |
 | `ml.py` | 機械学習 (棋譜) | `models/ml.json` の積和。onnxruntime / PyTorch を import しない |
 | `lgbm.py` | 機械学習 (LightGBM) | `models/lgbm.txt` を LightGBM ネイティブ形式で読む。onnxruntime / PyTorch / joblib / pickle を import しない |
@@ -430,6 +430,7 @@ web コンテナが Pod 内で `0.0.0.0:3000` を聞くのはよい。戦略コ�
 
 | 版 | 日付 | 内容 |
 | --- | --- | --- |
+| 0.1.38 | 2026-09-21 | ルールベース (αβ) の対局深さを 4 にし、ミニマックスと同じ探索深さにする |
 | 0.1.37 | 2026-09-21 | αβ 対ミニマックス評価を途中打ち切りとし、知見を `alphabeta-eval.md` に残す |
 | 0.1.36 | 2026-09-21 | ルールベース (αβ) と深さ 4 ミニマックスの先後入れ替え評価を `docs/benchmarks/` に置く |
 | 0.1.35 | 2026-09-21 | ルールベース (αβ) が空きマス 10 以下で終盤を完全読みする |
