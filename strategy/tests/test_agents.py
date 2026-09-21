@@ -2367,6 +2367,8 @@ def test_catalog_lists_alphabeta() -> None:
     assert "Mobility" in item.description
     assert "Corner" in item.description
     assert "Move Ordering" in item.description
+    assert "Transposition Table" in item.description
+    assert "Zobrist" in item.description
     assert "Frontier" in item.description
     assert "Game Phase" in item.description
     assert "点数表" not in item.description
@@ -2527,6 +2529,9 @@ def test_alphabeta_source_is_negamax_and_does_not_call_models() -> None:
     assert "def ordered_places(" in source
     assert "_X_SQUARES" in source
     assert "_C_SQUARES" in source
+    assert "Zobrist" in source
+    assert "transposition" in source.lower()
+    assert "_TT_EXACT" in source
     roots = _imported_roots(source)
     assert roots.isdisjoint(_FORBIDDEN_IMPORT_ROOTS)
     assert "minimax" not in roots
@@ -2603,6 +2608,55 @@ def test_alphabeta_root_tiebreak_is_coordinate_not_ordering() -> None:
     assert ordered_place == unordered_place == Place(Square.parse("d3"))
     assert ordered_value == unordered_value
     assert alphabeta.choose_move(position) == ordered_place
+
+
+def test_alphabeta_transposition_keeps_root_and_does_not_increase_nodes() -> None:
+    position = _position_from_rank8_rows(_CORNER_AND_X, Color.BLACK)
+    places = {square.algebraic for square in legal_places(position)}
+    assert "a1" in places and "b2" in places
+    with_place, with_value, with_nodes = alphabeta.search_stats(
+        position, alphabeta.SEARCH_DEPTH, order=True, table=True
+    )
+    without_place, without_value, without_nodes = alphabeta.search_stats(
+        position, alphabeta.SEARCH_DEPTH, order=True, table=False
+    )
+    assert with_place is not None
+    assert with_place == without_place
+    assert with_value == without_value
+    assert with_place.square in legal_places(position)
+    assert with_nodes <= without_nodes
+    assert with_nodes < without_nodes
+    assert alphabeta.choose_move(position) == with_place
+    assert alphabeta.choose_at_depth(position, 6, table=True) == with_place
+    assert alphabeta.choose_at_depth(position, 6, table=False) == without_place
+
+
+def test_alphabeta_transposition_keeps_initial_root() -> None:
+    position = initial_position()
+    with_place, with_value, with_nodes = alphabeta.search_stats(
+        position, alphabeta.SEARCH_DEPTH, table=True
+    )
+    without_place, without_value, without_nodes = alphabeta.search_stats(
+        position, alphabeta.SEARCH_DEPTH, table=False
+    )
+    assert with_place == without_place == Place(Square.parse("d3"))
+    assert with_value == without_value
+    assert with_nodes <= without_nodes
+    assert alphabeta.choose_move(position) == with_place
+    assert alphabeta.SEARCH_DEPTH == 6
+
+
+def test_alphabeta_engine_is_not_bitboard() -> None:
+    engine_dir = Path(__file__).resolve().parents[1] / "src" / "reversi" / "engine"
+    files = list(engine_dir.glob("*.py"))
+    assert files
+    for path in files:
+        text = path.read_text(encoding="utf-8")
+        assert "bitboard" not in text.lower()
+    source = _module_source("alphabeta.py")
+    assert "Zobrist" in source
+    assert "transposition" in source.lower()
+    assert "ハッシュ" in source
 
 
 def test_alphabeta_leaf_penalizes_x_on_empty_corner() -> None:
