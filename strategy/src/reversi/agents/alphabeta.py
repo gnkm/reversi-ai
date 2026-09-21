@@ -1,4 +1,4 @@
-"""深さ 4 の Negamax（αβ）。Transposition Table（Zobrist）。空きマスが少なければ終盤完全読み。"""
+"""深さ 4 の Negamax（αβ）。Transposition Table（Zobrist）。"""
 
 from __future__ import annotations
 
@@ -25,12 +25,10 @@ DESCRIPTION = (
     "同じ局面へ別手順で到達したときは Transposition Table（Zobrist ハッシュ）で再探索を省く。"
     "葉の評価は Mobility 差・Corner 差・X/C・Frontier 差・石数差の一次結合である。"
     "石数の重みは空きマス数（Game Phase）で変える。"
-    "空きマスが 10 以下ならヒューリスティックを使わず終局まで完全読みし、"
-    "葉は最終石数差（自分 − 相手）である。対局中にこの閾値も深さも変えない。"
-    "対局中に学習済みモデルも OpenRouter も呼ばない。"
+    "探索深さはミニマックス個体と同じ 4 であり、空きマスが少なくても終局まで延長しない。"
+    "対局中に深さを変えない。対局中に学習済みモデルも OpenRouter も呼ばない。"
 )
 SEARCH_DEPTH = 4
-ENDGAME_EMPTY = 10
 
 # score = 50×Mobility差 + 1000×Corner差 − 150×X差 − 80×C差 − 10×Frontier差 + W×石数差。
 # W は空きマス数（Game Phase）。40 以上は 1、20〜39 は 5、10〜19 は 20、9 以下は 100。
@@ -94,7 +92,6 @@ __all__ = [
     "CATEGORY",
     "DESCRIPTION",
     "DISPLAY_NAME",
-    "ENDGAME_EMPTY",
     "SEARCH_DEPTH",
     "SPECIMEN_ID",
     "choose_at_depth",
@@ -124,7 +121,7 @@ def leaf_score(board: Board, color: Color) -> int:
 
 
 def choose_move(position: Position, rng: Random | None = None) -> Place | None:
-    """深さ 4 の Negamax で合法手を選ぶ。空きマスが少なければ終盤完全読み。同点は a1…h8。"""
+    """深さ 4 の Negamax で合法手を選ぶ。同点は a1…h8。"""
     del rng
     return choose_at_depth(position, SEARCH_DEPTH)
 
@@ -136,10 +133,7 @@ def choose_at_depth(
     order: bool = True,
     table: bool = True,
 ) -> Place | None:
-    """指定深さの Negamax で合法手を選ぶ。対局経路は SEARCH_DEPTH を渡す。
-
-    空きマスが ENDGAME_EMPTY 以下なら深さを無視して終局まで完全読みする。
-    """
+    """指定深さの Negamax で合法手を選ぶ。対局経路は SEARCH_DEPTH を渡す。"""
     place, _value, _nodes = _search_root(position, depth, order, table)
     return place
 
@@ -252,31 +246,9 @@ def _danger_diff(
     return total
 
 
-def _empty_count(board: Board) -> int:
-    return sum(stone is Stone.EMPTY for row in board.cells for stone in row)
-
-
-def _endgame_disc_diff(board: Board, color: Color) -> int:
-    """終局盤面の石数差（自分 − 相手）。公式スコアの空マス加算はしない。"""
-    own = color.stone
-    diff = 0
-    for row in board.cells:
-        for stone in row:
-            if stone is Stone.EMPTY:
-                continue
-            diff += 1 if stone is own else -1
-    return diff
-
-
-def _evaluate_leaf(position: Position, endgame: bool) -> int:
-    if endgame:
-        return _endgame_disc_diff(position.board, position.side_to_move)
-    return leaf_score(position.board, position.side_to_move)
-
-
-def _is_leaf(position: Position, ply: int, limit: int, endgame: bool) -> bool:
-    # 通常探索は深さ上限を先に見て、葉での is_over 走査を避ける。
-    return ((not endgame) and ply >= limit) or is_over(position)
+def _is_leaf(position: Position, ply: int, limit: int) -> bool:
+    # 深さ上限を先に見て、葉での is_over 走査を避ける。
+    return ply >= limit or is_over(position)
 
 
 def _is_edge(square: Square) -> bool:
@@ -379,14 +351,6 @@ def _tt_store(
     table[(key, remaining)] = (value, bound)
 
 
-def _search_limit(position: Position, depth: int) -> tuple[int, bool]:
-    """通常は指定深さ。空きマスが閾値以下なら終局までの完全読み。"""
-    endgame = _empty_count(position.board) <= ENDGAME_EMPTY
-    if endgame:
-        return BOARD_SIZE * BOARD_SIZE, True
-    return depth, False
-
-
 def _search_root(
     position: Position,
     depth: int,
@@ -395,14 +359,11 @@ def _search_root(
 ) -> tuple[Place | None, int | None, int]:
     nodes = [0]
     table: _TtTable | None = {} if use_table else None
-    limit, endgame = _search_limit(position, depth)
     best_square = None
     best_value: int | None = None
     for square in legal_places(position):
         child = play(position, Place(square))
-        value = -_negamax(
-            child, 1, _NEG_INF, _POS_INF, limit, order, nodes, table, endgame
-        )
+        value = -_negamax(child, 1, _NEG_INF, _POS_INF, depth, order, nodes, table)
         if best_value is None or value > best_value:
             best_value = value
             best_square = square
@@ -420,7 +381,6 @@ def _negamax(
     order: bool,
     nodes: list[int],
     table: _TtTable | None,
-    endgame: bool,
 ) -> int:
     nodes[0] += 1
     remaining = limit - ply
@@ -429,8 +389,8 @@ def _negamax(
         hit = _tt_probe(table, key, remaining, alpha, beta)
         if hit is not None:
             return hit
-    if _is_leaf(position, ply, limit, endgame):
-        value = _evaluate_leaf(position, endgame)
+    if _is_leaf(position, ply, limit):
+        value = leaf_score(position.board, position.side_to_move)
         if table is not None:
             table[(key, remaining)] = (value, _TT_EXACT)
         return value
@@ -439,7 +399,7 @@ def _negamax(
     for move in _moves_to_search(position, order):
         child = play(position, move)
         child_value = -_negamax(
-            child, ply + 1, -beta, -alpha, limit, order, nodes, table, endgame
+            child, ply + 1, -beta, -alpha, limit, order, nodes, table
         )
         value = max(value, child_value)
         alpha = max(alpha, value)

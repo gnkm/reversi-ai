@@ -2,7 +2,7 @@
 
 数値の正本は [`alphabeta-eval.json`](alphabeta-eval.json) である。本ファイルはそれを要約し、判断を書く。表の小数は閲覧用に丸めた写しであり、再計算して正本にしない。[`render.py`](render.py) では生成しない。
 
-提案書はシードであり、本ファイルは [`docs/source-of-truth/`](../source-of-truth/) には置かない。勝率 70% は提案書第 20 章の目標であり、**shall にはしない**。記録時点の候補深さは 6 である。現行カタログの深さは [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md) を正とする。
+提案書はシードであり、本ファイルは [`docs/source-of-truth/`](../source-of-truth/) には置かない。勝率 70% は提案書第 20 章の目標であり、**shall にはしない**。記録時点の候補は深さ 6、空きマス 10 以下は終盤完全読みである。現行カタログの深さと終盤経路は [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md) を正とする。
 
 ## 範囲の変更
 
