@@ -38,6 +38,7 @@ JST = timezone(timedelta(hours=9))
 CTX = ssl._create_unverified_context()
 SEARCH = frozenset({"minimax", "alphabeta"})
 GENERATIVE = "generative_ai"
+PROGRESS_META = "progress_meta"
 
 
 def protocol_notes(count: int, extra: Sequence[str]) -> list[str]:
@@ -77,9 +78,64 @@ def load_done(path: Path) -> dict[tuple[str, str], dict[str, Any]]:
         if not line.strip():
             continue
         row = json.loads(line)
-        if not failed(row):
-            done[(str(row["black"]), str(row["white"]))] = row
+        if row.get("kind") == PROGRESS_META or failed(row):
+            continue
+        done[(str(row["black"]), str(row["white"]))] = row
     return done
+
+
+def progress_identity(
+    origin: str,
+    items: Sequence[Mapping[str, str]],
+    blobs: Mapping[str, str],
+) -> dict[str, Any]:
+    return {
+        "kind": PROGRESS_META,
+        "endpoint": origin,
+        "specimen_ids": [str(item["specimen_id"]) for item in items],
+        "blobs": dict(blobs),
+    }
+
+
+def identity_matches(stored: Mapping[str, Any], expected: Mapping[str, Any]) -> bool:
+    return (
+        stored.get("endpoint") == expected["endpoint"]
+        and stored.get("specimen_ids") == expected["specimen_ids"]
+        and stored.get("blobs") == expected["blobs"]
+    )
+
+
+def read_progress_meta(path: Path) -> dict[str, Any] | None:
+    if not path.exists():
+        return None
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        row = json.loads(line)
+        if row.get("kind") == PROGRESS_META:
+            return row
+        return None
+    return None
+
+
+def prepare_progress(
+    path: Path, identity: Mapping[str, Any]
+) -> dict[tuple[str, str], dict[str, Any]]:
+    if path.exists() and path.stat().st_size > 0:
+        meta = read_progress_meta(path)
+        if meta is None:
+            raise SystemExit(
+                f"progress に世代識別がありません。削除するか --progress で別ファイルを指定してください: {path}"
+            )
+        if not identity_matches(meta, identity):
+            raise SystemExit(
+                f"progress の世代が現行の入口・カタログ・学習成果物と違います。"
+                f"削除するか --progress で別ファイルを指定してください: {path}"
+            )
+    else:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        append_progress(path, identity)
+    return load_done(path)
 
 
 def wait_limit(black: str, white: str, categories: Mapping[str, str]) -> tuple[int, float]:
@@ -517,6 +573,45 @@ def self_check() -> None:
     assert payload["standings"][0]["points"] == 1.5
     assert payload["standings"][1]["points"] == 0.5
     assert archive_filename("2026-09-21 15:55") == "2026-09-21-1555.json"
+    identity = progress_identity(ORIGIN, items, {"models/ml.json": "def"})
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "progress.jsonl"
+        done = prepare_progress(path, identity)
+        assert done == {}
+        append_progress(
+            path,
+            {
+                "black": "alpha",
+                "white": "beta",
+                "winner": "black",
+                "score_black": 40,
+                "score_white": 24,
+                "id": "g-black",
+                "is_over": True,
+                "unplayable_reason": None,
+                "timeout": False,
+            },
+        )
+        resumed = prepare_progress(path, identity)
+        assert resumed[("alpha", "beta")]["winner"] == "black"
+        other = progress_identity(ORIGIN, items, {"models/ml.json": "other"})
+        try:
+            prepare_progress(path, other)
+        except SystemExit:
+            pass
+        else:
+            raise AssertionError("世代が違う progress を再利用してはいけない")
+        stale = Path(tmp) / "stale.jsonl"
+        stale.write_text(
+            json.dumps({"black": "alpha", "white": "beta", "winner": "black"}) + "\n",
+            encoding="utf-8",
+        )
+        try:
+            prepare_progress(stale, identity)
+        except SystemExit:
+            pass
+        else:
+            raise AssertionError("識別のない progress を再利用してはいけない")
     print("self-check ok", flush=True)
 
 
@@ -553,7 +648,10 @@ def run_tournament(args: argparse.Namespace) -> int:
         for black, white in pairs:
             print(f"{names[black]} vs {names[white]}", flush=True)
         return 0
-    done = load_done(args.progress)
+    blobs = git_blobs(ROOT, MODEL_PATHS)
+    done = prepare_progress(
+        args.progress, progress_identity(origin, items, blobs)
+    )
     results: list[dict[str, Any]] = []
     for index, (black, white) in enumerate(pairs, 1):
         existing = done.get((black, white))
@@ -598,7 +696,7 @@ def run_tournament(args: argparse.Namespace) -> int:
         results,
         recorded_at=datetime.now(JST).strftime("%Y-%m-%d %H:%M"),
         models_commit=git_head(ROOT),
-        blobs=git_blobs(ROOT, MODEL_PATHS),
+        blobs=blobs,
         extra_notes=tuple(args.note),
         endpoint=origin,
     )
