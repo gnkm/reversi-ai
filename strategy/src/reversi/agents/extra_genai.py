@@ -125,7 +125,7 @@ def _parse_entry(raw: object) -> ExtraSpecimen:
         model_id=model_id,
         display_name=f"生成 AI ({name})",
         description=(
-            f"OpenRouter 上の {model_id} を Chat Completions の構造化出力で呼び、"
+            "OpenRouter の Chat Completions を構造化出力で呼び、"
             "自分の手番の合法手から着手を選ぶ。対局中に WTHOR は参照しない。"
         ),
         parameters=parameters,
