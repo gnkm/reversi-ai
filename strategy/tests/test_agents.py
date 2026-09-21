@@ -2829,6 +2829,55 @@ def test_alphabeta_endgame_threshold_stays_ten() -> None:
     assert "endgame" not in _module_source("minimax.py").lower()
 
 
+def test_alphabeta_eval_record_has_paired_acceptance() -> None:
+    root = Path(__file__).resolve().parents[2] / "docs" / "benchmarks"
+    records = sorted(root.glob("alphabeta-eval*.json"))
+    assert records, "αβ 対ミニマックスの評価 JSON が無い"
+    data = json.loads(records[-1].read_text(encoding="utf-8"))
+    for key in (
+        "games",
+        "win_rate",
+        "mean_stone_diff",
+        "mean_nodes",
+        "mean_think_seconds",
+        "max_think_seconds",
+        "paired",
+        "accepted",
+    ):
+        assert key in data, key
+    assert data["paired"] is True
+    assert data.get("complete") is False
+    assert data.get("stopped_early") is True
+    assert data["games"] >= 20
+    assert data["games"] == len(data["game_records"])
+    assert data["games"] < 2 * len(data["starts"])
+    assert isinstance(data["accepted"], bool)
+    assert data["accepted"] is False
+    assert data.get("looks_strong") is True
+    assert data["win_rate"] >= 0.70
+    assert alphabeta.SEARCH_DEPTH == 6
+    assert minimax.SEARCH_DEPTH == 4
+    assert data["candidate"]["specimen_id"] == alphabeta.SPECIMEN_ID
+    assert data["candidate"]["search_depth"] == alphabeta.SEARCH_DEPTH
+    assert data["opponent"]["specimen_id"] == minimax.SPECIMEN_ID
+    assert data["opponent"]["search_depth"] == minimax.SEARCH_DEPTH
+    pairs = data["paired_results"]
+    assert len(pairs) >= 10
+    assert len(pairs) < len(data["starts"])
+    for row in pairs:
+        assert row["black"]["alphabeta_color"] == "black"
+        assert row["white"]["alphabeta_color"] == "white"
+        assert row["black"]["start_index"] == row["white"]["start_index"]
+    assert data.get("stop_reason") == "code_owner_instruction"
+    assert [item.display_name for item in items()].count("ルールベース (αβ)") == 1
+    assert [item.display_name for item in items()].count("ルールベース (ミニマックス)") == 1
+    report = root / "alphabeta-eval.md"
+    assert report.is_file(), "αβ 評価のレポートが無い"
+    text = report.read_text(encoding="utf-8")
+    assert "コードオーナー" in text
+    assert "強そう" in text
+
+
 def test_alphabeta_leaf_penalizes_x_on_empty_corner() -> None:
     danger = empty_board().replacing(
         {
