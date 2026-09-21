@@ -74,18 +74,29 @@ class Board:
         return self.cells[square.rank][square.file]
 
     def replacing(self, updates: Mapping[Square, Stone]) -> Board:
-        grid = [list(row) for row in self.cells]
+        rows = list(self.cells)
+        changed: dict[int, list[Stone]] = {}
         for square, stone in updates.items():
-            grid[square.rank][square.file] = stone
-        return Board(tuple(tuple(row) for row in grid))
+            row = changed.get(square.rank)
+            if row is None:
+                row = list(self.cells[square.rank])
+                changed[square.rank] = row
+            row[square.file] = stone
+        for rank, row in changed.items():
+            rows[rank] = tuple(row)
+        return Board(tuple(rows))
+
+
+# 64 マスは不変。探索中に Square を都度作らない。
+SQUARES: tuple[tuple[Square, ...], ...] = tuple(
+    tuple(Square(file=file, rank=rank) for file in range(BOARD_SIZE))
+    for rank in range(BOARD_SIZE)
+)
+_ALL_SQUARES: tuple[Square, ...] = tuple(square for row in SQUARES for square in row)
 
 
 def all_squares() -> tuple[Square, ...]:
-    return tuple(
-        Square(file=file, rank=rank)
-        for rank in range(BOARD_SIZE)
-        for file in range(BOARD_SIZE)
-    )
+    return _ALL_SQUARES
 
 
 def empty_board() -> Board:

@@ -6,11 +6,11 @@ from dataclasses import dataclass
 
 from reversi.engine.board import (
     BOARD_SIZE,
+    SQUARES,
     Board,
     Color,
     Square,
     Stone,
-    all_squares,
     initial_board,
 )
 
@@ -59,10 +59,6 @@ def initial_position() -> Position:
     return Position(board=initial_board(), side_to_move=Color.BLACK)
 
 
-def _in_bounds(file: int, rank: int) -> bool:
-    return 0 <= file < BOARD_SIZE and 0 <= rank < BOARD_SIZE
-
-
 def _flips_in_direction(
     board: Board,
     origin: Square,
@@ -72,14 +68,14 @@ def _flips_in_direction(
     df, dr = delta
     own = color.stone
     opponent = color.opponent.stone
+    cells = board.cells
     seen: list[Square] = []
     file = origin.file + df
     rank = origin.rank + dr
-    while _in_bounds(file, rank):
-        here = Square(file=file, rank=rank)
-        stone = board.stone_at(here)
+    while 0 <= file < BOARD_SIZE and 0 <= rank < BOARD_SIZE:
+        stone = cells[rank][file]
         if stone is opponent:
-            seen.append(here)
+            seen.append(SQUARES[rank][file])
             file += df
             rank += dr
             continue
@@ -100,16 +96,27 @@ def flips_for(board: Board, square: Square, color: Color) -> tuple[Square, ...]:
 
 
 def has_place(board: Board, color: Color) -> bool:
-    return any(flips_for(board, square, color) for square in all_squares())
+    cells = board.cells
+    for rank, row in enumerate(cells):
+        for file, stone in enumerate(row):
+            if stone is Stone.EMPTY and flips_for(
+                board, SQUARES[rank][file], color
+            ):
+                return True
+    return False
 
 
 def legal_places(position: Position) -> tuple[Square, ...]:
     color = position.side_to_move
-    return tuple(
-        square
-        for square in all_squares()
-        if flips_for(position.board, square, color)
-    )
+    cells = position.board.cells
+    found: list[Square] = []
+    for rank, row in enumerate(cells):
+        for file, stone in enumerate(row):
+            if stone is Stone.EMPTY:
+                square = SQUARES[rank][file]
+                if flips_for(position.board, square, color):
+                    found.append(square)
+    return tuple(found)
 
 
 def pass_is_legal(position: Position) -> bool:

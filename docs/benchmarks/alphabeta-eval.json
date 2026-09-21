@@ -1,0 +1,1781 @@
+{
+  "recorded_at": "2026-09-21 02:11",
+  "candidate": {
+    "specimen_id": "alphabeta",
+    "display_name": "ルールベース (αβ)",
+    "search_depth": 6,
+    "endgame_empty": 10
+  },
+  "opponent": {
+    "specimen_id": "minimax",
+    "display_name": "ルールベース (ミニマックス)",
+    "search_depth": 4
+  },
+  "protocol": {
+    "starts": 50,
+    "games_per_start": 2,
+    "opening_plies": [
+      4,
+      6,
+      8
+    ],
+    "seed": 20260921,
+    "paired": true,
+    "workers": 4,
+    "acceptance_win_rate": 0.7,
+    "notes": [
+      "開始局面は初形から 4/6/8 手を一様乱択で進めた組。各局面で先後を入れ替える。",
+      "候補はカタログの「ルールベース (αβ)」（深さ 6、空きマス 10 以下は終盤完全読み）。",
+      "比較対象は既存の「ルールベース (ミニマックス)」（深さ 4、位置評価表）。AI-B / AI-C は置かない。",
+      "勝敗は公式スコア。石数差は盤上の石数（αβ − ミニマックス）。",
+      "探索局面数と思考時間は αβ の各着手（search_stats）の平均と最大。",
+      "勝率は（勝 + 0.5×分）/ 局数。0.70 以上なら accepted。shall にはしない。",
+      "採用しても不採用でもカタログ個体は 1 体のまま。総当たりの取り直しはしない。",
+      "不採用なら next_phase に戻る段階を残す。再開は seed と開始局面数が一致するときだけ。",
+      "対局の再実行は CI に載せない。本スクリプトはホストで明示実行する。",
+      "100 局完走の前にコードオーナーが範囲を変更した。途中成績で「強そう」と分かればよい。本 JSON は打ち切り時点のスナップショットであり、対局の再実行はしない。"
+    ],
+    "planned_games": 100,
+    "stopped_after_games": 29
+  },
+  "games": 29,
+  "wins": 28,
+  "draws": 1,
+  "losses": 0,
+  "win_rate": 0.9827586206896551,
+  "mean_stone_diff": 37.724137931034484,
+  "mean_nodes": 11521.7602905569,
+  "mean_think_seconds": 12.557479754809927,
+  "max_think_seconds": 82.54282194300004,
+  "paired": true,
+  "accepted": false,
+  "complete": false,
+  "catalog_policy": "keep_phase6",
+  "paired_results": [
+    {
+      "start_index": 0,
+      "black": {
+        "start_index": 0,
+        "alphabeta_color": "black",
+        "result": "win",
+        "stone_diff": 38,
+        "official_black": 52,
+        "official_white": 12,
+        "stones_black": 50,
+        "stones_white": 12,
+        "ab_moves": 30,
+        "mean_nodes": 10420.566666666668,
+        "mean_think_seconds": 11.9088494657667,
+        "max_think_seconds": 35.79470609600003,
+        "total_nodes": 312617,
+        "total_think_seconds": 357.265483973001
+      },
+      "white": {
+        "start_index": 0,
+        "alphabeta_color": "white",
+        "result": "win",
+        "stone_diff": 10,
+        "official_black": 27,
+        "official_white": 37,
+        "stones_black": 27,
+        "stones_white": 37,
+        "ab_moves": 28,
+        "mean_nodes": 11370.535714285714,
+        "mean_think_seconds": 11.785413644357154,
+        "max_think_seconds": 31.587010587999885,
+        "total_nodes": 318375,
+        "total_think_seconds": 329.99158204200035
+      },
+      "pair_stone_diff": 24.0
+    },
+    {
+      "start_index": 1,
+      "black": {
+        "start_index": 1,
+        "alphabeta_color": "black",
+        "result": "win",
+        "stone_diff": 60,
+        "official_black": 62,
+        "official_white": 2,
+        "stones_black": 62,
+        "stones_white": 2,
+        "ab_moves": 31,
+        "mean_nodes": 7484.193548387097,
+        "mean_think_seconds": 6.962653487419373,
+        "max_think_seconds": 26.779893163999986,
+        "total_nodes": 232010,
+        "total_think_seconds": 215.84225811000056
+      },
+      "white": {
+        "start_index": 1,
+        "alphabeta_color": "white",
+        "result": "win",
+        "stone_diff": 28,
+        "official_black": 18,
+        "official_white": 46,
+        "stones_black": 18,
+        "stones_white": 46,
+        "ab_moves": 27,
+        "mean_nodes": 13592.37037037037,
+        "mean_think_seconds": 15.313897361037057,
+        "max_think_seconds": 40.00411276600016,
+        "total_nodes": 366994,
+        "total_think_seconds": 413.4752287480005
+      },
+      "pair_stone_diff": 44.0
+    },
+    {
+      "start_index": 2,
+      "black": {
+        "start_index": 2,
+        "alphabeta_color": "black",
+        "result": "win",
+        "stone_diff": 30,
+        "official_black": 47,
+        "official_white": 17,
+        "stones_black": 47,
+        "stones_white": 17,
+        "ab_moves": 28,
+        "mean_nodes": 11969.464285714286,
+        "mean_think_seconds": 14.715004632964353,
+        "max_think_seconds": 48.856455306999806,
+        "total_nodes": 335145,
+        "total_think_seconds": 412.0201297230019
+      },
+      "white": {
+        "start_index": 2,
+        "alphabeta_color": "white",
+        "result": "win",
+        "stone_diff": 48,
+        "official_black": 8,
+        "official_white": 56,
+        "stones_black": 8,
+        "stones_white": 56,
+        "ab_moves": 27,
+        "mean_nodes": 17852.48148148148,
+        "mean_think_seconds": 20.016220557703658,
+        "max_think_seconds": 82.54282194300004,
+        "total_nodes": 482017,
+        "total_think_seconds": 540.4379550579988
+      },
+      "pair_stone_diff": 39.0
+    },
+    {
+      "start_index": 3,
+      "black": {
+        "start_index": 3,
+        "alphabeta_color": "black",
+        "result": "win",
+        "stone_diff": 44,
+        "official_black": 54,
+        "official_white": 10,
+        "stones_black": 54,
+        "stones_white": 10,
+        "ab_moves": 29,
+        "mean_nodes": 8499.034482758621,
+        "mean_think_seconds": 9.438248382586185,
+        "max_think_seconds": 37.358519733000094,
+        "total_nodes": 246472,
+        "total_think_seconds": 273.70920309499934
+      },
+      "white": {
+        "start_index": 3,
+        "alphabeta_color": "white",
+        "result": "win",
+        "stone_diff": 26,
+        "official_black": 19,
+        "official_white": 45,
+        "stones_black": 19,
+        "stones_white": 45,
+        "ab_moves": 29,
+        "mean_nodes": 7913.0344827586205,
+        "mean_think_seconds": 9.078453116379306,
+        "max_think_seconds": 32.479214773999956,
+        "total_nodes": 229478,
+        "total_think_seconds": 263.27514037499986
+      },
+      "pair_stone_diff": 35.0
+    },
+    {
+      "start_index": 4,
+      "black": {
+        "start_index": 4,
+        "alphabeta_color": "black",
+        "result": "win",
+        "stone_diff": 22,
+        "official_black": 43,
+        "official_white": 21,
+        "stones_black": 43,
+        "stones_white": 21,
+        "ab_moves": 29,
+        "mean_nodes": 6490.310344827586,
+        "mean_think_seconds": 6.460088397241321,
+        "max_think_seconds": 30.535113052999804,
+        "total_nodes": 188219,
+        "total_think_seconds": 187.3425635199983
+      },
+      "white": {
+        "start_index": 4,
+        "alphabeta_color": "white",
+        "result": "win",
+        "stone_diff": 50,
+        "official_black": 7,
+        "official_white": 57,
+        "stones_black": 7,
+        "stones_white": 57,
+        "ab_moves": 28,
+        "mean_nodes": 8925.714285714286,
+        "mean_think_seconds": 9.109157488214269,
+        "max_think_seconds": 30.134892643000057,
+        "total_nodes": 249920,
+        "total_think_seconds": 255.05640966999954
+      },
+      "pair_stone_diff": 36.0
+    },
+    {
+      "start_index": 5,
+      "black": {
+        "start_index": 5,
+        "alphabeta_color": "black",
+        "result": "win",
+        "stone_diff": 44,
+        "official_black": 54,
+        "official_white": 10,
+        "stones_black": 54,
+        "stones_white": 10,
+        "ab_moves": 27,
+        "mean_nodes": 14324.481481481482,
+        "mean_think_seconds": 16.800268966518516,
+        "max_think_seconds": 54.67863372800002,
+        "total_nodes": 386761,
+        "total_think_seconds": 453.6072620959999
+      },
+      "white": {
+        "start_index": 5,
+        "alphabeta_color": "white",
+        "result": "win",
+        "stone_diff": 40,
+        "official_black": 12,
+        "official_white": 52,
+        "stones_black": 12,
+        "stones_white": 52,
+        "ab_moves": 28,
+        "mean_nodes": 12707.92857142857,
+        "mean_think_seconds": 13.61555612121424,
+        "max_think_seconds": 43.854787423999824,
+        "total_nodes": 355822,
+        "total_think_seconds": 381.2355713939987
+      },
+      "pair_stone_diff": 42.0
+    },
+    {
+      "start_index": 6,
+      "black": {
+        "start_index": 6,
+        "alphabeta_color": "black",
+        "result": "win",
+        "stone_diff": 54,
+        "official_black": 59,
+        "official_white": 5,
+        "stones_black": 59,
+        "stones_white": 5,
+        "ab_moves": 31,
+        "mean_nodes": 9150.290322580646,
+        "mean_think_seconds": 10.326610844741921,
+        "max_think_seconds": 50.73533685700022,
+        "total_nodes": 283659,
+        "total_think_seconds": 320.12493618699955
+      },
+      "white": {
+        "start_index": 6,
+        "alphabeta_color": "white",
+        "result": "win",
+        "stone_diff": 41,
+        "official_black": 11,
+        "official_white": 53,
+        "stones_black": 11,
+        "stones_white": 52,
+        "ab_moves": 28,
+        "mean_nodes": 18084.428571428572,
+        "mean_think_seconds": 21.475599273321432,
+        "max_think_seconds": 74.29143329399994,
+        "total_nodes": 506364,
+        "total_think_seconds": 601.3167796530001
+      },
+      "pair_stone_diff": 47.5
+    },
+    {
+      "start_index": 7,
+      "black": {
+        "start_index": 7,
+        "alphabeta_color": "black",
+        "result": "win",
+        "stone_diff": 58,
+        "official_black": 61,
+        "official_white": 3,
+        "stones_black": 61,
+        "stones_white": 3,
+        "ab_moves": 30,
+        "mean_nodes": 11604.3,
+        "mean_think_seconds": 12.601299406033316,
+        "max_think_seconds": 48.78507551499979,
+        "total_nodes": 348129,
+        "total_think_seconds": 378.0389821809995
+      },
+      "white": {
+        "start_index": 7,
+        "alphabeta_color": "white",
+        "result": "win",
+        "stone_diff": 26,
+        "official_black": 19,
+        "official_white": 45,
+        "stones_black": 19,
+        "stones_white": 45,
+        "ab_moves": 28,
+        "mean_nodes": 8299.892857142857,
+        "mean_think_seconds": 8.378283280607125,
+        "max_think_seconds": 23.168365657000322,
+        "total_nodes": 232397,
+        "total_think_seconds": 234.5919318569995
+      },
+      "pair_stone_diff": 42.0
+    },
+    {
+      "start_index": 8,
+      "black": {
+        "start_index": 8,
+        "alphabeta_color": "black",
+        "result": "win",
+        "stone_diff": 44,
+        "official_black": 54,
+        "official_white": 10,
+        "stones_black": 54,
+        "stones_white": 10,
+        "ab_moves": 29,
+        "mean_nodes": 14858.034482758621,
+        "mean_think_seconds": 14.683146774793071,
+        "max_think_seconds": 56.6622380849999,
+        "total_nodes": 430883,
+        "total_think_seconds": 425.8112564689991
+      },
+      "white": {
+        "start_index": 8,
+        "alphabeta_color": "white",
+        "result": "win",
+        "stone_diff": 44,
+        "official_black": 10,
+        "official_white": 54,
+        "stones_black": 10,
+        "stones_white": 54,
+        "ab_moves": 28,
+        "mean_nodes": 10672.035714285714,
+        "mean_think_seconds": 12.16400931432148,
+        "max_think_seconds": 47.82465799700003,
+        "total_nodes": 298817,
+        "total_think_seconds": 340.59226080100143
+      },
+      "pair_stone_diff": 44.0
+    },
+    {
+      "start_index": 9,
+      "black": {
+        "start_index": 9,
+        "alphabeta_color": "black",
+        "result": "win",
+        "stone_diff": 42,
+        "official_black": 53,
+        "official_white": 11,
+        "stones_black": 53,
+        "stones_white": 11,
+        "ab_moves": 30,
+        "mean_nodes": 11588.9,
+        "mean_think_seconds": 12.357484117699975,
+        "max_think_seconds": 43.94403804500007,
+        "total_nodes": 347667,
+        "total_think_seconds": 370.72452353099925
+      },
+      "white": {
+        "start_index": 9,
+        "alphabeta_color": "white",
+        "result": "win",
+        "stone_diff": 32,
+        "official_black": 16,
+        "official_white": 48,
+        "stones_black": 16,
+        "stones_white": 48,
+        "ab_moves": 28,
+        "mean_nodes": 11451.142857142857,
+        "mean_think_seconds": 13.092748924642901,
+        "max_think_seconds": 48.66303273499989,
+        "total_nodes": 320632,
+        "total_think_seconds": 366.5969698900012
+      },
+      "pair_stone_diff": 37.0
+    },
+    {
+      "start_index": 10,
+      "black": {
+        "start_index": 10,
+        "alphabeta_color": "black",
+        "result": "win",
+        "stone_diff": 52,
+        "official_black": 58,
+        "official_white": 6,
+        "stones_black": 58,
+        "stones_white": 6,
+        "ab_moves": 30,
+        "mean_nodes": 9209.1,
+        "mean_think_seconds": 10.569944941533262,
+        "max_think_seconds": 45.36806228899968,
+        "total_nodes": 276273,
+        "total_think_seconds": 317.09834824599784
+      },
+      "white": {
+        "start_index": 10,
+        "alphabeta_color": "white",
+        "result": "win",
+        "stone_diff": 28,
+        "official_black": 18,
+        "official_white": 46,
+        "stones_black": 18,
+        "stones_white": 46,
+        "ab_moves": 27,
+        "mean_nodes": 11519.777777777777,
+        "mean_think_seconds": 12.738849105814838,
+        "max_think_seconds": 38.524078848000045,
+        "total_nodes": 311034,
+        "total_think_seconds": 343.94892585700063
+      },
+      "pair_stone_diff": 40.0
+    },
+    {
+      "start_index": 11,
+      "black": {
+        "start_index": 11,
+        "alphabeta_color": "black",
+        "result": "draw",
+        "stone_diff": 0,
+        "official_black": 32,
+        "official_white": 32,
+        "stones_black": 32,
+        "stones_white": 32,
+        "ab_moves": 26,
+        "mean_nodes": 15773.5,
+        "mean_think_seconds": 15.89478178803849,
+        "max_think_seconds": 45.31505878600001,
+        "total_nodes": 410111,
+        "total_think_seconds": 413.2643264890007
+      },
+      "white": {
+        "start_index": 11,
+        "alphabeta_color": "white",
+        "result": "win",
+        "stone_diff": 32,
+        "official_black": 16,
+        "official_white": 48,
+        "stones_black": 16,
+        "stones_white": 48,
+        "ab_moves": 26,
+        "mean_nodes": 13230.461538461539,
+        "mean_think_seconds": 13.649836347000036,
+        "max_think_seconds": 40.39343705300007,
+        "total_nodes": 343992,
+        "total_think_seconds": 354.89574502200094
+      },
+      "pair_stone_diff": 16.0
+    },
+    {
+      "start_index": 12,
+      "black": {
+        "start_index": 12,
+        "alphabeta_color": "black",
+        "result": "win",
+        "stone_diff": 60,
+        "official_black": 62,
+        "official_white": 2,
+        "stones_black": 62,
+        "stones_white": 2,
+        "ab_moves": 31,
+        "mean_nodes": 9103.645161290322,
+        "mean_think_seconds": 10.192729443290274,
+        "max_think_seconds": 31.746457282999927,
+        "total_nodes": 282213,
+        "total_think_seconds": 315.9746127419985
+      },
+      "white": {
+        "start_index": 12,
+        "alphabeta_color": "white",
+        "result": "win",
+        "stone_diff": 18,
+        "official_black": 23,
+        "official_white": 41,
+        "stones_black": 23,
+        "stones_white": 41,
+        "ab_moves": 29,
+        "mean_nodes": 11764.827586206897,
+        "mean_think_seconds": 12.965807275827547,
+        "max_think_seconds": 42.38055123799995,
+        "total_nodes": 341180,
+        "total_think_seconds": 376.0084109989989
+      },
+      "pair_stone_diff": 39.0
+    },
+    {
+      "start_index": 13,
+      "black": {
+        "start_index": 13,
+        "alphabeta_color": "black",
+        "result": "win",
+        "stone_diff": 14,
+        "official_black": 39,
+        "official_white": 25,
+        "stones_black": 39,
+        "stones_white": 25,
+        "ab_moves": 27,
+        "mean_nodes": 12851.814814814816,
+        "mean_think_seconds": 12.95107732959266,
+        "max_think_seconds": 33.866746666999916,
+        "total_nodes": 346999,
+        "total_think_seconds": 349.67908789900184
+      },
+      "white": {
+        "start_index": 13,
+        "alphabeta_color": "white",
+        "result": "win",
+        "stone_diff": 61,
+        "official_black": 1,
+        "official_white": 63,
+        "stones_black": 1,
+        "stones_white": 62,
+        "ab_moves": 29,
+        "mean_nodes": 10921.724137931034,
+        "mean_think_seconds": 11.579948727206885,
+        "max_think_seconds": 42.688944486999844,
+        "total_nodes": 316730,
+        "total_think_seconds": 335.8185130889997
+      },
+      "pair_stone_diff": 37.5
+    }
+  ],
+  "starts": [
+    {
+      "index": 0,
+      "opening_plies": 4,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "........",
+        "........",
+        "...BW...",
+        "..BBW...",
+        "..WWW...",
+        "........",
+        "........"
+      ]
+    },
+    {
+      "index": 1,
+      "opening_plies": 6,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "........",
+        "..B.....",
+        ".BBBW...",
+        "...WW...",
+        "...WW...",
+        "...W....",
+        "........"
+      ]
+    },
+    {
+      "index": 2,
+      "opening_plies": 8,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "........",
+        "..BW.W..",
+        "..BBWW..",
+        "...WBW..",
+        "..BW....",
+        "........",
+        "........"
+      ]
+    },
+    {
+      "index": 3,
+      "opening_plies": 4,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "........",
+        "........",
+        "..WWW...",
+        "..WBB...",
+        "..WB....",
+        "........",
+        "........"
+      ]
+    },
+    {
+      "index": 4,
+      "opening_plies": 6,
+      "side_to_move": "black",
+      "board": [
+        "...W....",
+        "..BWB...",
+        "...W....",
+        "...WBB..",
+        "...WB...",
+        "........",
+        "........",
+        "........"
+      ]
+    },
+    {
+      "index": 5,
+      "opening_plies": 8,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "........",
+        "...WB...",
+        "...WB...",
+        ".WWWB...",
+        "..WWB...",
+        ".....B..",
+        "........"
+      ]
+    },
+    {
+      "index": 6,
+      "opening_plies": 4,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "....W...",
+        "....W...",
+        "...BW...",
+        "...BWW..",
+        "...B....",
+        "........",
+        "........"
+      ]
+    },
+    {
+      "index": 7,
+      "opening_plies": 6,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "........",
+        "BB......",
+        ".BWWW...",
+        "..BBW...",
+        ".....W..",
+        "........",
+        "........"
+      ]
+    },
+    {
+      "index": 8,
+      "opening_plies": 8,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "...B....",
+        "..BB....",
+        "...BWB..",
+        "...WBW..",
+        ".....WW.",
+        ".....W..",
+        "........"
+      ]
+    },
+    {
+      "index": 9,
+      "opening_plies": 4,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "........",
+        "...WWW..",
+        "...BW...",
+        "...BB...",
+        "...B....",
+        "........",
+        "........"
+      ]
+    },
+    {
+      "index": 10,
+      "opening_plies": 6,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "........",
+        ".B..B...",
+        "..BWB...",
+        "...WW...",
+        "...W.W..",
+        "...W....",
+        "........"
+      ]
+    },
+    {
+      "index": 11,
+      "opening_plies": 8,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "........",
+        "..WWB...",
+        "...BB...",
+        "..BBBW..",
+        "..B.W...",
+        "...W....",
+        "........"
+      ]
+    },
+    {
+      "index": 12,
+      "opening_plies": 4,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "........",
+        ".....B..",
+        "..WBB...",
+        "..BWW...",
+        "....W...",
+        "........",
+        "........"
+      ]
+    },
+    {
+      "index": 13,
+      "opening_plies": 6,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "........",
+        "........",
+        "...BW...",
+        ".WWWB...",
+        "..B.WB..",
+        "..B.....",
+        "........"
+      ]
+    },
+    {
+      "index": 14,
+      "opening_plies": 8,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "........",
+        "B.B.B...",
+        ".BWWWW..",
+        "..BWW...",
+        "...W....",
+        "........",
+        "........"
+      ]
+    },
+    {
+      "index": 15,
+      "opening_plies": 4,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "........",
+        "..W.....",
+        "...WW...",
+        "..BBW...",
+        "....B...",
+        ".....B..",
+        "........"
+      ]
+    },
+    {
+      "index": 16,
+      "opening_plies": 6,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "..BW....",
+        ".WWW....",
+        "...WBB..",
+        "...WB...",
+        "........",
+        "........",
+        "........"
+      ]
+    },
+    {
+      "index": 17,
+      "opening_plies": 8,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "......B.",
+        "..W..B..",
+        "...WWWW.",
+        "...BW...",
+        "...BB...",
+        ".....B..",
+        "........"
+      ]
+    },
+    {
+      "index": 18,
+      "opening_plies": 4,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "........",
+        "...WWW..",
+        "...BB...",
+        "..BBB...",
+        "........",
+        "........",
+        "........"
+      ]
+    },
+    {
+      "index": 19,
+      "opening_plies": 6,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "........",
+        "..W.BW..",
+        "...WBW..",
+        "...BWW..",
+        "...B....",
+        "........",
+        "........"
+      ]
+    },
+    {
+      "index": 20,
+      "opening_plies": 8,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "..WWW...",
+        "...W....",
+        "..WBW...",
+        "...BB...",
+        "...BBB..",
+        "........",
+        "........"
+      ]
+    },
+    {
+      "index": 21,
+      "opening_plies": 4,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "........",
+        "........",
+        "...BBB..",
+        "...WWWW.",
+        "......B.",
+        "........",
+        "........"
+      ]
+    },
+    {
+      "index": 22,
+      "opening_plies": 6,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "..W.....",
+        ".B.W....",
+        "..BBW...",
+        "...BB...",
+        "..WB....",
+        "........",
+        "........"
+      ]
+    },
+    {
+      "index": 23,
+      "opening_plies": 8,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "..B.....",
+        "..WB....",
+        "..WBBB..",
+        "..WWB...",
+        ".WW.....",
+        "........",
+        "........"
+      ]
+    },
+    {
+      "index": 24,
+      "opening_plies": 4,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        ".....B..",
+        ".....B..",
+        "...BWB..",
+        "...WWW..",
+        "........",
+        "........",
+        "........"
+      ]
+    },
+    {
+      "index": 25,
+      "opening_plies": 6,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "........",
+        "..B.....",
+        "..WBBB..",
+        "...WB...",
+        "..WW....",
+        "...W....",
+        "........"
+      ]
+    },
+    {
+      "index": 26,
+      "opening_plies": 8,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "........",
+        "...BBB..",
+        "..WWBW..",
+        "...BW...",
+        "...BWW..",
+        "........",
+        "........"
+      ]
+    },
+    {
+      "index": 27,
+      "opening_plies": 4,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "........",
+        "....BBB.",
+        "..WWW...",
+        "...WB...",
+        "........",
+        "........",
+        "........"
+      ]
+    },
+    {
+      "index": 28,
+      "opening_plies": 6,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "..B..W..",
+        "...BBB..",
+        "...WB...",
+        "...WW...",
+        ".....W..",
+        "........",
+        "........"
+      ]
+    },
+    {
+      "index": 29,
+      "opening_plies": 8,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "........",
+        ".....BW.",
+        "..WWBW..",
+        "..WBB...",
+        "..W.B...",
+        "....B...",
+        "........"
+      ]
+    },
+    {
+      "index": 30,
+      "opening_plies": 4,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "........",
+        ".....B..",
+        "..WBB...",
+        "...WW...",
+        "...BW...",
+        "........",
+        "........"
+      ]
+    },
+    {
+      "index": 31,
+      "opening_plies": 6,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        ".....B..",
+        "..W..B..",
+        "...WWB..",
+        "..BBW...",
+        "....W...",
+        "........",
+        "........"
+      ]
+    },
+    {
+      "index": 32,
+      "opening_plies": 8,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "....W...",
+        "....WW..",
+        "...BWB..",
+        "...WB...",
+        ".BBW....",
+        "...W....",
+        "........"
+      ]
+    },
+    {
+      "index": 33,
+      "opening_plies": 4,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "........",
+        "........",
+        "..WWW...",
+        "...BB...",
+        "...BBB..",
+        "........",
+        "........"
+      ]
+    },
+    {
+      "index": 34,
+      "opening_plies": 6,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "...B....",
+        "...BWW..",
+        "...BW...",
+        "..BBW...",
+        "....W...",
+        "........",
+        "........"
+      ]
+    },
+    {
+      "index": 35,
+      "opening_plies": 8,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "..W.....",
+        "...W....",
+        "..WBWWW.",
+        "..WBB...",
+        "..WB....",
+        "........",
+        "........"
+      ]
+    },
+    {
+      "index": 36,
+      "opening_plies": 4,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "........",
+        "..BW.W..",
+        "...BWB..",
+        "...WB...",
+        "........",
+        "........",
+        "........"
+      ]
+    },
+    {
+      "index": 37,
+      "opening_plies": 6,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "..BW....",
+        "..BBBW..",
+        "...BW...",
+        "...WB...",
+        "........",
+        "........",
+        "........"
+      ]
+    },
+    {
+      "index": 38,
+      "opening_plies": 8,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        ".W......",
+        ".W.BBW..",
+        ".WWBW...",
+        "...BB...",
+        "...B....",
+        "........",
+        "........"
+      ]
+    },
+    {
+      "index": 39,
+      "opening_plies": 4,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "........",
+        "........",
+        "...BW...",
+        "...BW...",
+        "...BW...",
+        "....WB..",
+        "........"
+      ]
+    },
+    {
+      "index": 40,
+      "opening_plies": 6,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "........",
+        "..B.....",
+        "..WBW...",
+        "..WBB...",
+        "..WW....",
+        "....W...",
+        "........"
+      ]
+    },
+    {
+      "index": 41,
+      "opening_plies": 8,
+      "side_to_move": "black",
+      "board": [
+        ".....W..",
+        "....WW..",
+        "....BW..",
+        "...BW...",
+        "...BBB..",
+        "...BW...",
+        "........",
+        "........"
+      ]
+    },
+    {
+      "index": 42,
+      "opening_plies": 4,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "........",
+        "....BW..",
+        "...BW...",
+        "...BW...",
+        "...BW...",
+        "........",
+        "........"
+      ]
+    },
+    {
+      "index": 43,
+      "opening_plies": 6,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "........",
+        "....B...",
+        "...BB...",
+        "...WWWWW",
+        "....W...",
+        ".....W..",
+        "........"
+      ]
+    },
+    {
+      "index": 44,
+      "opening_plies": 8,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "........",
+        "........",
+        "...BW...",
+        "..BWW...",
+        ".WWWW...",
+        ".WB.....",
+        "W......."
+      ]
+    },
+    {
+      "index": 45,
+      "opening_plies": 4,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "........",
+        "....BW..",
+        "..WWW...",
+        "...BB...",
+        "...B....",
+        "........",
+        "........"
+      ]
+    },
+    {
+      "index": 46,
+      "opening_plies": 6,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        ".....B..",
+        "....B.W.",
+        "...BWW..",
+        "...WWB..",
+        "......B.",
+        "........",
+        "........"
+      ]
+    },
+    {
+      "index": 47,
+      "opening_plies": 8,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "........",
+        "...WB...",
+        "...WBB..",
+        "...WBBB.",
+        "...W.B..",
+        "..W.....",
+        "........"
+      ]
+    },
+    {
+      "index": 48,
+      "opening_plies": 4,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "........",
+        "....B...",
+        "..WWB...",
+        "...BW...",
+        "...B.W..",
+        "........",
+        "........"
+      ]
+    },
+    {
+      "index": 49,
+      "opening_plies": 6,
+      "side_to_move": "black",
+      "board": [
+        "........",
+        "........",
+        "...W....",
+        "...WBB..",
+        "...WBBB.",
+        "....W...",
+        "...W....",
+        "........"
+      ]
+    }
+  ],
+  "game_records": [
+    {
+      "start_index": 1,
+      "alphabeta_color": "black",
+      "result": "win",
+      "stone_diff": 60,
+      "official_black": 62,
+      "official_white": 2,
+      "stones_black": 62,
+      "stones_white": 2,
+      "ab_moves": 31,
+      "mean_nodes": 7484.193548387097,
+      "mean_think_seconds": 6.962653487419373,
+      "max_think_seconds": 26.779893163999986,
+      "total_nodes": 232010,
+      "total_think_seconds": 215.84225811000056
+    },
+    {
+      "start_index": 0,
+      "alphabeta_color": "white",
+      "result": "win",
+      "stone_diff": 10,
+      "official_black": 27,
+      "official_white": 37,
+      "stones_black": 27,
+      "stones_white": 37,
+      "ab_moves": 28,
+      "mean_nodes": 11370.535714285714,
+      "mean_think_seconds": 11.785413644357154,
+      "max_think_seconds": 31.587010587999885,
+      "total_nodes": 318375,
+      "total_think_seconds": 329.99158204200035
+    },
+    {
+      "start_index": 0,
+      "alphabeta_color": "black",
+      "result": "win",
+      "stone_diff": 38,
+      "official_black": 52,
+      "official_white": 12,
+      "stones_black": 50,
+      "stones_white": 12,
+      "ab_moves": 30,
+      "mean_nodes": 10420.566666666668,
+      "mean_think_seconds": 11.9088494657667,
+      "max_think_seconds": 35.79470609600003,
+      "total_nodes": 312617,
+      "total_think_seconds": 357.265483973001
+    },
+    {
+      "start_index": 1,
+      "alphabeta_color": "white",
+      "result": "win",
+      "stone_diff": 28,
+      "official_black": 18,
+      "official_white": 46,
+      "stones_black": 18,
+      "stones_white": 46,
+      "ab_moves": 27,
+      "mean_nodes": 13592.37037037037,
+      "mean_think_seconds": 15.313897361037057,
+      "max_think_seconds": 40.00411276600016,
+      "total_nodes": 366994,
+      "total_think_seconds": 413.4752287480005
+    },
+    {
+      "start_index": 2,
+      "alphabeta_color": "black",
+      "result": "win",
+      "stone_diff": 30,
+      "official_black": 47,
+      "official_white": 17,
+      "stones_black": 47,
+      "stones_white": 17,
+      "ab_moves": 28,
+      "mean_nodes": 11969.464285714286,
+      "mean_think_seconds": 14.715004632964353,
+      "max_think_seconds": 48.856455306999806,
+      "total_nodes": 335145,
+      "total_think_seconds": 412.0201297230019
+    },
+    {
+      "start_index": 3,
+      "alphabeta_color": "black",
+      "result": "win",
+      "stone_diff": 44,
+      "official_black": 54,
+      "official_white": 10,
+      "stones_black": 54,
+      "stones_white": 10,
+      "ab_moves": 29,
+      "mean_nodes": 8499.034482758621,
+      "mean_think_seconds": 9.438248382586185,
+      "max_think_seconds": 37.358519733000094,
+      "total_nodes": 246472,
+      "total_think_seconds": 273.70920309499934
+    },
+    {
+      "start_index": 3,
+      "alphabeta_color": "white",
+      "result": "win",
+      "stone_diff": 26,
+      "official_black": 19,
+      "official_white": 45,
+      "stones_black": 19,
+      "stones_white": 45,
+      "ab_moves": 29,
+      "mean_nodes": 7913.0344827586205,
+      "mean_think_seconds": 9.078453116379306,
+      "max_think_seconds": 32.479214773999956,
+      "total_nodes": 229478,
+      "total_think_seconds": 263.27514037499986
+    },
+    {
+      "start_index": 4,
+      "alphabeta_color": "black",
+      "result": "win",
+      "stone_diff": 22,
+      "official_black": 43,
+      "official_white": 21,
+      "stones_black": 43,
+      "stones_white": 21,
+      "ab_moves": 29,
+      "mean_nodes": 6490.310344827586,
+      "mean_think_seconds": 6.460088397241321,
+      "max_think_seconds": 30.535113052999804,
+      "total_nodes": 188219,
+      "total_think_seconds": 187.3425635199983
+    },
+    {
+      "start_index": 2,
+      "alphabeta_color": "white",
+      "result": "win",
+      "stone_diff": 48,
+      "official_black": 8,
+      "official_white": 56,
+      "stones_black": 8,
+      "stones_white": 56,
+      "ab_moves": 27,
+      "mean_nodes": 17852.48148148148,
+      "mean_think_seconds": 20.016220557703658,
+      "max_think_seconds": 82.54282194300004,
+      "total_nodes": 482017,
+      "total_think_seconds": 540.4379550579988
+    },
+    {
+      "start_index": 4,
+      "alphabeta_color": "white",
+      "result": "win",
+      "stone_diff": 50,
+      "official_black": 7,
+      "official_white": 57,
+      "stones_black": 7,
+      "stones_white": 57,
+      "ab_moves": 28,
+      "mean_nodes": 8925.714285714286,
+      "mean_think_seconds": 9.109157488214269,
+      "max_think_seconds": 30.134892643000057,
+      "total_nodes": 249920,
+      "total_think_seconds": 255.05640966999954
+    },
+    {
+      "start_index": 5,
+      "alphabeta_color": "black",
+      "result": "win",
+      "stone_diff": 44,
+      "official_black": 54,
+      "official_white": 10,
+      "stones_black": 54,
+      "stones_white": 10,
+      "ab_moves": 27,
+      "mean_nodes": 14324.481481481482,
+      "mean_think_seconds": 16.800268966518516,
+      "max_think_seconds": 54.67863372800002,
+      "total_nodes": 386761,
+      "total_think_seconds": 453.6072620959999
+    },
+    {
+      "start_index": 6,
+      "alphabeta_color": "black",
+      "result": "win",
+      "stone_diff": 54,
+      "official_black": 59,
+      "official_white": 5,
+      "stones_black": 59,
+      "stones_white": 5,
+      "ab_moves": 31,
+      "mean_nodes": 9150.290322580646,
+      "mean_think_seconds": 10.326610844741921,
+      "max_think_seconds": 50.73533685700022,
+      "total_nodes": 283659,
+      "total_think_seconds": 320.12493618699955
+    },
+    {
+      "start_index": 5,
+      "alphabeta_color": "white",
+      "result": "win",
+      "stone_diff": 40,
+      "official_black": 12,
+      "official_white": 52,
+      "stones_black": 12,
+      "stones_white": 52,
+      "ab_moves": 28,
+      "mean_nodes": 12707.92857142857,
+      "mean_think_seconds": 13.61555612121424,
+      "max_think_seconds": 43.854787423999824,
+      "total_nodes": 355822,
+      "total_think_seconds": 381.2355713939987
+    },
+    {
+      "start_index": 7,
+      "alphabeta_color": "white",
+      "result": "win",
+      "stone_diff": 26,
+      "official_black": 19,
+      "official_white": 45,
+      "stones_black": 19,
+      "stones_white": 45,
+      "ab_moves": 28,
+      "mean_nodes": 8299.892857142857,
+      "mean_think_seconds": 8.378283280607125,
+      "max_think_seconds": 23.168365657000322,
+      "total_nodes": 232397,
+      "total_think_seconds": 234.5919318569995
+    },
+    {
+      "start_index": 6,
+      "alphabeta_color": "white",
+      "result": "win",
+      "stone_diff": 41,
+      "official_black": 11,
+      "official_white": 53,
+      "stones_black": 11,
+      "stones_white": 52,
+      "ab_moves": 28,
+      "mean_nodes": 18084.428571428572,
+      "mean_think_seconds": 21.475599273321432,
+      "max_think_seconds": 74.29143329399994,
+      "total_nodes": 506364,
+      "total_think_seconds": 601.3167796530001
+    },
+    {
+      "start_index": 7,
+      "alphabeta_color": "black",
+      "result": "win",
+      "stone_diff": 58,
+      "official_black": 61,
+      "official_white": 3,
+      "stones_black": 61,
+      "stones_white": 3,
+      "ab_moves": 30,
+      "mean_nodes": 11604.3,
+      "mean_think_seconds": 12.601299406033316,
+      "max_think_seconds": 48.78507551499979,
+      "total_nodes": 348129,
+      "total_think_seconds": 378.0389821809995
+    },
+    {
+      "start_index": 8,
+      "alphabeta_color": "black",
+      "result": "win",
+      "stone_diff": 44,
+      "official_black": 54,
+      "official_white": 10,
+      "stones_black": 54,
+      "stones_white": 10,
+      "ab_moves": 29,
+      "mean_nodes": 14858.034482758621,
+      "mean_think_seconds": 14.683146774793071,
+      "max_think_seconds": 56.6622380849999,
+      "total_nodes": 430883,
+      "total_think_seconds": 425.8112564689991
+    },
+    {
+      "start_index": 8,
+      "alphabeta_color": "white",
+      "result": "win",
+      "stone_diff": 44,
+      "official_black": 10,
+      "official_white": 54,
+      "stones_black": 10,
+      "stones_white": 54,
+      "ab_moves": 28,
+      "mean_nodes": 10672.035714285714,
+      "mean_think_seconds": 12.16400931432148,
+      "max_think_seconds": 47.82465799700003,
+      "total_nodes": 298817,
+      "total_think_seconds": 340.59226080100143
+    },
+    {
+      "start_index": 9,
+      "alphabeta_color": "black",
+      "result": "win",
+      "stone_diff": 42,
+      "official_black": 53,
+      "official_white": 11,
+      "stones_black": 53,
+      "stones_white": 11,
+      "ab_moves": 30,
+      "mean_nodes": 11588.9,
+      "mean_think_seconds": 12.357484117699975,
+      "max_think_seconds": 43.94403804500007,
+      "total_nodes": 347667,
+      "total_think_seconds": 370.72452353099925
+    },
+    {
+      "start_index": 9,
+      "alphabeta_color": "white",
+      "result": "win",
+      "stone_diff": 32,
+      "official_black": 16,
+      "official_white": 48,
+      "stones_black": 16,
+      "stones_white": 48,
+      "ab_moves": 28,
+      "mean_nodes": 11451.142857142857,
+      "mean_think_seconds": 13.092748924642901,
+      "max_think_seconds": 48.66303273499989,
+      "total_nodes": 320632,
+      "total_think_seconds": 366.5969698900012
+    },
+    {
+      "start_index": 10,
+      "alphabeta_color": "black",
+      "result": "win",
+      "stone_diff": 52,
+      "official_black": 58,
+      "official_white": 6,
+      "stones_black": 58,
+      "stones_white": 6,
+      "ab_moves": 30,
+      "mean_nodes": 9209.1,
+      "mean_think_seconds": 10.569944941533262,
+      "max_think_seconds": 45.36806228899968,
+      "total_nodes": 276273,
+      "total_think_seconds": 317.09834824599784
+    },
+    {
+      "start_index": 10,
+      "alphabeta_color": "white",
+      "result": "win",
+      "stone_diff": 28,
+      "official_black": 18,
+      "official_white": 46,
+      "stones_black": 18,
+      "stones_white": 46,
+      "ab_moves": 27,
+      "mean_nodes": 11519.777777777777,
+      "mean_think_seconds": 12.738849105814838,
+      "max_think_seconds": 38.524078848000045,
+      "total_nodes": 311034,
+      "total_think_seconds": 343.94892585700063
+    },
+    {
+      "start_index": 11,
+      "alphabeta_color": "white",
+      "result": "win",
+      "stone_diff": 32,
+      "official_black": 16,
+      "official_white": 48,
+      "stones_black": 16,
+      "stones_white": 48,
+      "ab_moves": 26,
+      "mean_nodes": 13230.461538461539,
+      "mean_think_seconds": 13.649836347000036,
+      "max_think_seconds": 40.39343705300007,
+      "total_nodes": 343992,
+      "total_think_seconds": 354.89574502200094
+    },
+    {
+      "start_index": 12,
+      "alphabeta_color": "black",
+      "result": "win",
+      "stone_diff": 60,
+      "official_black": 62,
+      "official_white": 2,
+      "stones_black": 62,
+      "stones_white": 2,
+      "ab_moves": 31,
+      "mean_nodes": 9103.645161290322,
+      "mean_think_seconds": 10.192729443290274,
+      "max_think_seconds": 31.746457282999927,
+      "total_nodes": 282213,
+      "total_think_seconds": 315.9746127419985
+    },
+    {
+      "start_index": 11,
+      "alphabeta_color": "black",
+      "result": "draw",
+      "stone_diff": 0,
+      "official_black": 32,
+      "official_white": 32,
+      "stones_black": 32,
+      "stones_white": 32,
+      "ab_moves": 26,
+      "mean_nodes": 15773.5,
+      "mean_think_seconds": 15.89478178803849,
+      "max_think_seconds": 45.31505878600001,
+      "total_nodes": 410111,
+      "total_think_seconds": 413.2643264890007
+    },
+    {
+      "start_index": 12,
+      "alphabeta_color": "white",
+      "result": "win",
+      "stone_diff": 18,
+      "official_black": 23,
+      "official_white": 41,
+      "stones_black": 23,
+      "stones_white": 41,
+      "ab_moves": 29,
+      "mean_nodes": 11764.827586206897,
+      "mean_think_seconds": 12.965807275827547,
+      "max_think_seconds": 42.38055123799995,
+      "total_nodes": 341180,
+      "total_think_seconds": 376.0084109989989
+    },
+    {
+      "start_index": 13,
+      "alphabeta_color": "black",
+      "result": "win",
+      "stone_diff": 14,
+      "official_black": 39,
+      "official_white": 25,
+      "stones_black": 39,
+      "stones_white": 25,
+      "ab_moves": 27,
+      "mean_nodes": 12851.814814814816,
+      "mean_think_seconds": 12.95107732959266,
+      "max_think_seconds": 33.866746666999916,
+      "total_nodes": 346999,
+      "total_think_seconds": 349.67908789900184
+    },
+    {
+      "start_index": 13,
+      "alphabeta_color": "white",
+      "result": "win",
+      "stone_diff": 61,
+      "official_black": 1,
+      "official_white": 63,
+      "stones_black": 1,
+      "stones_white": 62,
+      "ab_moves": 29,
+      "mean_nodes": 10921.724137931034,
+      "mean_think_seconds": 11.579948727206885,
+      "max_think_seconds": 42.688944486999844,
+      "total_nodes": 316730,
+      "total_think_seconds": 335.8185130889997
+    },
+    {
+      "start_index": 14,
+      "alphabeta_color": "black",
+      "result": "win",
+      "stone_diff": 48,
+      "official_black": 56,
+      "official_white": 8,
+      "stones_black": 56,
+      "stones_white": 8,
+      "ab_moves": 28,
+      "mean_nodes": 14859.42857142857,
+      "mean_think_seconds": 15.883352812750038,
+      "max_think_seconds": 52.37622702999988,
+      "total_nodes": 416064,
+      "total_think_seconds": 444.7338787570011
+    }
+  ],
+  "stopped_early": true,
+  "stop_reason": "code_owner_instruction",
+  "looks_strong": true
+}

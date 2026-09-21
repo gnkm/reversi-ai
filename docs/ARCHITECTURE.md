@@ -1,7 +1,7 @@
 ---
 title: アーキテクチャ
 product: Reversi Agents
-version: 0.1.35
+version: 0.1.37
 status: working
 date: 2026-09-21
 source: docs/srs.md
@@ -16,7 +16,7 @@ tech_stack_version: 0.2.19
 | --- | --- |
 | 文書識別 | reversi-ai-architecture |
 | 対象ソフトウェア | Reversi Agents |
-| 版 | 0.1.35 |
+| 版 | 0.1.37 |
 | 状態 | 現行（設計。要求ではない） |
 | 日付 | 2026-09-21 |
 | 入力 | [`docs/srs.md`](srs.md) 0.1.24、[`docs/tech-stack.md`](tech-stack.md) 0.2.19 |
@@ -126,6 +126,9 @@ reversi-ai/
 │   │   ├── jev-stage5.json            # Jev 段階 5（対局による最終確認）の記録
 │   │   ├── jev_stage5.py              # 基準線と指名設定を対で対局する。CI では走らせない
 │   │   ├── jev-experiment.md          # 段階 1–5 の知見。人手。JSON から生成しない
+│   │   ├── alphabeta-eval.json        # αβ 対ミニマックス（深さ 4）の先後入れ替え評価
+│   │   ├── alphabeta_eval.py          # 同じ開始局面の組で対局し JSON を書く。CI では走らせない
+│   │   ├── alphabeta-eval.md          # 途中打ち切りの知見。人手。JSON から生成しない
 │   │   └── archive/                   # 過去の総当たり正本（現行と同じ形）
 │   └── source-of-truth/
 │       ├── 01-seed.md                 # シード。AI は編集禁止
@@ -427,6 +430,8 @@ web コンテナが Pod 内で `0.0.0.0:3000` を聞くのはよい。戦略コ�
 
 | 版 | 日付 | 内容 |
 | --- | --- | --- |
+| 0.1.37 | 2026-09-21 | αβ 対ミニマックス評価を途中打ち切りとし、知見を `alphabeta-eval.md` に残す |
+| 0.1.36 | 2026-09-21 | ルールベース (αβ) と深さ 4 ミニマックスの先後入れ替え評価を `docs/benchmarks/` に置く |
 | 0.1.35 | 2026-09-21 | ルールベース (αβ) が空きマス 10 以下で終盤を完全読みする |
 | 0.1.34 | 2026-09-21 | ルールベース (αβ) の探索に Transposition Table（Zobrist ハッシュ）を入れる |
 | 0.1.33 | 2026-09-20 | カタログの Jev 既定を優先合成（#71）に戻し、段階切替は検証用に残す |
