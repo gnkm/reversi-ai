@@ -275,9 +275,8 @@ def _evaluate_leaf(position: Position, endgame: bool) -> int:
 
 
 def _is_leaf(position: Position, ply: int, limit: int, endgame: bool) -> bool:
-    if is_over(position):
-        return True
-    return (not endgame) and ply >= limit
+    # 通常探索は深さ上限を先に見て、葉での is_over 走査を避ける。
+    return ((not endgame) and ply >= limit) or is_over(position)
 
 
 def _is_edge(square: Square) -> bool:
