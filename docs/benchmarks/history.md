@@ -27,7 +27,7 @@ python3 docs/benchmarks/render.py
 
 | 記録 | 学習成果物 | 変更点 | 正本 |
 | --- | --- | --- | --- |
-| 2026-09-21 18:25 | `9c2c2f8f542cdafa8c4c21163dc0f6810dada094` | 更新 models/lgbm.txt | [JSON](round-robin.json) |
+| 2026-09-21 18:25 | `15099320b714163b9dec7709ae9f0d3d40189aa2` | 更新 models/lgbm.txt | [JSON](round-robin.json) |
 | 2026-09-21 15:55 | `802eb67155b776596275ae39b69a8b45f09d1051` | 追加個体 αβ。ルールベース (αβ) は深さ 4 の Negamax。終盤完全読みは使わない。生成 AI (Jev) は優先を答え、着手後の位置評価・モビリティ・石差・角差はコードが付ける | [JSON](archive/2026-09-21-1555.json) |
 | 2026-09-20 20:46 | `02dc6acb24632abf196098fc5a7c7c4cb8ee2f39` | 生成 AI (Jev) はコードが言葉にした合法手を Choice で選び、着手後評価と合成する | [JSON](archive/2026-09-20-2046.json) |
 | 2026-09-20 19:13 | `35de788630d438c03bee85f98641f5e0a720fe8c` | 生成 AI (Jev) は優先を答え、着手後の位置評価・モビリティ・石差・角差はコードが付ける | [JSON](archive/2026-09-20-1913.json) |
