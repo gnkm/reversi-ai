@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Phase 6 の αβ 個体を深さ 4 ミニマックスと先後入れ替え対局し、成績 JSON を書く。
+"""αβ 個体を深さ 4 ミニマックスと先後入れ替え対局し、成績 JSON を書く。
 
 対局の再実行は CI に載せない。ホストで明示的に走らせる。
 """
@@ -290,13 +290,13 @@ def _conclude(
         "paired": True,
         "accepted": accepted,
         "complete": complete,
-        "catalog_policy": "keep_phase6",
+        "catalog_policy": "keep_depth4_no_exact",
     }
     if complete and not accepted:
-        # 勝率不足は葉評価の寄与が足りない可能性が高い。TT（Phase 5）は速さ、
-        # 終盤完全読み（Phase 6）はすでに入っている。
+        # 勝率不足は葉評価の寄与が足りない可能性が高い。TT（Phase 5）は速さ。
+        # カタログは深さ 4・終盤完全読みなしのままにする。
         conclusion["next_phase"] = 4
-        conclusion["catalog_policy"] = "keep_phase6_until_retry"
+        conclusion["catalog_policy"] = "keep_depth4_no_exact_until_retry"
     return conclusion
 
 
@@ -314,7 +314,7 @@ def _payload(
             "specimen_id": alphabeta.SPECIMEN_ID,
             "display_name": alphabeta.DISPLAY_NAME,
             "search_depth": alphabeta.SEARCH_DEPTH,
-            "endgame_empty": alphabeta.ENDGAME_EMPTY,
+            "endgame_empty": 0,
         },
         "opponent": {
             "specimen_id": minimax.SPECIMEN_ID,
@@ -331,7 +331,7 @@ def _payload(
             "acceptance_win_rate": ACCEPT_WIN_RATE,
             "notes": [
                 "開始局面は初形から 4/6/8 手を一様乱択で進めた組。各局面で先後を入れ替える。",
-                "候補はカタログの「ルールベース (αβ)」（深さ 6、空きマス 10 以下は終盤完全読み）。",
+                "候補はカタログの「ルールベース (αβ)」（深さ 4、終盤完全読みなし）。",
                 "比較対象は既存の「ルールベース (ミニマックス)」（深さ 4、位置評価表）。AI-B / AI-C は置かない。",
                 "勝敗は公式スコア。石数差は盤上の石数（αβ − ミニマックス）。",
                 "探索局面数と思考時間は αβ の各着手（search_stats）の平均と最大。",
@@ -383,7 +383,7 @@ def _progress_matches(
         return (
             str(candidate["specimen_id"]) == alphabeta.SPECIMEN_ID
             and int(candidate["search_depth"]) == alphabeta.SEARCH_DEPTH
-            and int(candidate["endgame_empty"]) == alphabeta.ENDGAME_EMPTY
+            and int(candidate.get("endgame_empty") or 0) == 0
             and str(opponent["specimen_id"]) == minimax.SPECIMEN_ID
             and int(opponent["search_depth"]) == minimax.SEARCH_DEPTH
         )
@@ -411,8 +411,8 @@ def main() -> int:
     workers = args.workers if args.workers > 0 else min(4, cpu)
     output = args.output
     _ensure_output(output)
-    if alphabeta.SEARCH_DEPTH != 6:
-        raise SystemExit("αβ の深さは 6 のままであること")
+    if alphabeta.SEARCH_DEPTH != 4:
+        raise SystemExit("αβ の深さは 4 のままであること")
     if minimax.SEARCH_DEPTH != 4:
         raise SystemExit("ミニマックスの深さは 4 のままであること")
     progress = _load_progress(output)

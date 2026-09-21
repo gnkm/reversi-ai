@@ -2369,7 +2369,7 @@ def test_catalog_lists_alphabeta() -> None:
     assert item.description.strip()
     assert _JAPANESE.search(item.description)
     assert "Negamax" in item.description
-    assert "深さ 6" in item.description
+    assert "深さ 4" in item.description
     assert "Mobility" in item.description
     assert "Corner" in item.description
     assert "Move Ordering" in item.description
@@ -2377,13 +2377,12 @@ def test_catalog_lists_alphabeta() -> None:
     assert "Zobrist" in item.description
     assert "Frontier" in item.description
     assert "Game Phase" in item.description
-    assert "完全読み" in item.description
-    assert "空きマス" in item.description
+    assert "完全読み" not in item.description
     assert "点数表" not in item.description
     assert item.specimen_id != minimax_item.specimen_id
     assert item.display_name != minimax_item.display_name
-    assert alphabeta.SEARCH_DEPTH == 6
-    assert alphabeta.ENDGAME_EMPTY == 10
+    assert alphabeta.SEARCH_DEPTH == 4
+    assert not hasattr(alphabeta, "ENDGAME_EMPTY")
     assert minimax.SEARCH_DEPTH == 4
     assert get(alphabeta.SPECIMEN_ID) == item
     assert get(minimax.SPECIMEN_ID) == minimax_item
@@ -2486,12 +2485,11 @@ def test_alphabeta_leaf_does_not_use_position_table() -> None:
     assert "position_table" not in source
 
 
-def test_alphabeta_game_path_keeps_depth_six() -> None:
-    assert alphabeta.SEARCH_DEPTH == 6
-    assert alphabeta.ENDGAME_EMPTY == 10
+def test_alphabeta_game_path_keeps_depth_four() -> None:
+    assert alphabeta.SEARCH_DEPTH == 4
+    assert not hasattr(alphabeta, "ENDGAME_EMPTY")
     assert minimax.SEARCH_DEPTH == 4
     snapshot = alphabeta.SEARCH_DEPTH
-    endgame_snapshot = alphabeta.ENDGAME_EMPTY
     position = initial_position()
     first = alphabeta.choose_move(position)
     via_catalog = catalog_choose(alphabeta.SPECIMEN_ID, position)
@@ -2510,15 +2508,15 @@ def test_alphabeta_game_path_keeps_depth_six() -> None:
     assert corner.square in legal_places(
         _position_from_rank8_rows(_CORNER_VS_TWO_FLIPS, Color.BLACK)
     )
-    assert alphabeta.SEARCH_DEPTH == snapshot == 6
-    assert alphabeta.ENDGAME_EMPTY == endgame_snapshot == 10
+    assert alphabeta.SEARCH_DEPTH == snapshot == 4
+    assert not hasattr(alphabeta, "ENDGAME_EMPTY")
     assert alphabeta.choose_move is not minimax.choose_move
-    assert alphabeta.choose_move(position) == alphabeta.choose_at_depth(position, 6)
+    assert alphabeta.choose_move(position) == alphabeta.choose_at_depth(position, 4)
     after_d3 = play(position, Place(Square.parse("d3")))
-    depth_six = alphabeta.choose_move(after_d3)
-    assert depth_six is not None
-    assert depth_six.square in legal_places(after_d3)
-    assert depth_six == alphabeta.choose_at_depth(after_d3, 6)
+    depth_four = alphabeta.choose_move(after_d3)
+    assert depth_four is not None
+    assert depth_four.square in legal_places(after_d3)
+    assert depth_four == alphabeta.choose_at_depth(after_d3, 4)
 
 
 def test_alphabeta_does_not_move_when_no_legal_places() -> None:
@@ -2529,10 +2527,9 @@ def test_alphabeta_does_not_move_when_no_legal_places() -> None:
 
 def test_alphabeta_source_is_negamax_and_does_not_call_models() -> None:
     source = _module_source("alphabeta.py")
-    assert "SEARCH_DEPTH = 6" in source
-    assert "ENDGAME_EMPTY = 10" in source
-    assert "完全読み" in source
-    assert "endgame" in source.lower()
+    assert "SEARCH_DEPTH = 4" in source
+    assert "ENDGAME_EMPTY" not in source
+    assert "完全読み" not in source
     assert "def _negamax(" in source
     assert "-beta" in source and "-alpha" in source
     assert "score_at" not in source
@@ -2642,8 +2639,8 @@ def test_alphabeta_transposition_keeps_root_and_does_not_increase_nodes() -> Non
     assert with_nodes <= without_nodes
     assert with_nodes < without_nodes
     assert alphabeta.choose_move(position) == with_place
-    assert alphabeta.choose_at_depth(position, 6, table=True) == with_place
-    assert alphabeta.choose_at_depth(position, 6, table=False) == without_place
+    assert alphabeta.choose_at_depth(position, 4, table=True) == with_place
+    assert alphabeta.choose_at_depth(position, 4, table=False) == without_place
 
 
 def test_alphabeta_transposition_keeps_initial_root() -> None:
@@ -2658,7 +2655,7 @@ def test_alphabeta_transposition_keeps_initial_root() -> None:
     assert with_value == without_value
     assert with_nodes <= without_nodes
     assert alphabeta.choose_move(position) == with_place
-    assert alphabeta.SEARCH_DEPTH == 6
+    assert alphabeta.SEARCH_DEPTH == 4
 
 
 def test_alphabeta_engine_is_not_bitboard() -> None:
@@ -2705,7 +2702,7 @@ def _two_empty_white_plays_a1() -> Position:
     return Position(board, Color.WHITE)
 
 
-# 空きマス 8。完全読みなら a1 が石数差 +44 で勝ち切る。ヒューリスティックは e1 / b7 を誤る。
+# 空きマス 8。完全読みなら a1 が石数差 +44。深さ 4 の葉はヒューリスティック。
 _ENDGAME_WIN_ON_A1 = (
     "..WWWWWB",
     "..WWWWWB",
@@ -2717,7 +2714,7 @@ _ENDGAME_WIN_ON_A1 = (
     ".WW..BBB",
 )
 
-# 空きマス 11。深さ 6 の Phase 4 葉なら h7、終局石数差なら d7。
+# 空きマス 11。深さ 4 の Phase 4 葉なら h7、終局石数差なら d7。
 _MIDGAME_ELEVEN_EMPTY = (
     "....WBBW",
     "....BWB.",
@@ -2729,7 +2726,7 @@ _MIDGAME_ELEVEN_EMPTY = (
     "WWWWWWWW",
 )
 
-# 空きマスちょうど 10。完全読みなら a1 が石数差 +2。閾値を < 10 にすると深さ 6 の葉になる。
+# 空きマスちょうど 10。深さ 4 の葉はヒューリスティック。
 _ENDGAME_TEN_EMPTY = (
     "..BBBBBB",
     ".BBBBBBB",
@@ -2742,9 +2739,9 @@ _ENDGAME_TEN_EMPTY = (
 )
 
 
-def test_alphabeta_endgame_leaf_is_terminal_disc_diff() -> None:
+def test_alphabeta_short_endgame_uses_heuristic_leaf() -> None:
     position = _two_empty_white_plays_a1()
-    assert _empty_squares(position.board) <= alphabeta.ENDGAME_EMPTY
+    assert _empty_squares(position.board) == 2
     places = legal_places(position)
     assert places == (Square.parse("a1"),)
     move, value, nodes = alphabeta.search_stats(position, alphabeta.SEARCH_DEPTH)
@@ -2756,79 +2753,83 @@ def test_alphabeta_endgame_leaf_is_terminal_disc_diff() -> None:
     assert counts.empty == 1
     disc = _disc_diff(after.board, Color.WHITE)
     official = official_score(after.board)
-    heuristic = alphabeta.leaf_score(after.board, Color.WHITE)
+    child_heuristic = alphabeta.leaf_score(after.board, after.side_to_move)
     assert disc == 63
     assert official.white - official.black == 64
-    assert heuristic == _phase4_leaf_score(after.board, Color.WHITE)
-    assert value == disc
+    assert child_heuristic == _phase4_leaf_score(after.board, after.side_to_move)
+    assert value == -child_heuristic
+    assert value != disc
     assert value != official.white - official.black
-    assert value != heuristic
     assert alphabeta.choose_move(position) == move
+    assert alphabeta.choose_move(position) == alphabeta.choose_at_depth(position, 4)
 
 
-def test_alphabeta_endgame_does_not_miss_forced_win() -> None:
+def test_alphabeta_eight_empty_keeps_depth_four() -> None:
     position = _position_from_rank8_rows(_ENDGAME_WIN_ON_A1, Color.BLACK)
     assert _empty_squares(position.board) == 8
-    assert 8 <= alphabeta.ENDGAME_EMPTY
     places = {square.algebraic for square in legal_places(position)}
     assert "a1" in places
     assert "e1" in places
     assert "b7" in places
     move, value, _nodes = alphabeta.search_stats(position, alphabeta.SEARCH_DEPTH)
     assert move == Place(Square.parse("a1"))
-    assert value == 44
-    assert abs(value) <= BOARD_SIZE * BOARD_SIZE
+    assert value == 4140
+    assert abs(value) > BOARD_SIZE * BOARD_SIZE
     heuristic_now = alphabeta.leaf_score(position.board, Color.BLACK)
     assert heuristic_now == _phase4_leaf_score(position.board, Color.BLACK)
-    assert value != heuristic_now
     assert alphabeta.choose_move(position) == move
     assert catalog_choose(alphabeta.SPECIMEN_ID, position) == move
+    assert alphabeta.choose_move(position) == alphabeta.choose_at_depth(position, 4)
     assert minimax.choose_move(position) == Place(Square.parse("b8"))
     assert minimax.choose_move(position) != move
 
 
-def test_alphabeta_above_endgame_keeps_depth_six_leaf() -> None:
+def test_alphabeta_above_endgame_keeps_depth_four_leaf() -> None:
     position = _position_from_rank8_rows(_MIDGAME_ELEVEN_EMPTY, Color.WHITE)
     assert _empty_squares(position.board) == 11
-    assert 11 > alphabeta.ENDGAME_EMPTY
     places = {square.algebraic for square in legal_places(position)}
     assert "h7" in places
     assert "d7" in places
     move, value, _nodes = alphabeta.search_stats(position, alphabeta.SEARCH_DEPTH)
     assert move == Place(Square.parse("h7"))
-    assert value == 6020
+    assert value == 5410
     assert abs(value) > BOARD_SIZE * BOARD_SIZE
     assert alphabeta.choose_move(position) == move
-    assert alphabeta.choose_move(position) == alphabeta.choose_at_depth(position, 6)
-    assert alphabeta.SEARCH_DEPTH == 6
+    assert alphabeta.choose_move(position) == alphabeta.choose_at_depth(position, 4)
+    assert alphabeta.SEARCH_DEPTH == 4
 
 
-def test_alphabeta_endgame_includes_exactly_ten_empty() -> None:
+def test_alphabeta_ten_empty_keeps_depth_four() -> None:
     position = _position_from_rank8_rows(_ENDGAME_TEN_EMPTY, Color.BLACK)
-    assert _empty_squares(position.board) == alphabeta.ENDGAME_EMPTY == 10
+    assert _empty_squares(position.board) == 10
     places = {square.algebraic for square in legal_places(position)}
     assert places == {"a1", "h3"}
     move, value, _nodes = alphabeta.search_stats(position, alphabeta.SEARCH_DEPTH)
     assert move == Place(Square.parse("a1"))
-    assert value == 2
-    assert abs(value) <= BOARD_SIZE * BOARD_SIZE
+    assert value == 4660
+    assert abs(value) > BOARD_SIZE * BOARD_SIZE
     heuristic_now = alphabeta.leaf_score(position.board, Color.BLACK)
     assert heuristic_now == _phase4_leaf_score(position.board, Color.BLACK)
-    assert value != heuristic_now
     assert alphabeta.choose_move(position) == move
     assert alphabeta.choose_at_depth(position, 4) == move
 
 
-def test_alphabeta_endgame_threshold_stays_ten() -> None:
-    assert alphabeta.ENDGAME_EMPTY == 10
-    snapshot = alphabeta.ENDGAME_EMPTY
+def test_alphabeta_does_not_extend_search_in_endgame() -> None:
+    assert not hasattr(alphabeta, "ENDGAME_EMPTY")
+    snapshot = alphabeta.SEARCH_DEPTH
     alphabeta.choose_move(initial_position())
-    alphabeta.choose_move(_position_from_rank8_rows(_ENDGAME_WIN_ON_A1, Color.BLACK))
-    alphabeta.choose_move(_position_from_rank8_rows(_MIDGAME_ELEVEN_EMPTY, Color.WHITE))
-    alphabeta.choose_move(_two_empty_white_plays_a1())
-    assert alphabeta.ENDGAME_EMPTY == snapshot == 10
-    assert "ENDGAME_EMPTY = 10" in _module_source("alphabeta.py")
+    eight = _position_from_rank8_rows(_ENDGAME_WIN_ON_A1, Color.BLACK)
+    eleven = _position_from_rank8_rows(_MIDGAME_ELEVEN_EMPTY, Color.WHITE)
+    two = _two_empty_white_plays_a1()
+    assert alphabeta.choose_move(eight) == alphabeta.choose_at_depth(eight, 4)
+    assert alphabeta.choose_move(eleven) == alphabeta.choose_at_depth(eleven, 4)
+    assert alphabeta.choose_move(two) == alphabeta.choose_at_depth(two, 4)
+    assert alphabeta.SEARCH_DEPTH == snapshot == 4
+    source = _module_source("alphabeta.py")
+    assert "ENDGAME_EMPTY" not in source
+    assert "完全読み" not in source
     assert "endgame" not in _module_source("minimax.py").lower()
+    assert "完全読み" not in _module_source("minimax.py")
 
 
 def test_alphabeta_eval_record_has_paired_acceptance() -> None:
@@ -2857,11 +2858,13 @@ def test_alphabeta_eval_record_has_paired_acceptance() -> None:
     assert data["accepted"] is False
     assert data.get("looks_strong") is True
     assert data["win_rate"] >= 0.70
-    assert alphabeta.SEARCH_DEPTH == 6
+    assert alphabeta.SEARCH_DEPTH == 4
     assert minimax.SEARCH_DEPTH == 4
     assert data["candidate"]["specimen_id"] == alphabeta.SPECIMEN_ID
-    assert data["candidate"]["search_depth"] == alphabeta.SEARCH_DEPTH
-    assert data["candidate"]["endgame_empty"] == alphabeta.ENDGAME_EMPTY
+    assert data["candidate"]["search_depth"] == 6
+    assert data["candidate"]["search_depth"] != alphabeta.SEARCH_DEPTH
+    assert data["candidate"]["endgame_empty"] == 10
+    assert not hasattr(alphabeta, "ENDGAME_EMPTY")
     assert data["opponent"]["specimen_id"] == minimax.SPECIMEN_ID
     assert data["opponent"]["search_depth"] == minimax.SEARCH_DEPTH
     games = data["game_records"]
@@ -2891,6 +2894,11 @@ def test_alphabeta_eval_record_has_paired_acceptance() -> None:
             int(black["stone_diff"]) + int(white["stone_diff"])
         ) / 2
     assert data.get("stop_reason") == "code_owner_instruction"
+    assert data["catalog_policy"] == "keep_phase6"
+    script = (root / "alphabeta_eval.py").read_text(encoding="utf-8")
+    assert "keep_phase6" not in script
+    assert "keep_depth4_no_exact" in script
+    assert "keep_depth4_no_exact_until_retry" in script
     assert [item.display_name for item in items()].count("ルールベース (αβ)") == 1
     assert [item.display_name for item in items()].count("ルールベース (ミニマックス)") == 1
     report = root / "alphabeta-eval.md"
@@ -2932,8 +2940,16 @@ def test_alphabeta_eval_resume_requires_endgame_empty() -> None:
     )
     seed = int(data["protocol"]["seed"])
     n_starts = int(data["protocol"]["starts"])
+    assert data["candidate"]["search_depth"] == 6
+    assert data["candidate"]["endgame_empty"] == 10
+    assert alphabeta.SEARCH_DEPTH == 4
+    assert not hasattr(alphabeta, "ENDGAME_EMPTY")
+    assert not module._progress_matches(data, seed, n_starts)
+    data["candidate"]["search_depth"] = alphabeta.SEARCH_DEPTH
+    assert not module._progress_matches(data, seed, n_starts)
+    data["candidate"]["endgame_empty"] = 0
     assert module._progress_matches(data, seed, n_starts)
-    data["candidate"]["endgame_empty"] = alphabeta.ENDGAME_EMPTY - 1
+    data["candidate"]["endgame_empty"] = 10
     assert not module._progress_matches(data, seed, n_starts)
 
 
