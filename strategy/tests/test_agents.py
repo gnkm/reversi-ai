@@ -2894,6 +2894,11 @@ def test_alphabeta_eval_record_has_paired_acceptance() -> None:
             int(black["stone_diff"]) + int(white["stone_diff"])
         ) / 2
     assert data.get("stop_reason") == "code_owner_instruction"
+    assert data["catalog_policy"] == "keep_phase6"
+    script = (root / "alphabeta_eval.py").read_text(encoding="utf-8")
+    assert "keep_phase6" not in script
+    assert "keep_depth4_no_exact" in script
+    assert "keep_depth4_no_exact_until_retry" in script
     assert [item.display_name for item in items()].count("ルールベース (αβ)") == 1
     assert [item.display_name for item in items()].count("ルールベース (ミニマックス)") == 1
     report = root / "alphabeta-eval.md"

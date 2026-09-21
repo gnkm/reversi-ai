@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Phase 6 の αβ 個体を深さ 4 ミニマックスと先後入れ替え対局し、成績 JSON を書く。
+"""αβ 個体を深さ 4 ミニマックスと先後入れ替え対局し、成績 JSON を書く。
 
 対局の再実行は CI に載せない。ホストで明示的に走らせる。
 """
@@ -290,13 +290,13 @@ def _conclude(
         "paired": True,
         "accepted": accepted,
         "complete": complete,
-        "catalog_policy": "keep_phase6",
+        "catalog_policy": "keep_depth4_no_exact",
     }
     if complete and not accepted:
         # 勝率不足は葉評価の寄与が足りない可能性が高い。TT（Phase 5）は速さ。
-        # 現行カタログは終盤完全読みをしない。
+        # カタログは深さ 4・終盤完全読みなしのままにする。
         conclusion["next_phase"] = 4
-        conclusion["catalog_policy"] = "keep_phase6_until_retry"
+        conclusion["catalog_policy"] = "keep_depth4_no_exact_until_retry"
     return conclusion
 
 
