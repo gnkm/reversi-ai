@@ -56,6 +56,7 @@ from reversi.engine.rules import (
     pass_is_legal,
     play,
 )
+from reversi.engine.score import official_score, stone_counts
 
 _JAPANESE = re.compile(r"[\u3040-\u30ff\u4e00-\u9fff]")
 _FORBIDDEN_IMPORT_ROOTS = frozenset(
@@ -2216,6 +2217,9 @@ def test_minimax_source_does_not_call_models() -> None:
                 assert "ffothello.org" not in lowered
                 assert ".wtb" not in lowered
                 assert "openrouter.ai" not in lowered
+    minimax_source = _module_source("minimax.py")
+    assert "endgame" not in minimax_source.lower()
+    assert "完全読み" not in minimax_source
 
 
 _PHASE4_CORNERS = frozenset(Square.parse(name) for name in ("a1", "a8", "h1", "h8"))
@@ -2371,10 +2375,13 @@ def test_catalog_lists_alphabeta() -> None:
     assert "Zobrist" in item.description
     assert "Frontier" in item.description
     assert "Game Phase" in item.description
+    assert "完全読み" in item.description
+    assert "空きマス" in item.description
     assert "点数表" not in item.description
     assert item.specimen_id != minimax_item.specimen_id
     assert item.display_name != minimax_item.display_name
     assert alphabeta.SEARCH_DEPTH == 6
+    assert alphabeta.ENDGAME_EMPTY == 10
     assert minimax.SEARCH_DEPTH == 4
     assert get(alphabeta.SPECIMEN_ID) == item
     assert get(minimax.SPECIMEN_ID) == minimax_item
@@ -2479,8 +2486,10 @@ def test_alphabeta_leaf_does_not_use_position_table() -> None:
 
 def test_alphabeta_game_path_keeps_depth_six() -> None:
     assert alphabeta.SEARCH_DEPTH == 6
+    assert alphabeta.ENDGAME_EMPTY == 10
     assert minimax.SEARCH_DEPTH == 4
     snapshot = alphabeta.SEARCH_DEPTH
+    endgame_snapshot = alphabeta.ENDGAME_EMPTY
     position = initial_position()
     first = alphabeta.choose_move(position)
     via_catalog = catalog_choose(alphabeta.SPECIMEN_ID, position)
@@ -2500,6 +2509,7 @@ def test_alphabeta_game_path_keeps_depth_six() -> None:
         _position_from_rank8_rows(_CORNER_VS_TWO_FLIPS, Color.BLACK)
     )
     assert alphabeta.SEARCH_DEPTH == snapshot == 6
+    assert alphabeta.ENDGAME_EMPTY == endgame_snapshot == 10
     assert alphabeta.choose_move is not minimax.choose_move
     assert alphabeta.choose_move(position) == alphabeta.choose_at_depth(position, 6)
     after_d3 = play(position, Place(Square.parse("d3")))
@@ -2518,6 +2528,9 @@ def test_alphabeta_does_not_move_when_no_legal_places() -> None:
 def test_alphabeta_source_is_negamax_and_does_not_call_models() -> None:
     source = _module_source("alphabeta.py")
     assert "SEARCH_DEPTH = 6" in source
+    assert "ENDGAME_EMPTY = 10" in source
+    assert "完全読み" in source
+    assert "endgame" in source.lower()
     assert "def _negamax(" in source
     assert "-beta" in source and "-alpha" in source
     assert "score_at" not in source
@@ -2657,6 +2670,163 @@ def test_alphabeta_engine_is_not_bitboard() -> None:
     assert "Zobrist" in source
     assert "transposition" in source.lower()
     assert "ハッシュ" in source
+
+
+def _empty_squares(board: Board) -> int:
+    return sum(stone is Stone.EMPTY for row in board.cells for stone in row)
+
+
+def _disc_diff(board: Board, color: Color) -> int:
+    own = color.stone
+    diff = 0
+    for row in board.cells:
+        for stone in row:
+            if stone is Stone.EMPTY:
+                continue
+            diff += 1 if stone is own else -1
+    return diff
+
+
+def _two_empty_white_plays_a1() -> Position:
+    # a1 と h8 が空。b1 が黒、他は白。白は a1 に打つと終局し、h8 は残る。
+    board = empty_board().replacing(
+        {
+            Square.parse("b1"): Stone.BLACK,
+            **{
+                Square(file=file, rank=rank): Stone.WHITE
+                for rank in range(8)
+                for file in range(8)
+                if (file, rank) not in {(0, 0), (1, 0), (7, 7)}
+            },
+        }
+    )
+    return Position(board, Color.WHITE)
+
+
+# 空きマス 8。完全読みなら a1 が石数差 +44 で勝ち切る。ヒューリスティックは e1 / b7 を誤る。
+_ENDGAME_WIN_ON_A1 = (
+    "..WWWWWB",
+    "..WWWWWB",
+    ".WWWWBBB",
+    "BWWWBBBB",
+    "BWWWWWBB",
+    "BWBBWWWB",
+    "BWWWBWBB",
+    ".WW..BBB",
+)
+
+# 空きマス 11。深さ 6 の Phase 4 葉なら h7、終局石数差なら d7。
+_MIDGAME_ELEVEN_EMPTY = (
+    "....WBBW",
+    "....BWB.",
+    "..WBBBWB",
+    "WBBBWWWW",
+    "WBBBWBWW",
+    "BBWBBWWW",
+    "WWWWWWWW",
+    "WWWWWWWW",
+)
+
+# 空きマスちょうど 10。完全読みなら a1 が石数差 +2。閾値を < 10 にすると深さ 6 の葉になる。
+_ENDGAME_TEN_EMPTY = (
+    "..BBBBBB",
+    ".BBBBBBB",
+    "B.BBBBB.",
+    "BBBWWBBB",
+    "BBWWWBB.",
+    "BBBBWWW.",
+    "W.BBBWWW",
+    ".BBB.BBB",
+)
+
+
+def test_alphabeta_endgame_leaf_is_terminal_disc_diff() -> None:
+    position = _two_empty_white_plays_a1()
+    assert _empty_squares(position.board) <= alphabeta.ENDGAME_EMPTY
+    places = legal_places(position)
+    assert places == (Square.parse("a1"),)
+    move, value, nodes = alphabeta.search_stats(position, alphabeta.SEARCH_DEPTH)
+    assert move == Place(Square.parse("a1"))
+    assert nodes >= 1
+    after = play(position, move)
+    assert is_over(after)
+    counts = stone_counts(after.board)
+    assert counts.empty == 1
+    disc = _disc_diff(after.board, Color.WHITE)
+    official = official_score(after.board)
+    heuristic = alphabeta.leaf_score(after.board, Color.WHITE)
+    assert disc == 63
+    assert official.white - official.black == 64
+    assert heuristic == _phase4_leaf_score(after.board, Color.WHITE)
+    assert value == disc
+    assert value != official.white - official.black
+    assert value != heuristic
+    assert alphabeta.choose_move(position) == move
+
+
+def test_alphabeta_endgame_does_not_miss_forced_win() -> None:
+    position = _position_from_rank8_rows(_ENDGAME_WIN_ON_A1, Color.BLACK)
+    assert _empty_squares(position.board) == 8
+    assert 8 <= alphabeta.ENDGAME_EMPTY
+    places = {square.algebraic for square in legal_places(position)}
+    assert "a1" in places
+    assert "e1" in places
+    assert "b7" in places
+    move, value, _nodes = alphabeta.search_stats(position, alphabeta.SEARCH_DEPTH)
+    assert move == Place(Square.parse("a1"))
+    assert value == 44
+    assert abs(value) <= BOARD_SIZE * BOARD_SIZE
+    heuristic_now = alphabeta.leaf_score(position.board, Color.BLACK)
+    assert heuristic_now == _phase4_leaf_score(position.board, Color.BLACK)
+    assert value != heuristic_now
+    assert alphabeta.choose_move(position) == move
+    assert catalog_choose(alphabeta.SPECIMEN_ID, position) == move
+    assert minimax.choose_move(position) == Place(Square.parse("b8"))
+    assert minimax.choose_move(position) != move
+
+
+def test_alphabeta_above_endgame_keeps_depth_six_leaf() -> None:
+    position = _position_from_rank8_rows(_MIDGAME_ELEVEN_EMPTY, Color.WHITE)
+    assert _empty_squares(position.board) == 11
+    assert 11 > alphabeta.ENDGAME_EMPTY
+    places = {square.algebraic for square in legal_places(position)}
+    assert "h7" in places
+    assert "d7" in places
+    move, value, _nodes = alphabeta.search_stats(position, alphabeta.SEARCH_DEPTH)
+    assert move == Place(Square.parse("h7"))
+    assert value == 6020
+    assert abs(value) > BOARD_SIZE * BOARD_SIZE
+    assert alphabeta.choose_move(position) == move
+    assert alphabeta.choose_move(position) == alphabeta.choose_at_depth(position, 6)
+    assert alphabeta.SEARCH_DEPTH == 6
+
+
+def test_alphabeta_endgame_includes_exactly_ten_empty() -> None:
+    position = _position_from_rank8_rows(_ENDGAME_TEN_EMPTY, Color.BLACK)
+    assert _empty_squares(position.board) == alphabeta.ENDGAME_EMPTY == 10
+    places = {square.algebraic for square in legal_places(position)}
+    assert places == {"a1", "h3"}
+    move, value, _nodes = alphabeta.search_stats(position, alphabeta.SEARCH_DEPTH)
+    assert move == Place(Square.parse("a1"))
+    assert value == 2
+    assert abs(value) <= BOARD_SIZE * BOARD_SIZE
+    heuristic_now = alphabeta.leaf_score(position.board, Color.BLACK)
+    assert heuristic_now == _phase4_leaf_score(position.board, Color.BLACK)
+    assert value != heuristic_now
+    assert alphabeta.choose_move(position) == move
+    assert alphabeta.choose_at_depth(position, 4) == move
+
+
+def test_alphabeta_endgame_threshold_stays_ten() -> None:
+    assert alphabeta.ENDGAME_EMPTY == 10
+    snapshot = alphabeta.ENDGAME_EMPTY
+    alphabeta.choose_move(initial_position())
+    alphabeta.choose_move(_position_from_rank8_rows(_ENDGAME_WIN_ON_A1, Color.BLACK))
+    alphabeta.choose_move(_position_from_rank8_rows(_MIDGAME_ELEVEN_EMPTY, Color.WHITE))
+    alphabeta.choose_move(_two_empty_white_plays_a1())
+    assert alphabeta.ENDGAME_EMPTY == snapshot == 10
+    assert "ENDGAME_EMPTY = 10" in _module_source("alphabeta.py")
+    assert "endgame" not in _module_source("minimax.py").lower()
 
 
 def test_alphabeta_leaf_penalizes_x_on_empty_corner() -> None:
