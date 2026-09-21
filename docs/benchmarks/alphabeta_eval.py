@@ -383,6 +383,7 @@ def _progress_matches(
         return (
             str(candidate["specimen_id"]) == alphabeta.SPECIMEN_ID
             and int(candidate["search_depth"]) == alphabeta.SEARCH_DEPTH
+            and int(candidate["endgame_empty"]) == alphabeta.ENDGAME_EMPTY
             and str(opponent["specimen_id"]) == minimax.SPECIMEN_ID
             and int(opponent["search_depth"]) == minimax.SEARCH_DEPTH
         )
@@ -417,6 +418,10 @@ def main() -> int:
     progress = _load_progress(output)
     rng = Random(args.seed)
     if progress is not None:
+        if progress.get("stopped_early") is True:
+            raise SystemExit(
+                "打ち切り済みの記録です。上書きしません。別の --output を指定してください。"
+            )
         if not _progress_matches(progress, args.seed, args.starts):
             raise SystemExit(
                 "既存の記録は別の設定です。別の --output を指定してください。"

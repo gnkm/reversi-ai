@@ -5,6 +5,8 @@ from __future__ import annotations
 import ast
 import json
 import re
+import subprocess
+import sys
 from collections.abc import Sequence
 from dataclasses import replace
 from pathlib import Path
@@ -2859,15 +2861,35 @@ def test_alphabeta_eval_record_has_paired_acceptance() -> None:
     assert minimax.SEARCH_DEPTH == 4
     assert data["candidate"]["specimen_id"] == alphabeta.SPECIMEN_ID
     assert data["candidate"]["search_depth"] == alphabeta.SEARCH_DEPTH
+    assert data["candidate"]["endgame_empty"] == alphabeta.ENDGAME_EMPTY
     assert data["opponent"]["specimen_id"] == minimax.SPECIMEN_ID
     assert data["opponent"]["search_depth"] == minimax.SEARCH_DEPTH
+    games = data["game_records"]
+    wins = sum(1 for row in games if row["result"] == "win")
+    draws = sum(1 for row in games if row["result"] == "draw")
+    losses = sum(1 for row in games if row["result"] == "loss")
+    n = len(games)
+    assert data["wins"] == wins
+    assert data["draws"] == draws
+    assert data["losses"] == losses
+    assert data["win_rate"] == (wins + 0.5 * draws) / n
+    assert data["mean_stone_diff"] == sum(int(row["stone_diff"]) for row in games) / n
+    by_key = {(int(row["start_index"]), row["alphabeta_color"]): row for row in games}
     pairs = data["paired_results"]
     assert len(pairs) >= 10
     assert len(pairs) < len(data["starts"])
-    for row in pairs:
-        assert row["black"]["alphabeta_color"] == "black"
-        assert row["white"]["alphabeta_color"] == "white"
-        assert row["black"]["start_index"] == row["white"]["start_index"]
+    for pair in pairs:
+        black = by_key[(int(pair["start_index"]), "black")]
+        white = by_key[(int(pair["start_index"]), "white")]
+        assert pair["black"]["alphabeta_color"] == "black"
+        assert pair["white"]["alphabeta_color"] == "white"
+        assert pair["black"]["result"] == black["result"]
+        assert pair["white"]["result"] == white["result"]
+        assert pair["black"]["stone_diff"] == black["stone_diff"]
+        assert pair["white"]["stone_diff"] == white["stone_diff"]
+        assert pair["pair_stone_diff"] == (
+            int(black["stone_diff"]) + int(white["stone_diff"])
+        ) / 2
     assert data.get("stop_reason") == "code_owner_instruction"
     assert [item.display_name for item in items()].count("ルールベース (αβ)") == 1
     assert [item.display_name for item in items()].count("ルールベース (ミニマックス)") == 1
@@ -2876,6 +2898,43 @@ def test_alphabeta_eval_record_has_paired_acceptance() -> None:
     text = report.read_text(encoding="utf-8")
     assert "コードオーナー" in text
     assert "強そう" in text
+
+
+def test_alphabeta_eval_script_keeps_stopped_record(tmp_path: Path) -> None:
+    root = Path(__file__).resolve().parents[2]
+    source = root / "docs" / "benchmarks" / "alphabeta-eval.json"
+    dest = tmp_path / "alphabeta-eval.json"
+    dest.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+    before = dest.read_bytes()
+    script = root / "docs" / "benchmarks" / "alphabeta_eval.py"
+    completed = subprocess.run(
+        [sys.executable, str(script), "--output", str(dest)],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert completed.returncode != 0
+    assert "打ち切り済み" in completed.stderr
+    assert dest.read_bytes() == before
+
+
+def test_alphabeta_eval_resume_requires_endgame_empty() -> None:
+    import importlib.util
+
+    root = Path(__file__).resolve().parents[2]
+    path = root / "docs" / "benchmarks" / "alphabeta_eval.py"
+    spec = importlib.util.spec_from_file_location("alphabeta_eval_resume", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    data = json.loads(
+        (root / "docs" / "benchmarks" / "alphabeta-eval.json").read_text(encoding="utf-8")
+    )
+    seed = int(data["protocol"]["seed"])
+    n_starts = int(data["protocol"]["starts"])
+    assert module._progress_matches(data, seed, n_starts)
+    data["candidate"]["endgame_empty"] = alphabeta.ENDGAME_EMPTY - 1
+    assert not module._progress_matches(data, seed, n_starts)
 
 
 def test_alphabeta_leaf_penalizes_x_on_empty_corner() -> None:
