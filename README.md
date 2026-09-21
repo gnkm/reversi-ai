@@ -159,7 +159,14 @@ curl -sk https://127.0.0.1:3000/api/games \
 | ニューラルネットワーク (棋譜) | 対局前に学習したネットワークで着手する |
 | 生成 AI (Jev) | OpenRouter 上の Jev が合法手から選ぶ |
 
-学習し直さなくても、これらの相手とは対局できます。自分で学習し直す手順は次節です。基準の総当たり結果は [docs/benchmarks/round-robin.md](docs/benchmarks/round-robin.md) です（数値の正本は JSON）。勝ち点の推移は [docs/benchmarks/history.md](docs/benchmarks/history.md) です。その成績は JSON の `git.blobs` が指す学習成果物に対する記録であり、いまの `models/` と blob が異なれば一致しません。
+学習し直さなくても、これらの相手とは対局できます。自分で学習し直す手順は次節です。基準の総当たり結果は [docs/benchmarks/round-robin.md](docs/benchmarks/round-robin.md) です（数値の正本は JSON）。勝ち点の推移は [docs/benchmarks/history.md](docs/benchmarks/history.md) です。その成績は JSON の `git.blobs` が指す学習成果物に対する記録であり、いまの `models/` と blob が異なれば一致しません。取り直すときは、対局サービスを起動したうえで次を実行します。
+
+```bash
+python3 docs/benchmarks/round_robin.py
+python3 docs/benchmarks/render.py
+```
+
+ホストの Python は OpenRouter の鍵を持ちません。生成 AI (Jev) の鍵は戦略コンテナだけが読みます。CI では走らせません。
 
 ## 学習し直す（任意）
 
