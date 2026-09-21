@@ -1,7 +1,7 @@
 ---
 title: アーキテクチャ
 product: Reversi Agents
-version: 0.1.39
+version: 0.1.40
 status: working
 date: 2026-09-21
 source: docs/srs.md
@@ -16,7 +16,7 @@ tech_stack_version: 0.2.20
 | --- | --- |
 | 文書識別 | reversi-ai-architecture |
 | 対象ソフトウェア | Reversi Agents |
-| 版 | 0.1.39 |
+| 版 | 0.1.40 |
 | 状態 | 現行（設計。要求ではない） |
 | 日付 | 2026-09-21 |
 | 入力 | [`docs/srs.md`](srs.md) 0.1.24、[`docs/tech-stack.md`](tech-stack.md) 0.2.20 |
@@ -115,6 +115,7 @@ reversi-ai/
 │   │   ├── round-robin.md             # 最新の GitHub 閲覧用。JSON から生成
 │   │   ├── history.md                 # 勝ち点・順位の推移。archive と現行 JSON から生成
 │   │   ├── render.py                  # round-robin.md と history.md を書く
+│   │   ├── round_robin.py             # 起動済み対局 API で総当たりし JSON を書く。CI では走らせない
 │   │   ├── jev-stage1.json            # Jev 段階 1（4 構成切り分け）の成績スナップショット
 │   │   ├── jev_stage1.py              # 4 構成を同じ相手と対局させて JSON を書く。CI では走らせない
 │   │   ├── jev-stage2.json            # Jev 段階 2（局面単位オフライン評価）の記録
@@ -430,6 +431,7 @@ web コンテナが Pod 内で `0.0.0.0:3000` を聞くのはよい。戦略コ�
 
 | 版 | 日付 | 内容 |
 | --- | --- | --- |
+| 0.1.40 | 2026-09-21 | カタログ総当たりを起動済み対局 API へ問い合わせる `round_robin.py` を置く |
 | 0.1.39 | 2026-09-21 | ルールベース (αβ) の終盤完全読みを外し、ミニマックスと同じ探索深さに揃える |
 | 0.1.38 | 2026-09-21 | ルールベース (αβ) の対局深さを 4 にし、ミニマックスと同じ探索深さにする |
 | 0.1.37 | 2026-09-21 | αβ 対ミニマックス評価を途中打ち切りとし、知見を `alphabeta-eval.md` に残す |

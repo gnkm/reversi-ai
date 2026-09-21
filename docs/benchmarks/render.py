@@ -19,6 +19,7 @@ SHORT_NAME = {
     "most_flips": "最多",
     "positional": "位置",
     "minimax": "ミニ",
+    "alphabeta": "αβ",
     "opening": "定石",
     "ml": "ML",
     "lgbm": "LGBM",
@@ -39,6 +40,7 @@ XY_PLOT_COLORS = (
     "#17BECF",
     "#2CA02C",
     "#6A3D9A",
+    "#A6761D",
 )
 
 
@@ -263,7 +265,7 @@ def change_line(previous: Snapshot | None, current: Snapshot) -> str:
     parts.extend(extra)
     if not parts:
         return "学習成果物の blob は同一"
-    return "。".join(parts)
+    return "。".join(part.rstrip("。") for part in parts)
 
 
 def generation_changes(snapshots: Sequence[Snapshot]) -> dict[str, str]:
@@ -381,13 +383,20 @@ def render_history(
         "",
         "最新の数値の正本は [`round-robin.json`](round-robin.json) である。過去の正本は [`archive/`](archive/) に、現行と同じ形で残る。最新の閲覧用は [`round-robin.md`](round-robin.md) である。",
         "",
-        "写しを作り直す:",
+        "取り直す:",
+        "",
+        "```bash",
+        "python3 docs/benchmarks/round_robin.py",
+        "python3 docs/benchmarks/render.py",
+        "```",
+        "",
+        "対局サービスは README どおり起動済みであること。正本 JSON を書いたあと、本ファイルと `round-robin.md` は `render.py` が書く。",
+        "",
+        "写しだけを作り直す:",
         "",
         "```bash",
         "python3 docs/benchmarks/render.py",
         "```",
-        "",
-        f"総当たりを取り直すときは、いまの `round-robin.json` を `archive/{archive_filename(str(latest['recorded_at']))}` のような名前でコピーしてから置き換え、上のコマンドで本ファイルと `round-robin.md` を書き直す。",
         "",
         "同じ `specimen_id` を世代をまたいで追う。旧世代を別個体としては出さない。",
         "",
