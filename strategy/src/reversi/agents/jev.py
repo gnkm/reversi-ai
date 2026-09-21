@@ -1,4 +1,4 @@
-"""OpenRouter の Jev で合法手を選ぶ個体。コードが絞った候補を Choice で選ぶ。"""
+"""OpenRouter の Jev で合法手を選ぶ個体。優先の答えと着手後評価を合成する。"""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ from openrouter.utils.retries import BackoffStrategy, RetryConfig
 
 from reversi.agents.position_table import score_at
 from reversi.agents.prompt import PROMPTS_DIR, PromptFileError, load_json
-from reversi.engine.board import Board, Color, Square, Stone, all_squares
+from reversi.engine.board import BOARD_SIZE, Board, Color, Square, Stone, all_squares
 from reversi.engine.rules import Place, Position, apply_place, flips_for, legal_places
 
 MODEL_ID = "typesafe/jev-1.13"
@@ -25,8 +25,9 @@ SPECIMEN_ID = "jev"
 CATEGORY = "generative_ai"
 DISPLAY_NAME = "生成 AI (Jev)"
 DESCRIPTION = (
-    "コード評価の最善手で着手する。OpenRouter 上の Jev による絞り込みは"
-    "段階 5 の対局で不採用のため呼ばない。対局中に WTHOR は参照しない。"
+    "OpenRouter 上の Jev を Decisions API で呼び、どの目標を優先するかを"
+    "原子質問で答えさせ、着手後の盤の点数はコードが付けて合成する。"
+    "対局中に WTHOR は参照しない。"
 )
 DECISIONS_SERVER = "https://openrouter.ai"
 SECRET_PATH = Path("/run/secrets/openrouter-api-key")
@@ -34,7 +35,16 @@ PROMPT_PATH = PROMPTS_DIR / "jev.json"
 # Hono の戦略中継は 60 秒。それより先に失敗させ、ロックを返す。
 DECISIONS_TIMEOUT_MS = 55_000
 _NO_RETRY = RetryConfig("none", BackoffStrategy(0, 0, 1.0, 0), False)
+_NOUL_IDS = ("corner_priority", "mobility_priority", "position_priority")
+_SCORE_ID = "material_importance"
+_STAGE_ID = "stage"
 _METRIC_KEYS = ("position", "mobility", "material", "corners")
+_METRIC_ANSWERS = {
+    "position": "position_priority",
+    "mobility": "mobility_priority",
+    "material": _SCORE_ID,
+    "corners": "corner_priority",
+}
 _STAGE_KEYS = ("opening", "midgame", "endgame")
 _KIND_KEYS = ("corner", "x", "c", "edge", "interior")
 _AMOUNT_KEYS = ("few", "some", "many")
@@ -42,10 +52,12 @@ _YES_NO_KEYS = ("true", "false")
 _SIDE_KEYS = ("black", "white")
 _PLACE_FIELDS = ("kind", "takes_corner", "gives_corner", "opponent_places", "flips")
 _BOARD_CORNERS = frozenset({"a1", "h1", "a8", "h8"})
+_CORNERS = frozenset({Square.parse(name) for name in ("a1", "h1", "a8", "h8")})
+_CHOICE_CONFIGS = frozenset({"v2_code0", "v2_as_is"})
 
 STAGE1_CONFIG_NAMES = ("v1_constant", "v2_jev0", "v2_code0", "v2_as_is")
 STAGE1_CODE_ONLY = frozenset({"v1_constant", "v2_jev0"})
-DEFAULT_STAGE1_CONFIG = "v2_jev0"
+DEFAULT_STAGE1_CONFIG = "v1_priority"
 # 第 1 版（#71）の優先係数。答えは noul の中央 0.5 に固定し、コード評価だけを測る。
 _V1_CONSTANT_ANSWER = 0.5
 _V1_ANSWER_WEIGHTS = {
@@ -91,8 +103,9 @@ _active_stage1_config = DEFAULT_STAGE1_CONFIG
 
 @contextmanager
 def stage1_config(name: str) -> Iterator[str]:
-    """検証用の 4 構成切替。抜けたらカタログ既定（第 2 版そのまま）に戻す。"""
-    if name not in STAGE1_CONFIG_NAMES:
+    """検証用の構成切替。抜けたらカタログ既定（優先合成）に戻す。"""
+    allowed = set(STAGE1_CONFIG_NAMES) | {DEFAULT_STAGE1_CONFIG}
+    if name not in allowed:
         raise ValueError(f"未知の段階 1 構成です: {name}")
     global _active_stage1_config
     previous = _active_stage1_config
@@ -129,6 +142,12 @@ def select_stage1_baseline(configs: Sequence[Mapping[str, Any]]) -> str:
 @dataclass(frozen=True, slots=True)
 class _Spec:
     objective: str
+    origin: str
+    questions: dict[str, Any]
+    answer_weights: dict[str, float]
+    metric_weights: dict[str, float]
+    stage_weights: dict[str, dict[str, float]]
+    score_span: float
     question_id: str
     instructions: str
     place_line: str
@@ -144,15 +163,20 @@ class _Spec:
     shortlist_size: int
     margin: float
     confidence_threshold: float
-    metric_weights: dict[str, float]
     scales: dict[str, float]
-    stage_weights: dict[str, dict[str, float]]
     places_in_state: bool
     gives_corner_newly: bool
 
 
 @dataclass(frozen=True, slots=True)
 class _Parsed:
+    noul: dict[str, float]
+    material: float
+    stage: dict[str, float]
+
+
+@dataclass(frozen=True, slots=True)
+class _ChoiceParsed:
     probabilities: dict[str, float]
     confidence: float
     choice: str | None = None
@@ -234,7 +258,9 @@ def _int_pair(raw: object) -> tuple[int, int]:
     return lo, hi
 
 
-def _bucket_map(raw: Mapping[str, Any], keys: Sequence[str]) -> dict[str, tuple[int, int]]:
+def _bucket_map(
+    raw: Mapping[str, Any], keys: Sequence[str]
+) -> dict[str, tuple[int, int]]:
     if set(raw) != set(keys):
         raise _fail_spec()
     return {key: _int_pair(raw[key]) for key in keys}
@@ -281,26 +307,64 @@ def _load_kinds(raw: Mapping[str, Any]) -> dict[str, frozenset[str]]:
     return kinds
 
 
-def _load_question(raw: Mapping[str, Any]) -> tuple[str, str]:
-    if len(raw) != 1:
+def _question_payload(raw: object, expected: str) -> dict[str, Any]:
+    if not isinstance(raw, dict):
         raise _fail_spec()
-    question_id, payload = next(iter(raw.items()))
-    if not isinstance(question_id, str) or not question_id.strip():
+    if raw.get("type") != expected:
         raise _fail_spec()
-    if not isinstance(payload, dict):
+    instructions = raw.get("instructions")
+    if not isinstance(instructions, str) or not instructions.strip():
         raise _fail_spec()
-    if payload.get("type") != "choice":
+    payload: dict[str, Any] = {
+        "type": expected,
+        "instructions": instructions.strip(),
+    }
+    criteria = raw.get("criteria")
+    if expected == "noul":
+        if criteria is not None:
+            if not isinstance(criteria, dict) or set(criteria) != {"true", "false"}:
+                raise _fail_spec()
+            payload["criteria"] = criteria
+        return payload
+    if expected == "score":
+        if not isinstance(criteria, list) or len(criteria) < 2:
+            raise _fail_spec()
+        if any(not isinstance(item, str) or not item.strip() for item in criteria):
+            raise _fail_spec()
+        payload["criteria"] = criteria
+        return payload
+    if not isinstance(criteria, dict) or set(criteria) != set(_STAGE_KEYS):
         raise _fail_spec()
-    return question_id.strip(), _text_field(payload, "instructions")
+    payload["criteria"] = criteria
+    return payload
 
 
-def _load_weights(raw: Mapping[str, Any]) -> tuple[
+def _load_priority_questions(raw: Mapping[str, Any]) -> dict[str, Any]:
+    if len(raw) < 2:
+        raise _fail_spec()
+    expected = {
+        "corner_priority": "noul",
+        "mobility_priority": "noul",
+        "position_priority": "noul",
+        _SCORE_ID: "score",
+        _STAGE_ID: "choice",
+    }
+    if set(raw) != set(expected):
+        raise _fail_spec()
+    return {qid: _question_payload(raw[qid], qtype) for qid, qtype in expected.items()}
+
+
+def _load_weights(
+    raw: Mapping[str, Any],
+) -> tuple[
+    dict[str, float],
     dict[str, float],
     dict[str, float],
     dict[str, dict[str, float]],
 ]:
-    if set(raw) != {"metrics", "scales", "stage"}:
+    if set(raw) != {"answers", "metrics", "scales", "stage"}:
         raise _fail_spec()
+    answers = _float_map(_mapping_field(raw, "answers"), _NOUL_IDS + (_SCORE_ID,))
     metrics = _float_map(_mapping_field(raw, "metrics"), _METRIC_KEYS)
     scales = _float_map(_mapping_field(raw, "scales"), _METRIC_KEYS)
     if any(scales[key] <= 0.0 for key in _METRIC_KEYS):
@@ -312,7 +376,7 @@ def _load_weights(raw: Mapping[str, Any]) -> tuple[
         name: _float_map(_mapping_field(stage_raw, name), _METRIC_KEYS)
         for name in _STAGE_KEYS
     }
-    return metrics, scales, stage
+    return answers, metrics, scales, stage
 
 
 def _positive_int(value: object) -> int:
@@ -359,8 +423,8 @@ def _load_spec(path: Path | None = None) -> _Spec:
         raise ExternalModelError(str(exc)) from exc
     if not isinstance(loaded, dict):
         raise _fail_spec()
-    question_id, instructions = _load_question(_mapping_field(loaded, "questions"))
-    objective = _text_field(loaded, "objective")
+    questions = _load_priority_questions(_mapping_field(loaded, "questions"))
+    choice = _mapping_field(loaded, "choice")
     vocab = _mapping_field(loaded, "vocabulary")
     buckets = _mapping_field(loaded, "buckets")
     empty_buckets = _bucket_map(_mapping_field(buckets, "empty"), _STAGE_KEYS)
@@ -371,15 +435,21 @@ def _load_spec(path: Path | None = None) -> _Spec:
     _require_cover(empty_buckets, 0, 64)
     _require_cover(opponent_buckets, 0, 64)
     _require_cover(flip_buckets, 1, 64)
-    weights = _mapping_field(loaded, "weights")
-    metrics, scales, stage = _load_weights(weights)
+    answers, metrics, scales, stage = _load_weights(_mapping_field(loaded, "weights"))
     shortlist_size, margin, threshold = _load_selection(
         _mapping_field(loaded, "selection")
     )
+    criteria = questions[_SCORE_ID]["criteria"]
     return _Spec(
-        objective=objective,
-        question_id=question_id,
-        instructions=instructions,
+        objective=_text_field(loaded, "objective"),
+        origin=_text_field(loaded, "origin"),
+        questions=questions,
+        answer_weights=answers,
+        metric_weights=metrics,
+        stage_weights=stage,
+        score_span=float(len(criteria) - 1),
+        question_id=_text_field(choice, "id"),
+        instructions=_text_field(choice, "instructions"),
         place_line=_require_place_line(_text_field(loaded, "place_line")),
         kinds=_load_kinds(_mapping_field(loaded, "kinds")),
         kind_words=_word_map(_mapping_field(vocab, "kind"), _KIND_KEYS),
@@ -393,9 +463,7 @@ def _load_spec(path: Path | None = None) -> _Spec:
         shortlist_size=shortlist_size,
         margin=margin,
         confidence_threshold=threshold,
-        metric_weights=metrics,
         scales=scales,
-        stage_weights=stage,
         places_in_state=True,
         gives_corner_newly=False,
     )
@@ -428,7 +496,9 @@ def _yes_no(flag: bool, spec: _Spec) -> str:
     return spec.yes_no["true"] if flag else spec.yes_no["false"]
 
 
-def _amount_word(value: int, buckets: Mapping[str, tuple[int, int]], spec: _Spec) -> str:
+def _amount_word(
+    value: int, buckets: Mapping[str, tuple[int, int]], spec: _Spec
+) -> str:
     return spec.amounts[_bucket_label(value, buckets)]
 
 
@@ -459,10 +529,14 @@ def _place_line(position: Position, square: Square, spec: _Spec) -> str:
         "takes_corner": _yes_no(kind == "corner", spec),
         "gives_corner": _yes_no(_gives_corner(position, square, spec), spec),
         "opponent_places": _amount_word(
-            len(legal_places(Position(
-                apply_place(position.board, square, position.side_to_move),
-                position.side_to_move.opponent,
-            ))),
+            len(
+                legal_places(
+                    Position(
+                        apply_place(position.board, square, position.side_to_move),
+                        position.side_to_move.opponent,
+                    )
+                )
+            ),
             spec.opponent_buckets,
             spec,
         ),
@@ -507,6 +581,22 @@ def _decision_questions(spec: _Spec, lines: Mapping[str, str]) -> dict[str, Any]
     }
 
 
+def _board_state(
+    position: Position, places: Sequence[Square], spec: _Spec
+) -> dict[str, Any]:
+    board = [
+        [position.board.cells[rank][file].value for file in range(BOARD_SIZE)]
+        for rank in range(BOARD_SIZE)
+    ]
+    return {
+        "objective": spec.objective,
+        "origin": spec.origin,
+        "side_to_move": position.side_to_move.value,
+        "board": board,
+        "legal_places": [square.algebraic for square in places],
+    }
+
+
 def _attr(obj: object, name: str) -> object:
     if isinstance(obj, Mapping):
         return obj.get(name)
@@ -522,11 +612,61 @@ def _finite_answer(value: object) -> float:
     return number
 
 
+def _clamp_unit(value: float) -> float:
+    if value < 0.0:
+        return 0.0
+    if value > 1.0:
+        return 1.0
+    return value
+
+
 def _unit_answer(value: object) -> float:
     number = _finite_answer(value)
     if number < 0.0 or number > 1.0:
         raise ExternalModelError("合成できません")
     return number
+
+
+def _parse_noul(answers: Mapping[str, Any]) -> dict[str, float]:
+    parsed: dict[str, float] = {}
+    for qid in _NOUL_IDS:
+        answer = answers.get(qid)
+        if answer is None:
+            raise ExternalModelError("合成できません")
+        parsed[qid] = _clamp_unit(_finite_answer(_attr(answer, "noul")))
+    return parsed
+
+
+def _parse_material(answers: Mapping[str, Any], span: float) -> float:
+    answer = answers.get(_SCORE_ID)
+    if answer is None or span <= 0.0:
+        raise ExternalModelError("合成できません")
+    return _clamp_unit(_finite_answer(_attr(answer, "score")) / span)
+
+
+def _normalized_stage_probs(probs: Mapping[object, object]) -> dict[str, float] | None:
+    values = {key: _finite_answer(probs.get(key, 0.0)) for key in _STAGE_KEYS}
+    if any(value < 0.0 or value > 1.0 for value in values.values()):
+        raise ExternalModelError("合成できません")
+    total = sum(values.values())
+    if total <= 0.0:
+        return None
+    return {key: value / total for key, value in values.items()}
+
+
+def _parse_stage(answers: Mapping[str, Any]) -> dict[str, float]:
+    answer = answers.get(_STAGE_ID)
+    if answer is None:
+        raise ExternalModelError("合成できません")
+    probs = _attr(answer, "probabilities")
+    if isinstance(probs, Mapping):
+        mixed = _normalized_stage_probs(probs)
+        if mixed is not None:
+            return mixed
+    choice = _attr(answer, "choice")
+    if not isinstance(choice, str) or choice not in _STAGE_KEYS:
+        raise ExternalModelError("合成できません")
+    return {key: 1.0 if key == choice else 0.0 for key in _STAGE_KEYS}
 
 
 def _parse_probabilities(
@@ -547,7 +687,7 @@ def _parse_probabilities(
 
 def _parse_choice(
     answers: Mapping[str, Any], spec: _Spec, places: Sequence[Square]
-) -> _Parsed:
+) -> _ChoiceParsed:
     answer = answers.get(spec.question_id)
     if answer is None:
         raise ExternalModelError("合成できません")
@@ -565,26 +705,55 @@ def _parse_choice(
         probabilities = {key: 1.0 if key == choice_key else 0.0 for key in keys}
     confidence_raw = _attr(answer, "confidence")
     confidence = 1.0 if confidence_raw is None else _unit_answer(confidence_raw)
-    return _Parsed(
+    return _ChoiceParsed(
         probabilities=probabilities,
         confidence=confidence,
         choice=choice_key,
     )
 
 
+def _priority_from_response(response: object, spec: _Spec) -> _Parsed:
+    answers = _attr(response, "answers")
+    if not isinstance(answers, Mapping):
+        raise ExternalModelError("OpenRouter の応答に着手がありません")
+    return _Parsed(
+        noul=_parse_noul(answers),
+        material=_parse_material(answers, spec.score_span),
+        stage=_parse_stage(answers),
+    )
+
+
 def _answers_from_response(
-    response: object, spec: _Spec, places: Sequence[Square]
-) -> _Parsed:
+    response: object,
+    spec: _Spec,
+    places: Sequence[Square] | None = None,
+) -> _Parsed | _ChoiceParsed:
+    if places is None:
+        return _priority_from_response(response, spec)
     answers = _attr(response, "answers")
     if not isinstance(answers, Mapping):
         raise ExternalModelError("OpenRouter の応答に着手がありません")
     return _parse_choice(answers, spec, places)
 
 
-def _board_totals(board: Board, color: Color, spec: _Spec) -> tuple[float, float, float]:
+def _normalize_map(raw: Mapping[Square, float]) -> dict[Square, float]:
+    values = tuple(raw.values())
+    lo = min(values)
+    span = max(values) - lo
+    if span == 0.0:
+        return dict.fromkeys(raw, 0.0)
+    return {square: (value - lo) / span for square, value in raw.items()}
+
+
+def _board_totals(
+    board: Board, color: Color, spec: _Spec | None = None
+) -> tuple[float, float, float]:
     own = color.stone
     opponent = color.opponent.stone
-    corners = spec.kinds["corner"]
+    if spec is None:
+        corners = {square.algebraic for square in _CORNERS}
+    else:
+        corners = spec.kinds["corner"]
     position = 0.0
     material = 0.0
     corner_score = 0.0
@@ -603,8 +772,10 @@ def _board_totals(board: Board, color: Color, spec: _Spec) -> tuple[float, float
     return position, material, corner_score
 
 
-def _after_metrics(
-    position: Position, places: Sequence[Square], spec: _Spec
+def _raw_after_metrics(
+    position: Position,
+    places: Sequence[Square],
+    spec: _Spec | None = None,
 ) -> dict[Square, _Metrics]:
     color = position.side_to_move
     scored: dict[Square, _Metrics] = {}
@@ -620,6 +791,73 @@ def _after_metrics(
             corners=corners,
         )
     return scored
+
+
+def _v1_normalized(
+    metrics: Mapping[Square, _Metrics],
+) -> dict[Square, _Metrics]:
+    position_n = _normalize_map(
+        {square: row.position for square, row in metrics.items()}
+    )
+    mobility_n = _normalize_map(
+        {square: row.mobility for square, row in metrics.items()}
+    )
+    material_n = _normalize_map(
+        {square: row.material for square, row in metrics.items()}
+    )
+    corners_n = _normalize_map({square: row.corners for square, row in metrics.items()})
+    return {
+        square: _Metrics(
+            position=position_n[square],
+            mobility=mobility_n[square],
+            material=material_n[square],
+            corners=corners_n[square],
+        )
+        for square in metrics
+    }
+
+
+def _after_metrics(
+    position: Position,
+    places: Sequence[Square],
+    spec: _Spec | None = None,
+) -> dict[Square, _Metrics]:
+    raw = _raw_after_metrics(position, places, spec)
+    if spec is None:
+        return _v1_normalized(raw)
+    return raw
+
+
+def _stage_mix(parsed: _Parsed, spec: _Spec) -> dict[str, float]:
+    mixed = dict.fromkeys(_METRIC_KEYS, 0.0)
+    for name, share in parsed.stage.items():
+        row = spec.stage_weights[name]
+        for key in _METRIC_KEYS:
+            mixed[key] += share * row[key]
+    return mixed
+
+
+def _answer_factor(parsed: _Parsed, spec: _Spec, metric: str) -> float:
+    qid = _METRIC_ANSWERS[metric]
+    if qid == _SCORE_ID:
+        value = parsed.material
+    else:
+        value = parsed.noul[qid]
+    return 1.0 + spec.answer_weights[qid] * value
+
+
+def _score_metrics(
+    metrics: _Metrics, parsed: _Parsed, spec: _Spec, stage: Mapping[str, float]
+) -> float:
+    total = 0.0
+    for key in _METRIC_KEYS:
+        total += (
+            spec.metric_weights[key]
+            * getattr(metrics, key)
+            * stage[key]
+            * _answer_factor(parsed, spec, key)
+        )
+    return total
 
 
 def _code_score(metrics: _Metrics, spec: _Spec, stage: str) -> float:
@@ -671,7 +909,7 @@ def _shortlist(
     return best, chosen
 
 
-def _pick_choice(parsed: _Parsed, shortlist: Sequence[Square]) -> Square:
+def _pick_choice(parsed: _ChoiceParsed, shortlist: Sequence[Square]) -> Square:
     keys = {square.algebraic: square for square in shortlist}
     if parsed.choice is not None:
         if parsed.choice not in keys:
@@ -694,7 +932,7 @@ def _format_number(value: float) -> str:
 def _candidate_log_line(
     square: Square,
     metrics: _Metrics,
-    parsed: _Parsed,
+    parsed: _ChoiceParsed,
     spec: _Spec,
     stage: str,
     selected: bool,
@@ -721,7 +959,7 @@ def _candidate_log_line(
 def _log_candidates(
     places: Sequence[Square],
     metrics: Mapping[Square, _Metrics],
-    parsed: _Parsed,
+    parsed: _ChoiceParsed,
     spec: _Spec,
     stage: str,
     selected: Square,
@@ -747,10 +985,28 @@ def _log_candidates(
         )
 
 
-def _select_square(
+def _select_priority_square(
     position: Position,
     places: Sequence[Square],
     parsed: _Parsed,
+    spec: _Spec,
+) -> Square:
+    metrics = _after_metrics(position, places)
+    stage = _stage_mix(parsed, spec)
+    best_square = places[0]
+    best_score = _score_metrics(metrics[best_square], parsed, spec, stage)
+    for square in places[1:]:
+        score = _score_metrics(metrics[square], parsed, spec, stage)
+        if score > best_score:
+            best_score = score
+            best_square = square
+    return best_square
+
+
+def _select_choice_square(
+    position: Position,
+    places: Sequence[Square],
+    parsed: _ChoiceParsed,
     spec: _Spec,
 ) -> Square:
     stage = _stage_of(position.board, spec)
@@ -774,6 +1030,24 @@ def _select_square(
         frozenset(shortlist),
     )
     return selected
+
+
+def _select_square(
+    position: Position,
+    places: Sequence[Square],
+    parsed: _Parsed | _ChoiceParsed,
+    spec: _Spec,
+) -> Square:
+    if isinstance(parsed, _ChoiceParsed):
+        return _select_choice_square(position, places, parsed, spec)
+    return _select_priority_square(position, places, parsed, spec)
+
+
+def _dummy_parsed(places: Sequence[Square]) -> _ChoiceParsed:
+    return _ChoiceParsed(
+        probabilities={square.algebraic: 0.0 for square in places},
+        confidence=1.0,
+    )
 
 
 def _select_code_best(
@@ -804,33 +1078,6 @@ def _legal_square(square: Square, places: Sequence[Square]) -> Square:
     return square
 
 
-def _normalize_map(raw: Mapping[Square, float]) -> dict[Square, float]:
-    values = tuple(raw.values())
-    lo = min(values)
-    span = max(values) - lo
-    if span == 0.0:
-        return dict.fromkeys(raw, 0.0)
-    return {square: (value - lo) / span for square, value in raw.items()}
-
-
-def _v1_normalized(
-    metrics: Mapping[Square, _Metrics],
-) -> dict[Square, _Metrics]:
-    position_n = _normalize_map({square: row.position for square, row in metrics.items()})
-    mobility_n = _normalize_map({square: row.mobility for square, row in metrics.items()})
-    material_n = _normalize_map({square: row.material for square, row in metrics.items()})
-    corners_n = _normalize_map({square: row.corners for square, row in metrics.items()})
-    return {
-        square: _Metrics(
-            position=position_n[square],
-            mobility=mobility_n[square],
-            material=material_n[square],
-            corners=corners_n[square],
-        )
-        for square in metrics
-    }
-
-
 def _v1_code_score(metrics: _Metrics, spec: _Spec, stage: str) -> float:
     mix = spec.stage_weights[stage]
     total = 0.0
@@ -838,13 +1085,6 @@ def _v1_code_score(metrics: _Metrics, spec: _Spec, stage: str) -> float:
         factor = 1.0 + _V1_ANSWER_WEIGHTS[_V1_METRIC_ANSWERS[key]] * _V1_CONSTANT_ANSWER
         total += spec.metric_weights[key] * mix[key] * getattr(metrics, key) * factor
     return total
-
-
-def _dummy_parsed(places: Sequence[Square]) -> _Parsed:
-    return _Parsed(
-        probabilities={square.algebraic: 0.0 for square in places},
-        confidence=1.0,
-    )
 
 
 def _select_square_v1(
@@ -888,25 +1128,21 @@ def _spec_for_config(spec: _Spec, config: str) -> _Spec:
     return spec
 
 
-def _ask_jev(
-    position: Position,
-    places: Sequence[Square],
-    spec: _Spec,
-) -> _Parsed:
-    key = read_secret()
-    lines = _place_lines(position, places, spec)
-    state = _decision_state(position, spec, lines)
-    questions = _decision_questions(spec, lines)
+def _create_decisions(
+    key: str,
+    questions: Mapping[str, Any],
+    state: Mapping[str, Any],
+) -> object:
     try:
         with OpenRouter(
             api_key=key,
             server_url=DECISIONS_SERVER,
             timeout_ms=DECISIONS_TIMEOUT_MS,
         ) as client:
-            response = client.alpha.decisions.create(
+            return client.alpha.decisions.create(
                 model=MODEL_ID,
-                questions=questions,
-                state=state,
+                questions=dict(questions),
+                state=dict(state),
                 retries=_NO_RETRY,
                 timeout_ms=DECISIONS_TIMEOUT_MS,
             )
@@ -914,19 +1150,57 @@ def _ask_jev(
         raise
     except Exception:  # noqa: BLE001 - SDK の 4xx/5xx/timeout を継続不能に畳む
         raise ExternalModelError("OpenRouter の呼出しに失敗しました") from None
-    return _answers_from_response(response, spec, places)
 
 
-def _call_openrouter(position: Position, places: Sequence[Square]) -> Square:
-    spec = _spec_for_config(_load_spec(), _active_stage1_config)
+def _ask_priority(
+    position: Position,
+    places: Sequence[Square],
+    spec: _Spec,
+) -> _Parsed:
+    key = read_secret()
+    response = _create_decisions(
+        key, spec.questions, _board_state(position, places, spec)
+    )
+    parsed = _priority_from_response(response, spec)
+    return parsed
+
+
+def _ask_choice(
+    position: Position,
+    places: Sequence[Square],
+    spec: _Spec,
+) -> _ChoiceParsed:
+    key = read_secret()
+    lines = _place_lines(position, places, spec)
+    state = _decision_state(position, spec, lines)
+    questions = _decision_questions(spec, lines)
+    response = _create_decisions(key, questions, state)
+    parsed = _answers_from_response(response, spec, places)
+    assert isinstance(parsed, _ChoiceParsed)
+    return parsed
+
+
+def _call_choice_openrouter(
+    position: Position,
+    places: Sequence[Square],
+    spec: _Spec,
+) -> Square:
     stage = _stage_of(position.board, spec)
     metrics = _after_metrics(position, places, spec)
     scores = _code_scores(places, metrics, spec, stage)
     _, shortlist = _shortlist(places, scores, spec)
     if spec.margin == 0.0 or len(shortlist) == 1:
-        parsed = _dummy_parsed(places)
+        parsed: _ChoiceParsed = _dummy_parsed(places)
     else:
-        parsed = _ask_jev(position, shortlist, spec)
+        parsed = _ask_choice(position, shortlist, spec)
+    return _legal_square(_select_square(position, places, parsed, spec), places)
+
+
+def _call_openrouter(position: Position, places: Sequence[Square]) -> Square:
+    spec = _spec_for_config(_load_spec(), _active_stage1_config)
+    if _active_stage1_config in _CHOICE_CONFIGS:
+        return _call_choice_openrouter(position, places, spec)
+    parsed = _ask_priority(position, places, spec)
     return _legal_square(_select_square(position, places, parsed, spec), places)
 
 

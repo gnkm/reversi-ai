@@ -370,7 +370,7 @@ def test_jev_failure_on_start_does_not_leave_partial_game(
     assert listed.status_code == 200
 
 
-def test_catalog_jev_default_starts_without_openrouter(
+def test_catalog_jev_default_calls_openrouter_on_start(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
@@ -383,10 +383,8 @@ def test_catalog_jev_default_starts_without_openrouter(
         "/api/games",
         json={"black": _JEV, "white": _HUMAN},
     )
-    assert response.status_code == 201
-    game = GameState.model_validate(response.json())
-    assert game.status == "in_progress"
-    assert game.board[3][3] in {"black", "white"}
+    _problem(response, 422, "external_model_failed")
+    assert "sk-" not in response.text
 
 
 def test_jev_failure_after_human_move_marks_unplayable_without_adopting_model_move(
