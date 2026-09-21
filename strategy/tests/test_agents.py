@@ -142,6 +142,13 @@ def test_catalog_lists_random_uniform_specimen() -> None:
     assert _JAPANESE.search(item.description)
 
 
+def test_catalog_descriptions_are_at_most_100_unicode_points() -> None:
+    for item in items():
+        assert item.description.strip(), item.specimen_id
+        assert _JAPANESE.search(item.description), item.specimen_id
+        assert len(item.description) <= 100, (item.specimen_id, len(item.description))
+
+
 def test_catalog_selects_by_specimen_id_not_category() -> None:
     item = get(SPECIMEN_ID)
     assert item.specimen_id == SPECIMEN_ID
@@ -2095,6 +2102,7 @@ def test_catalog_lists_minimax() -> None:
     assert "ミニマックス" in item.description
     assert "深さ 4" in item.description
     assert "点数表" in item.description
+    assert len(item.description) <= 100
     assert get(minimax.SPECIMEN_ID) == item
     with pytest.raises(KeyError):
         get("rule_based")
@@ -2368,17 +2376,18 @@ def test_catalog_lists_alphabeta() -> None:
     assert item.description == alphabeta.DESCRIPTION
     assert item.description.strip()
     assert _JAPANESE.search(item.description)
-    assert "Negamax" in item.description
+    assert "アルファベータ" in item.description
     assert "深さ 4" in item.description
-    assert "Mobility" in item.description
-    assert "Corner" in item.description
-    assert "Move Ordering" in item.description
-    assert "Transposition Table" in item.description
-    assert "Zobrist" in item.description
-    assert "Frontier" in item.description
-    assert "Game Phase" in item.description
+    assert "Move Ordering" not in item.description
+    assert "Transposition Table" not in item.description
+    assert "Zobrist" not in item.description
+    assert "Mobility" not in item.description
+    assert "Corner" not in item.description
+    assert "Frontier" not in item.description
+    assert "Game Phase" not in item.description
     assert "完全読み" not in item.description
     assert "点数表" not in item.description
+    assert len(item.description) <= 100
     assert item.specimen_id != minimax_item.specimen_id
     assert item.display_name != minimax_item.display_name
     assert alphabeta.SEARCH_DEPTH == 4
@@ -3559,9 +3568,10 @@ def test_extra_genai_config_adds_display_name_and_calls_model_id(
     assert item.display_name == "生成 AI (GPT)"
     assert item.description.strip()
     assert _JAPANESE.search(item.description)
-    assert model_id in item.description
+    assert model_id not in item.description
     assert "Chat Completions" in item.description
     assert "WTHOR" in item.description
+    assert len(item.description) <= 100
     assert get(item.specimen_id) == item
 
     seen: dict[str, str] = {}

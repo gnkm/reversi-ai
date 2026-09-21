@@ -20,13 +20,8 @@ SPECIMEN_ID = "alphabeta"
 CATEGORY = "rule_based"
 DISPLAY_NAME = "ルールベース (αβ)"
 DESCRIPTION = (
-    "深さ 4 の Negamax 形式のアルファベータ探索で合法手を選ぶ。"
-    "探索前に合法手を Move Ordering で並べる（角、相手の合法手を減らす手、安全な辺、通常、C、X）。"
-    "同じ局面へ別手順で到達したときは Transposition Table（Zobrist ハッシュ）で再探索を省く。"
-    "葉の評価は Mobility 差・Corner 差・X/C・Frontier 差・石数差の一次結合である。"
-    "石数の重みは空きマス数（Game Phase）で変える。"
-    "探索深さはミニマックス個体と同じ 4 であり、空きマスが少なくても終局まで延長しない。"
-    "対局中に深さを変えない。対局中に学習済みモデルも OpenRouter も呼ばない。"
+    "深さ 4 のアルファベータ探索で合法手を選ぶ。"
+    "深さを対局中に変えない。対局中に学習済みモデルも OpenRouter も呼ばない。"
 )
 SEARCH_DEPTH = 4
 
