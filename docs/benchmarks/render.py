@@ -19,6 +19,7 @@ SHORT_NAME = {
     "most_flips": "最多",
     "positional": "位置",
     "minimax": "ミニ",
+    "alphabeta": "αβ",
     "opening": "定石",
     "ml": "ML",
     "lgbm": "LGBM",
@@ -39,6 +40,7 @@ XY_PLOT_COLORS = (
     "#17BECF",
     "#2CA02C",
     "#6A3D9A",
+    "#A6761D",
 )
 
 
@@ -263,7 +265,7 @@ def change_line(previous: Snapshot | None, current: Snapshot) -> str:
     parts.extend(extra)
     if not parts:
         return "学習成果物の blob は同一"
-    return "。".join(parts)
+    return "。".join(part.rstrip("。") for part in parts)
 
 
 def generation_changes(snapshots: Sequence[Snapshot]) -> dict[str, str]:
