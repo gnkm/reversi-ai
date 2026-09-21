@@ -2727,6 +2727,18 @@ _MIDGAME_ELEVEN_EMPTY = (
     "WWWWWWWW",
 )
 
+# 空きマスちょうど 10。完全読みなら a1 が石数差 +2。閾値を < 10 にすると深さ 6 の葉になる。
+_ENDGAME_TEN_EMPTY = (
+    "..BBBBBB",
+    ".BBBBBBB",
+    "B.BBBBB.",
+    "BBBWWBBB",
+    "BBWWWBB.",
+    "BBBBWWW.",
+    "W.BBBWWW",
+    ".BBB.BBB",
+)
+
 
 def test_alphabeta_endgame_leaf_is_terminal_disc_diff() -> None:
     position = _two_empty_white_plays_a1()
@@ -2787,6 +2799,22 @@ def test_alphabeta_above_endgame_keeps_depth_six_leaf() -> None:
     assert alphabeta.choose_move(position) == move
     assert alphabeta.choose_move(position) == alphabeta.choose_at_depth(position, 6)
     assert alphabeta.SEARCH_DEPTH == 6
+
+
+def test_alphabeta_endgame_includes_exactly_ten_empty() -> None:
+    position = _position_from_rank8_rows(_ENDGAME_TEN_EMPTY, Color.BLACK)
+    assert _empty_squares(position.board) == alphabeta.ENDGAME_EMPTY == 10
+    places = {square.algebraic for square in legal_places(position)}
+    assert places == {"a1", "h3"}
+    move, value, _nodes = alphabeta.search_stats(position, alphabeta.SEARCH_DEPTH)
+    assert move == Place(Square.parse("a1"))
+    assert value == 2
+    assert abs(value) <= BOARD_SIZE * BOARD_SIZE
+    heuristic_now = alphabeta.leaf_score(position.board, Color.BLACK)
+    assert heuristic_now == _phase4_leaf_score(position.board, Color.BLACK)
+    assert value != heuristic_now
+    assert alphabeta.choose_move(position) == move
+    assert alphabeta.choose_at_depth(position, 4) == move
 
 
 def test_alphabeta_endgame_threshold_stays_ten() -> None:
