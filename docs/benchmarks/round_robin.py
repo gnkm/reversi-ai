@@ -4,6 +4,7 @@
 対局の再実行は CI に載せない。ホストで明示的に走らせる。
 起動は README の対局コマンドのまま。本スクリプトはコンテナを起動しない。
 OpenRouter の鍵は戦略コンテナだけが読む。ホストの Python は鍵を受け取らない。
+`git.models_commit` は作業ツリーの `git.blobs` と同じ tree を持つコミットだけを書く。
 """
 
 from __future__ import annotations
@@ -398,6 +399,42 @@ def git_head(root: Path) -> str:
     ).strip()
 
 
+def git_tree_blobs(root: Path, commit: str, paths: Sequence[str]) -> dict[str, str]:
+    output = subprocess.check_output(
+        ["git", "ls-tree", commit, "--", *paths],
+        cwd=root,
+        text=True,
+    )
+    blobs: dict[str, str] = {}
+    for line in output.splitlines():
+        meta, path = line.split("\t", 1)
+        blobs[path] = meta.split()[2]
+    return blobs
+
+
+def blob_mismatches(
+    working: Mapping[str, str], tree: Mapping[str, str]
+) -> tuple[str, ...]:
+    return tuple(path for path, digest in working.items() if tree.get(path) != digest)
+
+
+def require_commit_blobs(
+    commit: str, working: Mapping[str, str], tree: Mapping[str, str]
+) -> None:
+    bad = blob_mismatches(working, tree)
+    if not bad:
+        return
+    detail = "; ".join(
+        f"{path} working={working[path]} commit={tree.get(path, 'missing')}"
+        for path in bad
+    )
+    raise SystemExit(
+        f"コミット {commit} の models/ が git.blobs と一致しません。"
+        "学習成果物を先にコミットしてから総当たりしてください。"
+        f" {detail}"
+    )
+
+
 def atomic_write(path: Path, payload: Mapping[str, Any]) -> None:
     serialized = json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
     handle = tempfile.NamedTemporaryFile(  # noqa: SIM115 - replace で原子的に置く
@@ -573,6 +610,30 @@ def self_check() -> None:
     assert payload["standings"][0]["points"] == 1.5
     assert payload["standings"][1]["points"] == 0.5
     assert archive_filename("2026-09-21 15:55") == "2026-09-21-1555.json"
+    assert blob_mismatches({"models/ml.json": "def"}, {"models/ml.json": "def"}) == ()
+    assert blob_mismatches({"models/ml.json": "def"}, {"models/ml.json": "other"}) == (
+        "models/ml.json",
+    )
+    require_commit_blobs("abc", {"models/ml.json": "def"}, {"models/ml.json": "def"})
+    try:
+        require_commit_blobs(
+            "abc", {"models/ml.json": "def"}, {"models/ml.json": "other"}
+        )
+    except SystemExit as exc:
+        assert "abc" in str(exc)
+        assert "models/ml.json" in str(exc)
+    else:
+        raise AssertionError("blob 不一致を拒否しない")
+    recorded = json.loads(SOURCE.read_text(encoding="utf-8"))
+    recorded_commit = str(recorded["git"]["models_commit"])
+    recorded_blobs = {
+        str(path): str(digest) for path, digest in recorded["git"]["blobs"].items()
+    }
+    require_commit_blobs(
+        recorded_commit,
+        recorded_blobs,
+        git_tree_blobs(ROOT, recorded_commit, tuple(recorded_blobs)),
+    )
     identity = progress_identity(ORIGIN, items, {"models/ml.json": "def"})
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "progress.jsonl"
@@ -649,6 +710,10 @@ def run_tournament(args: argparse.Namespace) -> int:
             print(f"{names[black]} vs {names[white]}", flush=True)
         return 0
     blobs = git_blobs(ROOT, MODEL_PATHS)
+    models_commit = git_head(ROOT)
+    require_commit_blobs(
+        models_commit, blobs, git_tree_blobs(ROOT, models_commit, MODEL_PATHS)
+    )
     done = prepare_progress(
         args.progress, progress_identity(origin, items, blobs)
     )
@@ -691,11 +756,16 @@ def run_tournament(args: argparse.Namespace) -> int:
         archived = archive_current(args.output, args.archive_dir)
         if archived is not None:
             print(f"archived {archived}", flush=True)
+    if git_blobs(ROOT, MODEL_PATHS) != blobs:
+        raise SystemExit("対局中に models/ が変わった。正本は書き換えない。")
+    require_commit_blobs(
+        models_commit, blobs, git_tree_blobs(ROOT, models_commit, MODEL_PATHS)
+    )
     payload = build_payload(
         items,
         results,
         recorded_at=datetime.now(JST).strftime("%Y-%m-%d %H:%M"),
-        models_commit=git_head(ROOT),
+        models_commit=models_commit,
         blobs=blobs,
         extra_notes=tuple(args.note),
         endpoint=origin,
