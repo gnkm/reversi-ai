@@ -124,16 +124,89 @@ def play_with_retries(black: str, white: str, seed: int, retries: int) -> dict[s
     raise RuntimeError(f"{black} vs {white} が継続不能") from last
 
 
-def _load_done(path: Path) -> dict[tuple[str, str], dict[str, Any]]:
-    done: dict[tuple[str, str], dict[str, Any]] = {}
-    if not path.is_file():
-        return done
-    for line in path.read_text(encoding="utf-8").splitlines():
-        if not line.strip():
-            continue
-        row = json.loads(line)
-        done[(str(row["black"]), str(row["white"]))] = row
+def progress_identity(
+    catalog: Sequence[dict[str, str]],
+    blobs: dict[str, str],
+    seed: int,
+) -> dict[str, Any]:
+    """通常版と同じ世代に、ホスト対局の乱数種を足す。"""
+    identity = round_robin.progress_identity("in-process", catalog, blobs)
+    identity["seed"] = int(seed)
+    return identity
+
+
+def prepare_local_progress(
+    path: Path, identity: dict[str, Any]
+) -> dict[tuple[str, str], dict[str, Any]]:
+    """世代か seed が違う進捗は再利用しない。"""
+    done = round_robin.prepare_progress(path, identity)
+    meta = round_robin.read_progress_meta(path)
+    if meta is None or meta.get("seed") != identity.get("seed"):
+        raise SystemExit(
+            "progress の seed が現行と違います。"
+            f"削除するか --progress で別ファイルを指定してください: {path}"
+        )
     return done
+
+
+def self_check() -> None:
+    identity = progress_identity(
+        [{"specimen_id": "a"}, {"specimen_id": "b"}],
+        {"models/rl.json": "abc"},
+        20260922,
+    )
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "progress.jsonl"
+        assert prepare_local_progress(path, identity) == {}
+        round_robin.append_progress(
+            path,
+            {
+                "black": "a",
+                "white": "b",
+                "winner": "black",
+                "score_black": 40,
+                "score_white": 24,
+                "id": "g",
+                "is_over": True,
+                "status": "completed",
+            },
+        )
+        resumed = prepare_local_progress(path, identity)
+        assert resumed[("a", "b")]["winner"] == "black"
+        other_seed = progress_identity(
+            [{"specimen_id": "a"}, {"specimen_id": "b"}],
+            {"models/rl.json": "abc"},
+            1,
+        )
+        try:
+            prepare_local_progress(path, other_seed)
+        except SystemExit:
+            pass
+        else:
+            raise AssertionError("seed が違う progress を再利用してはいけない")
+        other_blobs = progress_identity(
+            [{"specimen_id": "a"}, {"specimen_id": "b"}],
+            {"models/rl.json": "other"},
+            20260922,
+        )
+        try:
+            prepare_local_progress(path, other_blobs)
+        except SystemExit:
+            pass
+        else:
+            raise AssertionError("学習成果物が違う progress を再利用してはいけない")
+        stale = Path(tmp) / "stale.jsonl"
+        stale.write_text(
+            json.dumps({"black": "a", "white": "b", "winner": "black"}) + "\n",
+            encoding="utf-8",
+        )
+        try:
+            prepare_local_progress(stale, identity)
+        except SystemExit:
+            pass
+        else:
+            raise AssertionError("識別のない progress を再利用してはいけない")
+    print("self-check ok", flush=True)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -145,7 +218,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--workers", type=int, default=0)
     parser.add_argument("--retries", type=int, default=3)
     parser.add_argument("--note", action="append", default=[])
+    parser.add_argument("--self-check", action="store_true", help="対局せず進捗の世代検査だけを固定する")
     args = parser.parse_args(argv)
+    if args.self_check:
+        self_check()
+        return 0
     secret = bind_secret()
     if secret is not None:
         from reversi.agents import jev
@@ -160,14 +237,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         for item in items()
     ]
     pairs = round_robin.make_pairs(catalog)
-    done = _load_done(args.progress)
-    pending = [pair for pair in pairs if pair not in done]
-    workers = args.workers if args.workers > 0 else (os.cpu_count() or 1)
-    print(
-        f"agents {[item['specimen_id'] for item in catalog]} "
-        f"games {len(pairs)} pending {len(pending)} workers {workers}",
-        flush=True,
-    )
     blobs = round_robin.git_blobs(ROOT, round_robin.MODEL_PATHS)
     models_commit = round_robin.git_head(ROOT)
     round_robin.require_commit_blobs(
@@ -175,12 +244,20 @@ def main(argv: Sequence[str] | None = None) -> int:
         blobs,
         round_robin.git_tree_blobs(ROOT, models_commit, round_robin.MODEL_PATHS),
     )
-    args.progress.parent.mkdir(parents=True, exist_ok=True)
+    done = prepare_local_progress(
+        args.progress, progress_identity(catalog, blobs, args.seed)
+    )
+    pending = [pair for pair in pairs if pair not in done]
+    workers = args.workers if args.workers > 0 else (os.cpu_count() or 1)
+    print(
+        f"agents {[item['specimen_id'] for item in catalog]} "
+        f"games {len(pairs)} pending {len(pending)} workers {workers}",
+        flush=True,
+    )
     results = [done[pair] for pair in pairs if pair in done]
 
     def _store(row: dict[str, Any]) -> None:
-        with args.progress.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(row, ensure_ascii=False) + "\n")
+        round_robin.append_progress(args.progress, row)
         results.append(row)
         print(
             f"{len(results):03d}/{len(pairs)} {row['black']} vs {row['white']} "
@@ -227,6 +304,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         endpoint="in-process",
     )
     round_robin.atomic_write(args.output, payload)
+    args.progress.unlink(missing_ok=True)
     print(f"wrote {args.output}", flush=True)
     return 0
 
