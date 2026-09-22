@@ -24,6 +24,7 @@ SHORT_NAME = {
     "ml": "ML",
     "lgbm": "LGBM",
     "rl": "RL",
+    "rl_search": "RL読",
     "nn": "NN",
     "jev": "Jev",
 }

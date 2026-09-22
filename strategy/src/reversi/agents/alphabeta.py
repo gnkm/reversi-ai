@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import math
+from collections.abc import Callable
 from random import Random
 
 from reversi.engine.board import BOARD_SIZE, Board, Color, Square, Stone
@@ -67,9 +69,12 @@ _TT_EXACT = "exact"
 _TT_LOWER = "lower"
 _TT_UPPER = "upper"
 
+# 葉の差し替えは大小だけを使う。葉の外に閾値や定数ボーナスは足さない。
+LeafScore = Callable[[Board, Color], float]
+
 # Zobrist 乱数は探索用ハッシュに限る。対局エンジンは 8×8 配列のまま。
 _ZOBRIST_SEED = 0xA1B2C3D4E5F60789
-_TtTable = dict[tuple[int, int], tuple[int, str]]
+_TtTable = dict[tuple[int, int], tuple[float, str]]
 
 
 def _zobrist_tables(seed: int) -> tuple[tuple[tuple[int, int], ...], int]:
@@ -127,9 +132,10 @@ def choose_at_depth(
     *,
     order: bool = True,
     table: bool = True,
+    evaluate: LeafScore | None = None,
 ) -> Place | None:
-    """指定深さの Negamax で合法手を選ぶ。対局経路は SEARCH_DEPTH を渡す。"""
-    place, _value, _nodes = _search_root(position, depth, order, table)
+    """指定深さの Negamax で合法手を選ぶ。対局経路は既定の葉と SEARCH_DEPTH。"""
+    place, _value, _nodes = _search_root(position, depth, order, table, evaluate)
     return place
 
 
@@ -139,9 +145,19 @@ def search_stats(
     *,
     order: bool = True,
     table: bool = True,
-) -> tuple[Place | None, int | None, int]:
+    evaluate: LeafScore | None = None,
+) -> tuple[Place | None, float | None, int]:
     """(手, その Negamax 値, 探索ノード数)。合法手が無ければ値は None。"""
-    return _search_root(position, depth, order, table)
+    return _search_root(position, depth, order, table, evaluate)
+
+
+def _leaf_and_bounds(
+    evaluate: LeafScore | None,
+) -> tuple[LeafScore, float, float]:
+    """既定の葉は整数の番兵。差し替え葉は無限大で、葉の値へは何も足さない。"""
+    if evaluate is None:
+        return leaf_score, _NEG_INF, _POS_INF
+    return evaluate, -math.inf, math.inf
 
 
 def ordered_places(position: Position) -> tuple[Square, ...]:
@@ -313,9 +329,9 @@ def _tt_probe(
     table: _TtTable,
     key: int,
     remaining: int,
-    alpha: int,
-    beta: int,
-) -> int | None:
+    alpha: float,
+    beta: float,
+) -> float | None:
     entry = table.get((key, remaining))
     if entry is None:
         return None
@@ -333,9 +349,9 @@ def _tt_store(
     table: _TtTable,
     key: int,
     remaining: int,
-    value: int,
-    alpha_orig: int,
-    beta: int,
+    value: float,
+    alpha_orig: float,
+    beta: float,
 ) -> None:
     if value <= alpha_orig:
         bound = _TT_UPPER
@@ -351,14 +367,28 @@ def _search_root(
     depth: int,
     order: bool,
     use_table: bool,
-) -> tuple[Place | None, int | None, int]:
+    evaluate: LeafScore | None = None,
+) -> tuple[Place | None, float | None, int]:
     nodes = [0]
     table: _TtTable | None = {} if use_table else None
+    score_of, neg_inf, pos_inf = _leaf_and_bounds(evaluate)
     best_square = None
-    best_value: int | None = None
+    best_value: float | None = None
     for square in legal_places(position):
         child = play(position, Place(square))
-        value = -_negamax(child, 1, _NEG_INF, _POS_INF, depth, order, nodes, table)
+        value = -_negamax(
+            child,
+            1,
+            neg_inf,
+            pos_inf,
+            depth,
+            order,
+            nodes,
+            table,
+            score_of,
+            neg_inf,
+            pos_inf,
+        )
         if best_value is None or value > best_value:
             best_value = value
             best_square = square
@@ -370,13 +400,16 @@ def _search_root(
 def _negamax(
     position: Position,
     ply: int,
-    alpha: int,
-    beta: int,
+    alpha: float,
+    beta: float,
     limit: int,
     order: bool,
     nodes: list[int],
     table: _TtTable | None,
-) -> int:
+    score_of: LeafScore,
+    neg_inf: float,
+    pos_inf: float,
+) -> float:
     nodes[0] += 1
     remaining = limit - ply
     key = _position_key(position) if table is not None else 0
@@ -385,16 +418,26 @@ def _negamax(
         if hit is not None:
             return hit
     if _is_leaf(position, ply, limit):
-        value = leaf_score(position.board, position.side_to_move)
+        value = score_of(position.board, position.side_to_move)
         if table is not None:
             table[(key, remaining)] = (value, _TT_EXACT)
         return value
     alpha_orig = alpha
-    value = _NEG_INF
+    value: float = neg_inf
     for move in _moves_to_search(position, order):
         child = play(position, move)
         child_value = -_negamax(
-            child, ply + 1, -beta, -alpha, limit, order, nodes, table
+            child,
+            ply + 1,
+            -beta,
+            -alpha,
+            limit,
+            order,
+            nodes,
+            table,
+            score_of,
+            neg_inf,
+            pos_inf,
         )
         value = max(value, child_value)
         alpha = max(alpha, value)

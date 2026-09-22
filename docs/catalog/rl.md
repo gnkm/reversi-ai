@@ -27,13 +27,20 @@ b \leftarrow b + \alpha\,\delta
 ```python
 def value_of(board: Board, policy: LinearPolicy) -> float:
     total = policy.bias
-    for weight, feature in zip(policy.weights, encode(board).as_vector(), strict=True):
-        if feature:
-            total += weight
+    for rank, row in enumerate(board.cells):
+        base = rank * 8
+        for file, stone in enumerate(row):
+            index = base + file
+            if stone is Stone.BLACK:
+                total += policy.weights[index]
+            elif stone is Stone.WHITE:
+                total += policy.weights[64 + index]
+            else:
+                total += policy.weights[128 + index]
     return total
 ```
 
-特徴は 0/1 なので、1 の成分の重みだけを足せば内積になる。
+各マスは黒・白・空のどれか一つなので、立っている平面の重みだけを足せば内積になる。
 
 ## 出典
 

@@ -37,7 +37,7 @@ MODEL_PATHS = (
 )
 JST = timezone(timedelta(hours=9))
 CTX = ssl._create_unverified_context()
-SEARCH = frozenset({"minimax", "alphabeta"})
+SEARCH = frozenset({"minimax", "alphabeta", "rl_search"})
 GENERATIVE = "generative_ai"
 PROGRESS_META = "progress_meta"
 

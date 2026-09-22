@@ -16,6 +16,7 @@ _BUILTIN = (
     "ml",
     "lgbm",
     "rl",
+    "rl_search",
     "nn",
     "jev",
 )

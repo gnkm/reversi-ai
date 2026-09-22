@@ -1,7 +1,7 @@
 ---
 title: アーキテクチャ
 product: Reversi Agents
-version: 0.1.42
+version: 0.1.43
 status: working
 date: 2026-09-22
 source: docs/srs.md
@@ -16,7 +16,7 @@ tech_stack_version: 0.2.20
 | --- | --- |
 | 文書識別 | reversi-ai-architecture |
 | 対象ソフトウェア | Reversi Agents |
-| 版 | 0.1.42 |
+| 版 | 0.1.43 |
 | 状態 | 現行（設計。要求ではない） |
 | 日付 | 2026-09-22 |
 | 入力 | [`docs/srs.md`](srs.md) 0.1.25、[`docs/tech-stack.md`](tech-stack.md) 0.2.20 |
@@ -205,6 +205,7 @@ reversi-ai/
 │   │   │   ├── ml.py                  # 機械学習 (棋譜)。係数 JSON の積和のみ
 │   │   │   ├── lgbm.py                # 機械学習 (LightGBM)。ネイティブテキストを読む
 │   │   │   ├── rl.py                  # 強化学習 (自己対局)。線形重み。NN も OpenRouter も使わない
+│   │   │   ├── rl_search.py           # 強化学習 (自己対局＋読み)。葉は線形 v の深さ 4 αβ。NN も OpenRouter も使わない
 │   │   │   ├── nn.py                  # ニューラルネットワーク (棋譜)。ONNX CPU
 │   │   │   ├── prompt.py              # prompts/ の Markdown と JSON を読む
 │   │   │   ├── jev.py                 # 生成 AI (Jev)。優先の答えと着手後評価を合成
@@ -340,7 +341,8 @@ reversi-ai/
 | `opening.py` | ルールベース (定石) | 虎・牛・鼠の 3 列と 8 対称。外れは位置評価 |
 | `ml.py` | 機械学習 (棋譜) | `models/ml.json` の積和。onnxruntime / PyTorch を import しない |
 | `lgbm.py` | 機械学習 (LightGBM) | `models/lgbm.txt` を LightGBM ネイティブ形式で読む。onnxruntime / PyTorch / joblib / pickle を import しない |
-| `rl.py` | 強化学習 (自己対局) | `models/rl.json`。NN 推論も OpenRouter も使わない |
+| `rl.py` | 強化学習 (自己対局) | `models/rl.json`。着手直後の線形 v だけで選ぶ（1 手読み）。NN 推論も OpenRouter も使わない |
+| `rl_search.py` | 強化学習 (自己対局＋読み) | 同じ `models/rl.json` の線形 v を葉にした深さ 4 の αβ。白番は v を符号反転する。葉の外に閾値や定数ボーナスは足さない。探索の Move Ordering と Transposition Table は `alphabeta.py` と共有し、カタログの αβ 個体の葉（Mobility・Corner・X/C・Frontier・石差）は置き換えない。終盤完全読みはしない。新しい重みは学習しない。NN 推論も OpenRouter も使わない |
 | `nn.py` | ニューラルネットワーク (棋譜) | `models/nn.onnx` を onnxruntime CPU で順伝播し、合法手へマスク |
 | `prompt.py` | （指示ファイル） | `prompts/` の Markdown と JSON を対局時に読む。欠落は継続不能 |
 | `jev.py` | 生成 AI (Jev) | `typesafe/jev-1.13` の Decisions API。1 着手 1 呼出しで優先の原子質問を送り、typed answers とコードの着手後評価を合成する。指示は `prompts/jev.json`。合法手の外を採用しない。合法手が 1 つのときは Decisions を呼ばない。検証用に第 1 版定数・コードだけ・全合法手 Choice・絞り込みの 4 構成を切り替えられる。カタログ表示名は増やさない。カタログの既定は優先合成であり、コード最善（`v2_jev0`）や合法手 Choice にはしない |
@@ -447,6 +449,7 @@ web コンテナが Pod 内で `0.0.0.0:3000` を聞くのはよい。戦略コ�
 
 | 版 | 日付 | 内容 |
 | --- | --- | --- |
+| 0.1.43 | 2026-09-22 | 強化学習 (自己対局＋読み) を載せ、αβ の葉を線形 v に差し替えられるようにする |
 | 0.1.42 | 2026-09-22 | RL 改善の開始局面集合と段階 0 基準線を `docs/benchmarks/` に置く |
 | 0.1.41 | 2026-09-21 | 組込み個体の着手解説を `docs/catalog/` に置く |
 | 0.1.40 | 2026-09-21 | カタログ総当たりを起動済み対局 API へ問い合わせる `round_robin.py` を置く |

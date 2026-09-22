@@ -156,6 +156,7 @@ curl -sk https://127.0.0.1:3000/api/games \
 | 機械学習 (棋譜) | 対局前に学習したモデルで着手する | [docs/catalog/ml.md](docs/catalog/ml.md) |
 | 機械学習 (LightGBM) | 対局前に LightGBM で学習したモデルで着手する | [docs/catalog/lgbm.md](docs/catalog/lgbm.md) |
 | 強化学習 (自己対局) | 自己対局で得た方針で着手する | [docs/catalog/rl.md](docs/catalog/rl.md) |
+| 強化学習 (自己対局＋読み) | 自己対局で学んだ評価を、数手先を読んで使う | [docs/catalog/rl_search.md](docs/catalog/rl_search.md) |
 | ニューラルネットワーク (棋譜) | 対局前に学習したネットワークで着手する | [docs/catalog/nn.md](docs/catalog/nn.md) |
 | 生成 AI (Jev) | OpenRouter 上の Jev が合法手から選ぶ | [docs/catalog/jev.md](docs/catalog/jev.md) |
 

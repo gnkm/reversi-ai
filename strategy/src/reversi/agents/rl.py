@@ -8,8 +8,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from random import Random
 
-from reversi.encode import VECTOR_SIZE, encode
-from reversi.engine.board import Board, Color, Square
+from reversi.encode import VECTOR_SIZE
+from reversi.engine.board import BOARD_SIZE, Board, Color, Square, Stone
 from reversi.engine.rules import Place, Position, apply_place, legal_places
 
 SPECIMEN_ID = "rl"
@@ -33,6 +33,7 @@ __all__ = [
     "choose_move",
     "greedy_place",
     "load_policy",
+    "perspective_value",
     "value_of",
 ]
 
@@ -60,12 +61,29 @@ _CACHED_PATH: Path | None = None
 
 
 def value_of(board: Board, policy: LinearPolicy) -> float:
-    """黒有利为正の線形価値。"""
+    """黒有利为正の線形価値。特徴は黒・白・空の 0/1 なので、立っている成分の重みだけ足す。"""
+    weights = policy.weights
     total = policy.bias
-    for weight, feature in zip(policy.weights, encode(board).as_vector(), strict=True):
-        if feature:
-            total += weight
+    cells = board.cells
+    for rank, row in enumerate(cells):
+        base = rank * BOARD_SIZE
+        for file, stone in enumerate(row):
+            index = base + file
+            if stone is Stone.BLACK:
+                total += weights[index]
+            elif stone is Stone.WHITE:
+                total += weights[VECTOR_SIZE // 3 + index]
+            else:
+                total += weights[2 * (VECTOR_SIZE // 3) + index]
     return total
+
+
+def perspective_value(board: Board, color: Color, policy: LinearPolicy) -> float:
+    """手番 color から見た線形価値。白番は黒有利の v を符号反転する。"""
+    value = value_of(board, policy)
+    if color is Color.BLACK:
+        return value
+    return -value
 
 
 def load_policy(path: Path | None = None) -> LinearPolicy:
@@ -99,10 +117,7 @@ def default_policy() -> LinearPolicy:
 
 def _afterstate_score(position: Position, square: Square, policy: LinearPolicy) -> float:
     after = apply_place(position.board, square, position.side_to_move)
-    value = value_of(after, policy)
-    if position.side_to_move is Color.BLACK:
-        return value
-    return -value
+    return perspective_value(after, position.side_to_move, policy)
 
 
 def greedy_place(position: Position, policy: LinearPolicy) -> Place | None:
