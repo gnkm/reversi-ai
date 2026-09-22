@@ -15,7 +15,6 @@ from typing import Any
 import numpy as np
 
 from reversi.engine.board import BOARD_SIZE, Board, Color, Stone
-from reversi.engine.rules import count_places
 
 N_STAGES = 10
 STAGE_WIDTH = 6
@@ -260,6 +259,28 @@ _DELTAS = (
 )
 
 
+def _rays() -> tuple[tuple[tuple[int, ...], ...], ...]:
+    """各マスから 8 方向へ進む盤内の添字。合法手数を盤の配列だけで数える。"""
+    found: list[tuple[tuple[int, ...], ...]] = []
+    for rank in range(BOARD_SIZE):
+        for file in range(BOARD_SIZE):
+            origin: list[tuple[int, ...]] = []
+            for file_step, rank_step in _DELTAS:
+                ray: list[int] = []
+                next_file = file + file_step
+                next_rank = rank + rank_step
+                while 0 <= next_file < BOARD_SIZE and 0 <= next_rank < BOARD_SIZE:
+                    ray.append(next_rank * BOARD_SIZE + next_file)
+                    next_file += file_step
+                    next_rank += rank_step
+                origin.append(tuple(ray))
+            found.append(tuple(origin))
+    return tuple(found)
+
+
+_RAYS = _rays()
+
+
 def _pack(board: Board) -> np.ndarray:
     """空 0、黒 1、白 2。呼び出しのあいだだけ有効なバッファを返す。"""
     pack = _PACK
@@ -276,26 +297,26 @@ def _pack(board: Board) -> np.ndarray:
     return pack
 
 
-def _adjacent_empty(pack: np.ndarray, file: int, rank: int) -> bool:
+def _adjacent_empty_cells(cells: list[int], file: int, rank: int) -> bool:
     for file_step, rank_step in _DELTAS:
         next_file = file + file_step
         next_rank = rank + rank_step
         if (
             0 <= next_file < BOARD_SIZE
             and 0 <= next_rank < BOARD_SIZE
-            and pack[next_rank * BOARD_SIZE + next_file] == 0
+            and cells[next_rank * BOARD_SIZE + next_file] == 0
         ):
             return True
     return False
 
 
-def _frontier_feature(pack: np.ndarray) -> float:
+def _frontier_feature(cells: list[int]) -> float:
     black = 0
     white = 0
-    for index, state in enumerate(pack.tolist()):
+    for index, state in enumerate(cells):
         if state == 0:
             continue
-        if not _adjacent_empty(pack, index % BOARD_SIZE, index // BOARD_SIZE):
+        if not _adjacent_empty_cells(cells, index % BOARD_SIZE, index // BOARD_SIZE):
             continue
         if state == 1:
             black += 1
@@ -304,9 +325,33 @@ def _frontier_feature(pack: np.ndarray) -> float:
     return (black - white) / SCALAR_SCALE
 
 
-def _mobility_feature(board: Board) -> float:
-    black = count_places(board, Color.BLACK)
-    white = count_places(board, Color.WHITE)
+def _sandwiches(cells: list[int], ray: tuple[int, ...], own: int, opponent: int) -> bool:
+    seen = False
+    for index in ray:
+        stone = cells[index]
+        if stone == opponent:
+            seen = True
+            continue
+        return seen and stone == own
+    return False
+
+
+def _mobility_counts(cells: list[int]) -> tuple[int, int]:
+    """空 0・黒 1・白 2 の配列で、黒と白の合法手数。count_places と同じ数。"""
+    black = 0
+    white = 0
+    for origin, rays in enumerate(_RAYS):
+        if cells[origin] != 0:
+            continue
+        if any(_sandwiches(cells, ray, 1, 2) for ray in rays):
+            black += 1
+        if any(_sandwiches(cells, ray, 2, 1) for ray in rays):
+            white += 1
+    return black, white
+
+
+def _mobility_feature(cells: list[int]) -> float:
+    black, white = _mobility_counts(cells)
     return (black - white) / SCALAR_SCALE
 
 
@@ -337,13 +382,11 @@ def _pattern_total(
     return total
 
 
-def _scalar_values(
-    board: Board, pack: np.ndarray, side: Color
-) -> tuple[float, float, float]:
-    empty = int(np.count_nonzero(pack == 0))
+def _scalar_values(cells: list[int], side: Color) -> tuple[float, float, float]:
+    empty = cells.count(0)
     return (
-        _mobility_feature(board),
-        _frontier_feature(pack),
+        _mobility_feature(cells),
+        _frontier_feature(cells),
         _parity_feature(empty, side),
     )
 
@@ -355,10 +398,11 @@ def analyze(
 ) -> tuple[int, tuple[tuple[str, int, float], ...], float]:
     """段階、活性な項目（名前、添字、勾配）、黒有利の価値。"""
     pack = _pack(board)
-    stage = stage_of(int(np.count_nonzero(pack)))
+    cells = pack.tolist()
+    stage = stage_of(BOARD_SIZE * BOARD_SIZE - cells.count(0))
     grouped: dict[tuple[str, int], float] = {}
     total = float(policy.bias[stage]) + _pattern_total(pack, stage, policy, grouped)
-    scalars = _scalar_values(board, pack, side)
+    scalars = _scalar_values(cells, side)
     hits = [("bias", 0, 1.0)]
     hits.extend((name, index, gradient) for (name, index), gradient in grouped.items())
     for index, feature in enumerate(scalars):
@@ -370,9 +414,10 @@ def analyze(
 def black_value(board: Board, side: Color, policy: PatternPolicy) -> float:
     """黒有利が正。パターンの参照表とスカラーを足す。192 次元の配置特徴ではない。"""
     pack = _pack(board)
-    stage = stage_of(int(np.count_nonzero(pack)))
+    cells = pack.tolist()
+    stage = stage_of(BOARD_SIZE * BOARD_SIZE - cells.count(0))
     total = float(policy.bias[stage]) + _pattern_total(pack, stage, policy, None)
-    scalars = np.asarray(_scalar_values(board, pack, side), dtype=np.float64)
+    scalars = np.asarray(_scalar_values(cells, side), dtype=np.float64)
     return total + float(policy.scalars[stage] @ scalars)
 
 

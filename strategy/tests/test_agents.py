@@ -2168,6 +2168,37 @@ def test_rl_stage2_comparison_json_has_rates_and_flat_tail() -> None:
             assert "openrouter.ai" not in lowered
 
 
+def test_pattern_mobility_matches_legal_place_counts() -> None:
+    from reversi.agents.pattern_eval import (
+        SCALAR_NAMES,
+        _pack,
+        black_value,
+        zero_policy,
+    )
+    from reversi.engine.rules import count_places, play
+
+    position = initial_position()
+    for _ in range(12):
+        places = legal_places(position)
+        if not places:
+            break
+        position = play(position, Place(places[0]))
+        cells = _pack(position.board).tolist()
+        black = count_places(position.board, Color.BLACK)
+        white = count_places(position.board, Color.WHITE)
+        policy = zero_policy()
+        mobility = SCALAR_NAMES.index("mobility")
+        policy.scalars[:, mobility] = 8.0
+        assert black_value(position.board, Color.BLACK, policy) == pytest.approx(
+            black - white
+        )
+        assert cells.count(0) == 64 - sum(
+            stone is not Stone.EMPTY
+            for row in position.board.cells
+            for stone in row
+        )
+
+
 def test_pattern_value_is_a_lookup_table_not_a_192_vector() -> None:
     from reversi.agents.pattern_eval import (
         EDGE_X_BLACK_CORNER_BLACK,
