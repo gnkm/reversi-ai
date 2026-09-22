@@ -208,7 +208,7 @@ class PatternPolicy:
     scalars: np.ndarray
     bias: np.ndarray
     reward: str = "win_loss"
-    lam: float = 0.7
+    lam: float = 0.9
     games: int = 0
 
     def __post_init__(self) -> None:
@@ -580,6 +580,6 @@ def load_policy(path: Path) -> PatternPolicy:
         scalars=np.asarray(scalars, dtype=np.float64),
         bias=np.asarray(bias, dtype=np.float64),
         reward=str(raw.get("reward", "win_loss")),
-        lam=float(raw.get("lambda", 0.7)),
+        lam=float(raw.get("lambda", 0.9)),
         games=int(raw.get("games", 0)),
     )

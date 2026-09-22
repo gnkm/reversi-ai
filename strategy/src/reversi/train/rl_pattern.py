@@ -36,7 +36,7 @@ DEFAULT_OUT = Path(__file__).resolve().parents[4] / "models" / "rl-pattern.json"
 DEFAULT_GAMES = 400
 DEFAULT_ALPHA = 0.05
 DEFAULT_EPSILON = 0.1
-DEFAULT_LAMBDA = 0.7
+DEFAULT_LAMBDA = 0.9
 # α は全対局を通して初期値の 20% まで下げる。0 にはしない。
 ALPHA_FLOOR_RATIO = 0.2
 ALPHA_DECAY_FRACTION = 1.0
