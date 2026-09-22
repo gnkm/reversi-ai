@@ -74,6 +74,7 @@ __all__ = [
     "make_openings",
     "mean_and_ci95",
     "openings_payload",
+    "resolve_openings",
     "summarize_games",
 ]
 
@@ -516,14 +517,41 @@ def _stage0_payload(
     }
 
 
-def _load_openings(path: Path) -> list[dict[str, Any]]:
+def _load_openings(path: Path) -> tuple[int | None, list[dict[str, Any]]]:
     raw = json.loads(path.read_text(encoding="utf-8"))
     if isinstance(raw, list):
-        return [dict(row) for row in raw]
+        return None, [dict(row) for row in raw]
+    if not isinstance(raw, dict):
+        raise ValueError("開始局面 JSON の根はオブジェクトか配列でなければなりません")
     positions = raw.get("positions")
     if not isinstance(positions, list):
         raise ValueError("開始局面 JSON に positions が無い")
-    return [dict(row) for row in positions]
+    seed = raw.get("seed")
+    stored_seed = seed if isinstance(seed, int) else None
+    return stored_seed, [dict(row) for row in positions]
+
+
+def resolve_openings(path: Path, seed: int, count: int) -> list[dict[str, Any]]:
+    """既存ファイルがあれば seed と件数を検証し、無ければ生成して書く。"""
+    expected = make_openings(Random(seed), count)
+    if not path.is_file():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        _atomic_write(path, openings_payload(expected, seed))
+        return expected
+    stored_seed, positions = _load_openings(path)
+    if stored_seed is None:
+        raise SystemExit(f"開始局面 JSON に seed が無い: {path}")
+    if stored_seed != seed:
+        raise SystemExit(
+            f"開始局面の seed が一致しない: file={stored_seed} requested={seed}"
+        )
+    if len(positions) < count:
+        raise SystemExit(
+            f"開始局面が足りない: file={len(positions)} requested={count}"
+        )
+    if positions[:count] != expected:
+        raise SystemExit("開始局面が seed から再現しない")
+    return expected
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -549,18 +577,12 @@ def main(argv: list[str] | None = None) -> int:
     cpu = os.cpu_count() or 1
     workers = args.workers if args.workers > 0 else min(4, cpu)
     openings_path = args.openings_out
-    openings_path.parent.mkdir(parents=True, exist_ok=True)
-    if openings_path.is_file():
-        openings = _load_openings(openings_path)
-        print(f"loaded openings n={len(openings)} path={openings_path}", flush=True)
-    else:
-        openings = make_openings(Random(args.seed), args.starts)
-        _atomic_write(openings_path, openings_payload(openings, args.seed))
-        print(f"wrote openings n={len(openings)} path={openings_path}", flush=True)
+    existed = openings_path.is_file()
+    openings = resolve_openings(openings_path, args.seed, args.starts)
+    verb = "loaded" if existed else "wrote"
+    print(f"{verb} openings n={len(openings)} path={openings_path}", flush=True)
     if args.write_openings_only:
         return 0
-    if len(openings) != args.starts:
-        openings = openings[: args.starts]
     policy = rl.load_policy(args.policy)
     summary, games = evaluate_policy(
         policy, openings, seed=args.seed, workers=workers, progress=True

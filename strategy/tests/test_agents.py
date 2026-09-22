@@ -1618,10 +1618,31 @@ def test_rl_openings_are_reproducible_with_seed() -> None:
     assert payload["seed"] == module.SEED
     regenerated = module.make_openings(Random(payload["seed"]), len(positions))
     assert regenerated == positions
+    assert module.resolve_openings(openings[-1], payload["seed"], len(positions)) == positions
     assert [item.display_name for item in items()].count("強化学習 (自己対局)") == 1
     assert rl_agent.SPECIMEN_ID == "rl"
     assert rl_agent.DISPLAY_NAME == "強化学習 (自己対局)"
     assert rl_agent.CATEGORY == "reinforcement_learning"
+
+
+def test_rl_eval_rejects_openings_seed_or_count_mismatch(tmp_path: Path) -> None:
+    module = _rl_eval_module()
+    path = tmp_path / "rl-openings.json"
+    positions = module.make_openings(Random(7), 8)
+    path.write_text(
+        json.dumps(module.openings_payload(positions, 7), ensure_ascii=False),
+        encoding="utf-8",
+    )
+    assert module.resolve_openings(path, 7, 8) == positions
+    assert module.resolve_openings(path, 7, 4) == positions[:4]
+    with pytest.raises(SystemExit, match="seed"):
+        module.resolve_openings(path, 8, 8)
+    with pytest.raises(SystemExit, match="足りない"):
+        module.resolve_openings(path, 7, 9)
+    missing = tmp_path / "missing.json"
+    created = module.resolve_openings(missing, 11, 5)
+    assert created == module.make_openings(Random(11), 5)
+    assert json.loads(missing.read_text(encoding="utf-8"))["seed"] == 11
 
 
 def test_rl_stage0_baseline_has_metrics() -> None:
