@@ -2324,6 +2324,27 @@ def test_pattern_td_lambda_normalizes_alpha_and_skips_exploratory_moves(
     assert ".wtb" not in text
 
 
+def test_load_policy_rejects_mismatched_feature_layout(tmp_path: Path) -> None:
+    from reversi.agents.pattern_eval import dump_policy, load_policy, zero_policy
+
+    path = tmp_path / "rl-pattern.json"
+    dump_policy(path, zero_policy())
+    load_policy(path)
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    raw["patterns"]["edge_2x"]["squares"] = list(
+        reversed(raw["patterns"]["edge_2x"]["squares"])
+    )
+    path.write_text(json.dumps(raw), encoding="utf-8")
+    with pytest.raises(ValueError, match="squares"):
+        load_policy(path)
+    dump_policy(path, zero_policy())
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    raw["scalar_scale"] = 1.0
+    path.write_text(json.dumps(raw), encoding="utf-8")
+    with pytest.raises(ValueError, match="scalar_scale"):
+        load_policy(path)
+
+
 def test_rl_stage3_record_has_reward_and_pattern_metrics() -> None:
     from reversi.agents import rl_pattern, rl_tied
     from reversi.agents.pattern_eval import ALGORITHM, PATTERN_SPECS, load_policy

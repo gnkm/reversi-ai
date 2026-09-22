@@ -74,6 +74,7 @@ def _instances(squares: tuple[tuple[int, int], ...]) -> tuple[tuple[int, ...], .
                 mapped.append(next_rank * BOARD_SIZE + next_file)
             key = frozenset(mapped)
             if key in seen:
+                # 同じマスを逆順にする変換は、同じ組を二重に足さない。
                 continue
             seen.add(key)
             found.append(tuple(mapped))
@@ -246,7 +247,6 @@ def zero_policy() -> PatternPolicy:
     )
 
 
-_PACK = np.empty(BOARD_SIZE * BOARD_SIZE, dtype=np.int16)
 _DELTAS = (
     (1, 0),
     (-1, 0),
@@ -282,8 +282,8 @@ _RAYS = _rays()
 
 
 def _pack(board: Board) -> np.ndarray:
-    """空 0、黒 1、白 2。呼び出しのあいだだけ有効なバッファを返す。"""
-    pack = _PACK
+    """空 0、黒 1、白 2。呼び出しごとに独立した配列を返す。"""
+    pack = np.empty(BOARD_SIZE * BOARD_SIZE, dtype=np.int16)
     index = 0
     for row in board.cells:
         for stone in row:
@@ -550,6 +550,29 @@ def _scatter(spec: PatternSpec, rows: object) -> np.ndarray:
     return table
 
 
+def _expect(actual: object, expected: object, label: str) -> None:
+    if actual != expected:
+        raise ValueError(f"{label} が現行の特徴定義と合いません")
+
+
+def _check_layout(raw: dict[str, Any], patterns: dict[str, Any]) -> None:
+    """保存時のマス順・段階・スカラー定義が現行と一致することを確かめる。"""
+    _expect(raw.get("stages"), N_STAGES, "stages")
+    _expect(raw.get("stage_width"), STAGE_WIDTH, "stage_width")
+    _expect(raw.get("scalar_names"), list(SCALAR_NAMES), "scalar_names")
+    _expect(raw.get("scalar_scale"), SCALAR_SCALE, "scalar_scale")
+    neighbor = raw.get("neighbor_smooth")
+    if neighbor is not None:
+        _expect(neighbor, NEIGHBOR_SMOOTH, "neighbor_smooth")
+    for spec in PATTERN_SPECS:
+        block = patterns.get(spec.name)
+        if not isinstance(block, dict):
+            raise TypeError(f"{spec.name} の定義がありません")
+        _expect(block.get("length"), len(spec.labels), f"{spec.name}.length")
+        _expect(block.get("size"), spec.size, f"{spec.name}.size")
+        _expect(block.get("squares"), list(spec.labels), f"{spec.name}.squares")
+
+
 def _pattern_rows(patterns: dict[str, Any], spec: PatternSpec) -> object:
     block = patterns.get(spec.name)
     if not isinstance(block, dict):
@@ -571,6 +594,7 @@ def load_policy(path: Path) -> PatternPolicy:
         raise TypeError("patterns が必要です")
     if not isinstance(scalars, list) or not isinstance(bias, list):
         raise TypeError("scalars と bias が必要です")
+    _check_layout(raw, patterns)
     weights = {
         spec.name: _scatter(spec, _pattern_rows(patterns, spec))
         for spec in PATTERN_SPECS
