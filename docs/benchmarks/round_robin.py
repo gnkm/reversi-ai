@@ -33,11 +33,12 @@ MODEL_PATHS = (
     "models/ml.json",
     "models/lgbm.txt",
     "models/rl.json",
+    "models/rl-tied.json",
     "models/nn.onnx",
 )
 JST = timezone(timedelta(hours=9))
 CTX = ssl._create_unverified_context()
-SEARCH = frozenset({"minimax", "alphabeta", "rl_search"})
+SEARCH = frozenset({"minimax", "alphabeta", "rl_search", "rl_tied"})
 GENERATIVE = "generative_ai"
 PROGRESS_META = "progress_meta"
 
