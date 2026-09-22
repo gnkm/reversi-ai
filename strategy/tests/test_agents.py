@@ -2537,6 +2537,8 @@ def test_rl_stage4_record_compares_exact_search() -> None:
     assert data["baseline"]["exact_empty"] == 0
     assert data["candidate"]["model"] == data["baseline"]["model"]
     assert data["baseline"]["specimen_id"] == rl_pattern.SPECIMEN_ID
+    assert data["candidate"]["catalog_depth"] == rl_pattern.SEARCH_DEPTH
+    assert data["baseline"]["catalog_depth"] == rl_pattern.SEARCH_DEPTH
     script = (root / "rl_stage4.py").read_text(encoding="utf-8")
     tree = ast.parse(script)
     for node in ast.walk(tree):
@@ -2551,6 +2553,30 @@ def test_rl_stage4_record_compares_exact_search() -> None:
     assert rl.SPECIMEN_ID == "rl"
     assert rl_search.SPECIMEN_ID == "rl_search"
     assert rl_tied.SPECIMEN_ID == "rl_tied"
+
+
+def test_rl_stage4_threshold_adopts_none_when_no_sample_fits() -> None:
+    import importlib.util
+
+    from reversi.agents import rl_pattern
+    from reversi.agents.pattern_eval import load_policy
+
+    path = Path(__file__).resolve().parents[2] / "docs" / "benchmarks" / "rl_stage4.py"
+    spec = importlib.util.spec_from_file_location("rl_stage4_threshold", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    policy = load_policy(rl_pattern.DEFAULT_MODEL_PATH)
+    result = module.measure_threshold(
+        [],
+        policy,
+        (10, 12, 14),
+        samples=1,
+        think_limit=2.0,
+    )
+    assert result["adopted"] is None
+    assert all(not row["within_limit"] for row in result["by_empty"])
+    assert all(int(row["n"]) == 0 for row in result["by_empty"])
 
 
 def test_rl_train_default_out_is_tied_model() -> None:

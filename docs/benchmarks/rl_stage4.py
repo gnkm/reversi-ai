@@ -255,7 +255,7 @@ def measure_threshold(
     """各空きマス数で完全読み 1 手の所要時間を測り、上限以内の最大を採る。"""
     positions = _collect_endgames(openings, policy, candidates, samples)
     by_empty: list[dict[str, Any]] = []
-    adopted = min(candidates)
+    adopted: int | None = None
     for empty in candidates:
         seconds: list[float] = []
         nodes: list[int] = []
@@ -346,6 +346,9 @@ def main(argv: list[str] | None = None) -> int:
             f"within={row['within_limit']}",
             flush=True,
         )
+    if threshold["adopted"] is None:
+        print("上限以内で完全読みし切れる空きマス数が無い", flush=True)
+        return 1
     if args.threshold_only:
         return 0
     if int(args.exact_empty) != int(threshold["adopted"]):
@@ -382,7 +385,7 @@ def main(argv: list[str] | None = None) -> int:
             "specimen_id": rl_pattern.SPECIMEN_ID,
             "display_name": rl_pattern.DISPLAY_NAME,
             "model": _rel(args.candidate),
-            "catalog_depth": args.depth,
+            "catalog_depth": rl_pattern.SEARCH_DEPTH,
             "exact_empty": 0,
             "leaf": "pattern_features",
         },
