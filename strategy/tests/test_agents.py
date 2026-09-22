@@ -1585,6 +1585,188 @@ def test_rl_td_update_moves_weights_toward_terminal_reward() -> None:
     np.testing.assert_allclose(updated, alpha * _features(later))
 
 
+def _rl_eval_module():
+    import importlib.util
+
+    path = Path(__file__).resolve().parents[2] / "docs" / "benchmarks" / "rl_eval.py"
+    spec = importlib.util.spec_from_file_location("rl_eval_stage0", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_rl_openings_are_reproducible_with_seed() -> None:
+    from reversi.agents import rl as rl_agent
+
+    module = _rl_eval_module()
+    first = module.make_openings(Random(module.SEED), 12)
+    second = module.make_openings(Random(module.SEED), 12)
+    assert first == second
+    other = module.make_openings(Random(module.SEED + 1), 12)
+    assert first != other
+    assert len(first) == 12
+    plies = {int(row["opening_plies"]) for row in first}
+    assert plies <= set(module.OPENING_PLIES)
+    assert plies & {4, 5, 6, 7, 8}
+    root = Path(__file__).resolve().parents[2] / "docs" / "benchmarks"
+    openings = sorted(root.glob("rl-openings*.json"))
+    assert openings, "開始局面 JSON が docs/benchmarks/ に無い"
+    payload = json.loads(openings[-1].read_text(encoding="utf-8"))
+    positions = payload["positions"] if isinstance(payload, dict) else payload
+    assert len(positions) >= 100
+    assert payload["seed"] == module.SEED
+    regenerated = module.make_openings(Random(payload["seed"]), len(positions))
+    assert regenerated == positions
+    assert module.resolve_openings(openings[-1], payload["seed"], len(positions)) == positions
+    assert [item.display_name for item in items()].count("強化学習 (自己対局)") == 1
+    assert rl_agent.SPECIMEN_ID == "rl"
+    assert rl_agent.DISPLAY_NAME == "強化学習 (自己対局)"
+    assert rl_agent.CATEGORY == "reinforcement_learning"
+
+
+def test_rl_eval_rejects_openings_seed_or_count_mismatch(tmp_path: Path) -> None:
+    module = _rl_eval_module()
+    path = tmp_path / "rl-openings.json"
+    positions = module.make_openings(Random(7), 8)
+    path.write_text(
+        json.dumps(module.openings_payload(positions, 7), ensure_ascii=False),
+        encoding="utf-8",
+    )
+    assert module.resolve_openings(path, 7, 8) == positions
+    assert module.resolve_openings(path, 7, 4) == positions[:4]
+    with pytest.raises(SystemExit, match="seed"):
+        module.resolve_openings(path, 8, 8)
+    with pytest.raises(SystemExit, match="足りない"):
+        module.resolve_openings(path, 7, 9)
+    missing = tmp_path / "missing.json"
+    created = module.resolve_openings(missing, 11, 5)
+    assert created == module.make_openings(Random(11), 5)
+    assert json.loads(missing.read_text(encoding="utf-8"))["seed"] == 11
+
+
+def test_rl_stage0_baseline_has_metrics() -> None:
+    from reversi.agents import rl as rl_agent
+
+    root = Path(__file__).resolve().parents[2] / "docs" / "benchmarks"
+    candidates = sorted(root.glob("rl-stage0*.json"))
+    assert candidates, "段階 0 の基準線 JSON が docs/benchmarks/ に無い"
+    data = json.loads(candidates[-1].read_text(encoding="utf-8"))
+    for key in ("win_rate", "mean_stone_diff", "ci95", "opponents", "n_games"):
+        assert key in data, key
+    assert data["n_games"] >= 200
+    assert data["n_games"] == len(data["game_records"])
+    wins = sum(1 for row in data["game_records"] if row["result"] == "win")
+    draws = sum(1 for row in data["game_records"] if row["result"] == "draw")
+    losses = sum(1 for row in data["game_records"] if row["result"] == "loss")
+    n = data["n_games"]
+    assert data["wins"] == wins
+    assert data["draws"] == draws
+    assert data["losses"] == losses
+    assert data["win_rate"] == pytest.approx((wins + 0.5 * draws) / n)
+    assert data["mean_stone_diff"] == pytest.approx(
+        sum(int(row["stone_diff"]) for row in data["game_records"]) / n
+    )
+    assert "win_rate" in data["ci95"]
+    assert "mean_stone_diff" in data["ci95"]
+    win_ci = data["ci95"]["win_rate"]
+    assert "low" in win_ci and "high" in win_ci
+    if win_ci.get("crosses_even"):
+        assert win_ci["note"] == "この局数では区別できない"
+        assert "差がない" not in (win_ci["note"] or "")
+    else:
+        assert win_ci.get("note") in {None, ""}
+    opponent_ids = {row["specimen_id"] for row in data["opponents"]}
+    assert opponent_ids == {"random_uniform", "positional", "minimax"}
+    for row in data["opponents"]:
+        assert "win_rate" in row and "mean_stone_diff" in row and "ci95" in row
+        assert row["n_games"] >= 2
+    assert data["candidate"]["specimen_id"] == rl_agent.SPECIMEN_ID == "rl"
+    assert data["candidate"]["display_name"] == rl_agent.DISPLAY_NAME
+    assert data["learning_curve"]
+    point = data["learning_curve"][0]
+    assert "win_rate" in point and "mean_stone_diff" in point
+    script = (root / "rl_eval.py").read_text(encoding="utf-8")
+    tree = ast.parse(script)
+    imported: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            imported.update(alias.name.split(".")[0] for alias in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            imported.add(node.module.split(".")[0])
+            imported.add(node.module)
+    assert "wthor" not in imported
+    assert "openrouter" not in imported
+    assert "torch" not in imported
+    assert "onnx" not in imported
+    assert "onnxruntime" not in imported
+    assert all("wthor" not in name and "openrouter" not in name for name in imported)
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            lowered = node.value.lower()
+            assert "ffothello.org" not in lowered
+            assert ".wtb" not in lowered
+            assert "openrouter.ai" not in lowered
+    assert [item.display_name for item in items()].count("強化学習 (自己対局)") == 1
+
+
+def test_rl_eval_ci_notes_when_interval_crosses_even() -> None:
+    module = _rl_eval_module()
+    even = module.mean_and_ci95([0.0, 1.0] * 20)
+    assert even["crosses_even"] is True
+    assert even["note"] == module.EVEN_NOTE
+    assert "差がない" not in even["note"]
+    lopsided = module.mean_and_ci95([1.0] * 40)
+    assert lopsided["crosses_even"] is False
+    assert lopsided["note"] is None
+
+
+def test_rl_training_snapshots_can_be_evaluated(tmp_path: Path) -> None:
+    from reversi.agents.rl import load_policy
+    from reversi.train.rl import train_and_write
+
+    module = _rl_eval_module()
+    snaps = tmp_path / "snaps"
+    out = tmp_path / "rl.json"
+    train_and_write(
+        out,
+        games=4,
+        seed=3,
+        alpha=0.001,
+        epsilon=0.5,
+        snapshot_every=2,
+        snapshot_dir=snaps,
+    )
+    files = sorted(snaps.glob("games-*.json"))
+    assert [path.name for path in files] == ["games-00002.json", "games-00004.json"]
+    load_policy(files[0])
+    openings = module.make_openings(Random(0), 2)
+    policy = load_policy(out)
+    summary, games = module.evaluate_policy(
+        policy,
+        openings,
+        seed=0,
+        workers=1,
+        opponent_ids=("random_uniform", "positional"),
+    )
+    assert summary["n_games"] == 8
+    assert len(games) == 8
+    assert {row["opponent"] for row in games} == {"random_uniform", "positional"}
+    assert summary["ci95"]["win_rate"]["low"] <= summary["win_rate"]
+    assert summary["win_rate"] <= summary["ci95"]["win_rate"]["high"]
+    loaded = module.load_snapshot_policies(snaps)
+    assert [games_trained for games_trained, _path, _policy in loaded] == [2, 4]
+    first_summary, _ = module.evaluate_policy(
+        loaded[0][2],
+        openings,
+        seed=0,
+        workers=1,
+        opponent_ids=("positional",),
+    )
+    assert first_summary["n_games"] == 4
+    assert first_summary["opponents"]
+
+
 def _linear_ml_model(black_squares: dict[str, float], bias: float = 0.0):
     from reversi.agents.ml import LinearModel
 

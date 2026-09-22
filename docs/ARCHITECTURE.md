@@ -1,9 +1,9 @@
 ---
 title: アーキテクチャ
 product: Reversi Agents
-version: 0.1.41
+version: 0.1.42
 status: working
-date: 2026-09-21
+date: 2026-09-22
 source: docs/srs.md
 srs_version: 0.1.25
 tech_stack: docs/tech-stack.md
@@ -16,9 +16,9 @@ tech_stack_version: 0.2.20
 | --- | --- |
 | 文書識別 | reversi-ai-architecture |
 | 対象ソフトウェア | Reversi Agents |
-| 版 | 0.1.41 |
+| 版 | 0.1.42 |
 | 状態 | 現行（設計。要求ではない） |
-| 日付 | 2026-09-21 |
+| 日付 | 2026-09-22 |
 | 入力 | [`docs/srs.md`](srs.md) 0.1.25、[`docs/tech-stack.md`](tech-stack.md) 0.2.20 |
 
 本文書は**配置と層**の設計正本である。ソフトウェア要求の正本は [`docs/srs.md`](srs.md) であり、本文書は shall を追加・変更・撤回しない。言語・ライブラリ・コンテナの選定は [`docs/tech-stack.md`](tech-stack.md) を正とする。ディレクトリ名は tech-stack 2.3 と一致させ、ファイル単位の置き場と目的は本文書を正とする。
@@ -142,6 +142,10 @@ reversi-ai/
 │   │   ├── alphabeta-eval.json        # αβ 対ミニマックス（深さ 4）の先後入れ替え評価
 │   │   ├── alphabeta_eval.py          # 同じ開始局面の組で対局し JSON を書く。CI では走らせない
 │   │   ├── alphabeta-eval.md          # 途中打ち切りの知見。人手。JSON から生成しない
+│   │   ├── rl-openings.json           # RL 改善の固定開始局面集合。seed で再現する
+│   │   ├── rl_eval.py                 # 開始局面と先後入れ替え評価を書く。CI では走らせない
+│   │   ├── rl-stage0.json             # 現行 models/rl.json の段階 0 基準線
+│   │   ├── rl-stage0.md               # 基準線と総当たりとの傾向。人手。JSON から生成しない
 │   │   └── archive/                   # 過去の総当たり正本（現行と同じ形）
 │   └── source-of-truth/
 │       ├── 01-seed.md                 # シード。AI は編集禁止
@@ -443,6 +447,7 @@ web コンテナが Pod 内で `0.0.0.0:3000` を聞くのはよい。戦略コ�
 
 | 版 | 日付 | 内容 |
 | --- | --- | --- |
+| 0.1.42 | 2026-09-22 | RL 改善の開始局面集合と段階 0 基準線を `docs/benchmarks/` に置く |
 | 0.1.41 | 2026-09-21 | 組込み個体の着手解説を `docs/catalog/` に置く |
 | 0.1.40 | 2026-09-21 | カタログ総当たりを起動済み対局 API へ問い合わせる `round_robin.py` を置く |
 | 0.1.39 | 2026-09-21 | ルールベース (αβ) の終盤完全読みを外し、ミニマックスと同じ探索深さに揃える |
