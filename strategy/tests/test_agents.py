@@ -1678,10 +1678,13 @@ def test_rl_alpha_and_epsilon_decay_as_games_advance(
     ]
     assert alphas[0] == pytest.approx(alpha)
     assert alphas[-1] == pytest.approx(alpha * rl_train.ALPHA_FLOOR_RATIO)
-    assert alphas[0] > alphas[2] > alphas[-1]
+    assert alphas[0] > alphas[1] > alphas[-1]
+    assert alphas[-1] == pytest.approx(alphas[-2])
+    assert all(earlier + 1e-12 >= later for earlier, later in zip(alphas, alphas[1:]))
     assert epsilons[0] == pytest.approx(epsilon)
     assert epsilons[-1] == pytest.approx(0.0)
-    assert epsilons[0] > epsilons[2] > epsilons[-1]
+    assert epsilons[0] > epsilons[1] > epsilons[-1]
+    assert epsilons[-1] == pytest.approx(epsilons[-2])
     seen: list[float] = []
 
     def spy(_rng: Random, _policy: object, epsilon_now: float):

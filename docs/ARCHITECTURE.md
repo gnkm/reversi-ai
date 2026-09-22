@@ -352,7 +352,7 @@ reversi-ai/
 | `lgbm.py` | 機械学習 (LightGBM) | `models/lgbm.txt` を LightGBM ネイティブ形式で読む。onnxruntime / PyTorch / joblib / pickle を import しない |
 | `rl.py` | 強化学習 (自己対局) | `models/rl.json`。着手直後の線形 v だけで選ぶ（1 手読み）。NN 推論も OpenRouter も使わない |
 | `rl_search.py` | 強化学習 (自己対局＋読み) | 同じ `models/rl.json` の線形 v を葉にした深さ 4 の αβ。白番は v を符号反転する。葉の外に閾値や定数ボーナスは足さない。探索の Move Ordering と Transposition Table は `alphabeta.py` と共有し、カタログの αβ 個体の葉（Mobility・Corner・X/C・Frontier・石差）は置き換えない。終盤完全読みはしない。新しい重みは学習しない。NN 推論も OpenRouter も使わない |
-| `rl_tied.py` | 強化学習 (対称な読み) | `models/rl-tied.json` の線形 v を葉にした深さ 4 の αβ。学習は α と ε を下げ、探索手の直後を目標にせず、8 回対称で重みを共有し、空平面を使わない。既存の `models/rl.json` と「強化学習 (自己対局)」は置き換えない。終盤完全読みはしない。NN 推論も OpenRouter も使わない |
+| `rl_tied.py` | 強化学習 (対称な読み) | `models/rl-tied.json` の線形 v を葉にした深さ 4 の αβ。学習は α と ε を対局数の 70% で 0 まで下げ、その後は重みを動かさない。探索手の直後を目標にせず、8 回対称で重みを共有し、空平面を使わない。既存の `models/rl.json` と「強化学習 (自己対局)」は置き換えない。終盤完全読みはしない。NN 推論も OpenRouter も使わない |
 | `nn.py` | ニューラルネットワーク (棋譜) | `models/nn.onnx` を onnxruntime CPU で順伝播し、合法手へマスク |
 | `prompt.py` | （指示ファイル） | `prompts/` の Markdown と JSON を対局時に読む。欠落は継続不能 |
 | `jev.py` | 生成 AI (Jev) | `typesafe/jev-1.13` の Decisions API。1 着手 1 呼出しで優先の原子質問を送り、typed answers とコードの着手後評価を合成する。指示は `prompts/jev.json`。合法手の外を採用しない。合法手が 1 つのときは Decisions を呼ばない。検証用に第 1 版定数・コードだけ・全合法手 Choice・絞り込みの 4 構成を切り替えられる。カタログ表示名は増やさない。カタログの既定は優先合成であり、コード最善（`v2_jev0`）や合法手 Choice にはしない |
@@ -384,7 +384,7 @@ Pod 内 HTTP。TLS は Hono が担う。
 | `examples.py` | WTHOR と永続化対局から、Ridge と LightGBM が共有する教師あり学習例を集める |
 | `ml.py` | sklearn で学習し、対局用の係数 JSON を書く |
 | `lgbm.py` | LightGBM で学習し、対局用のネイティブテキストを書く |
-| `rl.py` | 自己対局の線形 TD。α と ε は線形に減衰し、探索手の直後は更新せず、8 回対称で重みを共有し、空平面は使わない。WTHOR を使わない。段階 2 の成果物は `models/rl-tied.json`。既存の `models/rl.json` は手順を直す前のスナップショットとして残す |
+| `rl.py` | 自己対局の線形 TD。α と ε は対局数の 70% で 0 まで線形に下げ、その後は重みを動かさない。探索手の直後は更新せず、8 回対称で重みを共有し、空平面は使わない。WTHOR を使わない。段階 2 の成果物は `models/rl-tied.json`。既存の `models/rl.json` は手順を直す前のスナップショットとして残す |
 | `nn.py` | PyTorch CPU で学習し ONNX へ出す |
 
 学習済みの小さい成果物は `models/` に含め、再学習なしで初版カタログが揃うようにする。再生は対局エンジンと同じ関数を呼ぶ。

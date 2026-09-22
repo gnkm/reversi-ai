@@ -34,14 +34,16 @@ DEFAULT_OUT = Path(__file__).resolve().parents[4] / "models" / "rl.json"
 DEFAULT_GAMES = 400
 DEFAULT_ALPHA = 0.001
 DEFAULT_EPSILON = 0.1
-# 最終局の α は初期値のこの割合。ε は 0 まで下げる。
-ALPHA_FLOOR_RATIO = 0.1
+# 減衰が終わるときの割合。その後は下限のままにする。下限は 0 で、後半の重みを動かさない。
+ALPHA_FLOOR_RATIO = 0.0
 EPSILON_FLOOR_RATIO = 0.0
+DECAY_FRACTION = 0.7
 PLANE = 64
 EMPTY_PLANE = 2 * PLANE
 
 __all__ = [
     "ALPHA_FLOOR_RATIO",
+    "DECAY_FRACTION",
     "DEFAULT_OUT",
     "EPSILON_FLOOR_RATIO",
     "SQUARE_ORBITS",
@@ -89,17 +91,24 @@ def scheduled_rate(
     game_index: int,
     games: int,
     floor_ratio: float,
+    decay_fraction: float = DECAY_FRACTION,
 ) -> float:
-    """局が進むほど線形に下げる。最初の局は初期値、最後の局は初期値×floor_ratio。"""
+    """序盤から中盤にかけて線形に下げ、その後は下限のままにする。"""
     if games < 1:
         raise ValueError("対局数は 1 以上でなければなりません")
     if game_index < 1 or game_index > games:
         raise ValueError("局番号は 1 から対局数までです")
     if floor_ratio < 0 or floor_ratio > 1:
         raise ValueError("下限の割合は 0 以上 1 以下です")
+    if decay_fraction <= 0 or decay_fraction > 1:
+        raise ValueError("減衰の割合は 0 より大きく 1 以下です")
     if games == 1:
         return float(initial)
-    progress = (game_index - 1) / (games - 1)
+    decay_games = max(1, round(decay_fraction * (games - 1)))
+    step = game_index - 1
+    if step >= decay_games:
+        return float(initial) * floor_ratio
+    progress = step / decay_games
     return float(initial) * (1.0 - progress * (1.0 - floor_ratio))
 
 
@@ -311,13 +320,13 @@ def main(argv: list[str] | None = None) -> None:
         "--alpha",
         type=float,
         default=DEFAULT_ALPHA,
-        help="最初の局の学習率。最後の局は初期値の 0.1 倍まで線形に下がる。",
+        help="最初の局の学習率。対局数の 70% で 0 まで線形に下げ、その後は 0 のまま。",
     )
     parser.add_argument(
         "--epsilon",
         type=float,
         default=DEFAULT_EPSILON,
-        help="最初の局の探索率。最後の局は 0 まで線形に下がる。",
+        help="最初の局の探索率。対局数の 70% で 0 まで線形に下げ、その後は 0 のまま。",
     )
     parser.add_argument(
         "--snapshot-every",
