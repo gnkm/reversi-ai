@@ -1,7 +1,7 @@
 ---
 title: アーキテクチャ
 product: Reversi Agents
-version: 0.1.43
+version: 0.1.45
 status: working
 date: 2026-09-22
 source: docs/srs.md
@@ -16,7 +16,7 @@ tech_stack_version: 0.2.20
 | --- | --- |
 | 文書識別 | reversi-ai-architecture |
 | 対象ソフトウェア | Reversi Agents |
-| 版 | 0.1.43 |
+| 版 | 0.1.45 |
 | 状態 | 現行（設計。要求ではない） |
 | 日付 | 2026-09-22 |
 | 入力 | [`docs/srs.md`](srs.md) 0.1.25、[`docs/tech-stack.md`](tech-stack.md) 0.2.20 |
@@ -122,6 +122,7 @@ reversi-ai/
 │   │   ├── rl.md                      # 強化学習 (自己対局) の着手解説
 │   │   ├── rl_search.md               # 強化学習 (自己対局＋読み) の着手解説
 │   │   ├── rl_tied.md                 # 強化学習 (対称な読み) の着手解説
+│   │   ├── rl_pattern.md              # 強化学習 (パターンの読み) の着手解説
 │   │   ├── nn.md                      # ニューラルネットワーク (棋譜) の着手解説
 │   │   └── jev.md                     # 生成 AI (Jev) の着手解説
 │   ├── benchmarks/
@@ -154,6 +155,7 @@ reversi-ai/
 │   │   ├── rl-stage2.json             # 段階 2。減衰・対称・探索手除外の RL と段階 1 の比較
 │   │   ├── rl_stage2.py               # 段階 1 の RL と先後入れ替えで対局する。CI では走らせない
 │   │   ├── rl-stage2.md               # 段階 2 の知見。人手。JSON から生成しない
+│   │   ├── rl_stage3.py               # 段階 3。パターン評価を同じ深さの αβ で比べる。CI では走らせない
 │   │   └── archive/                   # 過去の総当たり正本（現行と同じ形）
 │   └── source-of-truth/
 │       ├── 01-seed.md                 # シード。AI は編集禁止
@@ -215,6 +217,8 @@ reversi-ai/
 │   │   │   ├── rl.py                  # 強化学習 (自己対局)。線形重み。NN も OpenRouter も使わない
 │   │   │   ├── rl_search.py           # 強化学習 (自己対局＋読み)。葉は線形 v の深さ 4 αβ。NN も OpenRouter も使わない
 │   │   │   ├── rl_tied.py             # 強化学習 (対称な読み)。減衰・対称の線形 v を葉にした深さ 4 αβ
+│   │   │   ├── pattern_eval.py        # パターン特徴の参照表。8 回対称、石数 10 段階、スカラー
+│   │   │   ├── rl_pattern.py          # 強化学習 (パターンの読み)。パターン評価を葉にした深さ 4 αβ
 │   │   │   ├── nn.py                  # ニューラルネットワーク (棋譜)。ONNX CPU
 │   │   │   ├── prompt.py              # prompts/ の Markdown と JSON を読む
 │   │   │   ├── jev.py                 # 生成 AI (Jev)。優先の答えと着手後評価を合成
@@ -235,6 +239,7 @@ reversi-ai/
 │   │       ├── ml.py                  # scikit-learn → models/ml.json
 │   │       ├── lgbm.py                # LightGBM → models/lgbm.txt
 │   │       ├── rl.py                  # NumPy 線形 TD。α/ε 減衰、探索手除外、8 回対称、空平面なし
+│   │       ├── rl_pattern.py          # パターン特徴の TD(λ)。WTHOR を使わない
 │   │       └── nn.py                  # PyTorch CPU → models/nn.onnx
 │   └── tests/                         # pytest。規則とエージェントの正
 │       ├── test_engine.py
@@ -353,6 +358,8 @@ reversi-ai/
 | `rl.py` | 強化学習 (自己対局) | `models/rl.json`。着手直後の線形 v だけで選ぶ（1 手読み）。NN 推論も OpenRouter も使わない |
 | `rl_search.py` | 強化学習 (自己対局＋読み) | 同じ `models/rl.json` の線形 v を葉にした深さ 4 の αβ。白番は v を符号反転する。葉の外に閾値や定数ボーナスは足さない。探索の Move Ordering と Transposition Table は `alphabeta.py` と共有し、カタログの αβ 個体の葉（Mobility・Corner・X/C・Frontier・石差）は置き換えない。終盤完全読みはしない。新しい重みは学習しない。NN 推論も OpenRouter も使わない |
 | `rl_tied.py` | 強化学習 (対称な読み) | `models/rl-tied.json` の線形 v を葉にした深さ 4 の αβ。学習は α と ε を対局数の 70% で 0 まで下げ、その後は重みを動かさない。探索手の直後を目標にせず、8 回対称で重みを共有し、空平面を使わない。既存の `models/rl.json` と「強化学習 (自己対局)」は置き換えない。終盤完全読みはしない。NN 推論も OpenRouter も使わない |
+| `pattern_eval.py` | （評価） | パターン特徴の参照表。辺＋2X、角 3×3、角 2×5、斜め、辺から 2〜4 列目。8 回対称で重みを共有する。石数で 10 段階。mobility・フロンティア・パリティを足す。NN も OpenRouter も使わない |
+| `rl_pattern.py` | 強化学習 (パターンの読み) | `models/rl-pattern.json` のパターン評価を葉にした深さ 4 の αβ。学習は自己対局の TD(λ) で、WTHOR を使わない。既存の線形 RL は置き換えない。終盤完全読みはしない。NN 推論も OpenRouter も使わない |
 | `nn.py` | ニューラルネットワーク (棋譜) | `models/nn.onnx` を onnxruntime CPU で順伝播し、合法手へマスク |
 | `prompt.py` | （指示ファイル） | `prompts/` の Markdown と JSON を対局時に読む。欠落は継続不能 |
 | `jev.py` | 生成 AI (Jev) | `typesafe/jev-1.13` の Decisions API。1 着手 1 呼出しで優先の原子質問を送り、typed answers とコードの着手後評価を合成する。指示は `prompts/jev.json`。合法手の外を採用しない。合法手が 1 つのときは Decisions を呼ばない。検証用に第 1 版定数・コードだけ・全合法手 Choice・絞り込みの 4 構成を切り替えられる。カタログ表示名は増やさない。カタログの既定は優先合成であり、コード最善（`v2_jev0`）や合法手 Choice にはしない |
@@ -385,6 +392,7 @@ Pod 内 HTTP。TLS は Hono が担う。
 | `ml.py` | sklearn で学習し、対局用の係数 JSON を書く |
 | `lgbm.py` | LightGBM で学習し、対局用のネイティブテキストを書く |
 | `rl.py` | 自己対局の線形 TD。α と ε は対局数の 70% で 0 まで線形に下げ、その後は重みを動かさない。探索手の直後は更新せず、8 回対称で重みを共有し、空平面は使わない。WTHOR を使わない。段階 2 の成果物は `models/rl-tied.json`。既存の `models/rl.json` は手順を直す前のスナップショットとして残す |
+| `rl_pattern.py` | 自己対局のパターン TD(λ)。活性な項目数で α を割る。探索手の直後は目標にしない。段階別の重みは隣段階へ半分を足す。WTHOR を使わない。成果物は `models/rl-pattern.json` |
 | `nn.py` | PyTorch CPU で学習し ONNX へ出す |
 
 学習済みの小さい成果物は `models/` に含め、再学習なしで初版カタログが揃うようにする。再生は対局エンジンと同じ関数を呼ぶ。
@@ -459,6 +467,7 @@ web コンテナが Pod 内で `0.0.0.0:3000` を聞くのはよい。戦略コ�
 
 | 版 | 日付 | 内容 |
 | --- | --- | --- |
+| 0.1.45 | 2026-09-22 | 強化学習 (パターンの読み) を載せ、パターン特徴と TD(λ) の学習を置く |
 | 0.1.44 | 2026-09-22 | 強化学習の学習を減衰・対称・探索手除外・空平面なしにし、対称な読みの個体を載せる |
 | 0.1.43 | 2026-09-22 | 強化学習 (自己対局＋読み) を載せ、αβ の葉を線形 v に差し替えられるようにする |
 | 0.1.42 | 2026-09-22 | RL 改善の開始局面集合と段階 0 基準線を `docs/benchmarks/` に置く |

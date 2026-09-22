@@ -68,7 +68,7 @@ def _string_literals(source: str) -> tuple[str, ...]:
 
 
 def _agent_files() -> tuple[str, ...]:
-    names = ["rl.py", "rl_search.py", "rl_tied.py"]
+    names = ["rl.py", "rl_search.py", "rl_tied.py", "rl_pattern.py", "pattern_eval.py"]
     if (_SRC / "agents" / "ml.py").is_file():
         names.append("ml.py")
     if (_SRC / "agents" / "lgbm.py").is_file():
@@ -103,7 +103,9 @@ def test_rl_training_script_does_not_read_wthor() -> None:
     assert "openrouter" not in roots
     assert "torch" not in roots
     assert "onnxruntime" not in roots
-    assert all(not name.endswith(".wthor") and ".wthor." not in name for name in modules)
+    assert all(
+        not name.endswith(".wthor") and ".wthor." not in name for name in modules
+    )
     assert "reversi.train.wthor" not in modules
     tree = ast.parse(source)
     option_strings: list[str] = []
@@ -122,6 +124,21 @@ def test_rl_training_script_does_not_read_wthor() -> None:
         assert "ffothello.org" not in lowered
         assert "data/wthor" not in lowered
 
+
+def test_pattern_training_script_does_not_read_wthor() -> None:
+    source = _read("train", "rl_pattern.py")
+    roots = _imported_roots(source)
+    modules = _imported_modules(source)
+    assert roots.isdisjoint(_NN_RUNTIME_ROOTS)
+    assert roots.isdisjoint(_WTHOR_ROOTS)
+    assert "openrouter" not in roots
+    assert "torch" not in roots
+    assert "reversi.train.wthor" not in modules
+    for literal in _string_literals(source):
+        lowered = literal.lower()
+        assert ".wtb" not in lowered
+        assert "ffothello.org" not in lowered
+        assert "data/wthor" not in lowered
 
 
 def test_ml_play_path_does_not_import_nn_runtime_or_sklearn() -> None:
@@ -257,9 +274,12 @@ def test_containerfile_bakes_train_group_only_on_train_target() -> None:
     )
     train_stage, _, rest = text.partition("FROM base AS train")
     strategy_stage = rest.partition("FROM base AS strategy")[2]
-    assert "uv sync --frozen --no-dev --group train" in rest.partition(
-        "FROM base AS strategy",
-    )[0]
+    assert (
+        "uv sync --frozen --no-dev --group train"
+        in rest.partition(
+            "FROM base AS strategy",
+        )[0]
+    )
     assert "--group train" not in strategy_stage
     assert "--group train" not in train_stage
 

@@ -18,6 +18,7 @@ _BUILTIN = (
     "rl",
     "rl_search",
     "rl_tied",
+    "rl_pattern",
     "nn",
     "jev",
 )

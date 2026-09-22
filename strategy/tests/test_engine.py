@@ -10,6 +10,7 @@ from reversi.engine.rules import (
     PassMove,
     Place,
     Position,
+    count_places,
     flips_for,
     initial_position,
     is_over,
@@ -298,6 +299,24 @@ def test_official_score_draw_is_32_32() -> None:
     score = official_score(tied_with_empty)
     assert score.black == 32
     assert score.white == 32
+
+
+def test_count_places_matches_legal_places() -> None:
+    position = initial_position()
+    for _ in range(12):
+        assert count_places(position.board, Color.BLACK) == len(
+            legal_places(Position(position.board, Color.BLACK))
+        )
+        assert count_places(position.board, Color.WHITE) == len(
+            legal_places(Position(position.board, Color.WHITE))
+        )
+        places = legal_places(position)
+        if not places:
+            if is_over(position):
+                break
+            position = play(position, PassMove())
+            continue
+        position = play(position, Place(places[0]))
 
 
 def test_opening_place_uniquely_flips_one_disc() -> None:

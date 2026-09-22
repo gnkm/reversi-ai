@@ -85,6 +85,57 @@ def _flips_in_direction(
     return ()
 
 
+def _reaches_own(
+    cells: tuple[tuple[Stone, ...], ...],
+    file: int,
+    rank: int,
+    color: Color,
+    delta: tuple[int, int],
+) -> bool:
+    """その方向で相手石を挟める。マスオブジェクトは作らない。"""
+    df, dr = delta
+    own = color.stone
+    opponent = color.opponent.stone
+    seen = False
+    file += df
+    rank += dr
+    while 0 <= file < BOARD_SIZE and 0 <= rank < BOARD_SIZE:
+        stone = cells[rank][file]
+        if stone is opponent:
+            seen = True
+            file += df
+            rank += dr
+            continue
+        return seen and stone is own
+    return False
+
+
+def can_place(board: Board, square: Square, color: Color) -> bool:
+    """空マスで、少なくとも一方向に相手石を挟める。"""
+    if board.stone_at(square) is not Stone.EMPTY:
+        return False
+    cells = board.cells
+    for delta in DIRECTIONS:
+        if _reaches_own(cells, square.file, square.rank, color, delta):
+            return True
+    return False
+
+
+def count_places(board: Board, color: Color) -> int:
+    """合法手の数。着手の列は作らない。"""
+    cells = board.cells
+    total = 0
+    for rank, row in enumerate(cells):
+        for file, stone in enumerate(row):
+            if stone is not Stone.EMPTY:
+                continue
+            for delta in DIRECTIONS:
+                if _reaches_own(cells, file, rank, color, delta):
+                    total += 1
+                    break
+    return total
+
+
 def flips_for(board: Board, square: Square, color: Color) -> tuple[Square, ...]:
     """置いたマスから直線で挟む相手石。新しい石からの連鎖は含めない。"""
     if board.stone_at(square) is not Stone.EMPTY:
@@ -99,9 +150,7 @@ def has_place(board: Board, color: Color) -> bool:
     cells = board.cells
     for rank, row in enumerate(cells):
         for file, stone in enumerate(row):
-            if stone is Stone.EMPTY and flips_for(
-                board, SQUARES[rank][file], color
-            ):
+            if stone is Stone.EMPTY and flips_for(board, SQUARES[rank][file], color):
                 return True
     return False
 
@@ -128,9 +177,7 @@ def pass_is_legal(position: Position) -> bool:
 
 def is_over(position: Position) -> bool:
     board = position.board
-    return (not has_place(board, Color.BLACK)) and (
-        not has_place(board, Color.WHITE)
-    )
+    return (not has_place(board, Color.BLACK)) and (not has_place(board, Color.WHITE))
 
 
 def legal_moves(position: Position) -> tuple[Move, ...]:
