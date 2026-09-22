@@ -275,6 +275,7 @@ def _payload(
     workers: int,
     learning_curve: Sequence[Mapping[str, Any]],
     primary_depth: int,
+    curve_depth: int,
 ) -> dict[str, Any]:
     primary = next(row for row in by_depth if int(row["depth"]) == primary_depth)
     return {
@@ -311,7 +312,7 @@ def _payload(
                 "勝率は（勝 + 0.5×分）/ 局数。石差は盤上の石数（段階 2 − 段階 1）。",
                 "95% 区間は標本平均の正規近似。勝率の区間が 0.5 をまたぐときは「この局数では区別できない」と書く。差がない、とは書かない。",
                 "改善と判定するのは、段階 2 側の勝率の 95% 区間が 0.5 を上回ったとき。",
-                "学習曲線は同じ相手（段階 1 の葉）・同じ開始局面で、学習局数ごとの重みを深さ 4 で測る。",
+                f"学習曲線は同じ相手（段階 1 の葉）・同じ開始局面で、学習局数ごとの重みを深さ {curve_depth} で測る。",
                 "既存の「強化学習 (自己対局)」と models/rl.json は残す。",
                 "評価経路は WTHOR を読まない。対局時に NN 推論も OpenRouter も使わない。",
                 "対局の再実行は CI に載せない。本スクリプトはホストで明示実行する。",
@@ -331,11 +332,12 @@ def _curve_point(
     games_trained: int | str,
     model: Path,
     summary: Mapping[str, Any],
+    depth: int,
 ) -> dict[str, Any]:
     return {
         "games": games_trained,
         "model": _rel(model),
-        "depth": CURVE_DEPTH,
+        "depth": depth,
         "n_games": summary["n_games"],
         "win_rate": summary["win_rate"],
         "mean_stone_diff": summary["mean_stone_diff"],
@@ -395,6 +397,7 @@ def main(argv: list[str] | None = None) -> int:
             workers=workers,
             learning_curve=curve,
             primary_depth=primary_depth,
+            curve_depth=args.curve_depth,
         )
         rl_eval._atomic_write(args.output, payload)
 
@@ -409,7 +412,7 @@ def main(argv: list[str] | None = None) -> int:
                 progress=True,
             )
             summary = snap_rows[0]
-            curve.append(_curve_point(games_trained, path, summary))
+            curve.append(_curve_point(games_trained, path, summary, args.curve_depth))
             print(
                 f"snapshot games={games_trained} "
                 f"win_rate={summary['win_rate']:.4f} "
@@ -428,7 +431,7 @@ def main(argv: list[str] | None = None) -> int:
         by_depth.extend(depth_rows)
         games.extend(depth_games)
         if int(depth) == args.curve_depth:
-            curve.append(_curve_point("final", args.candidate, depth_rows[0]))
+            curve.append(_curve_point("final", args.candidate, depth_rows[0], args.curve_depth))
         _checkpoint()
         print(f"checkpoint depth={depth}", flush=True)
     for row in by_depth:

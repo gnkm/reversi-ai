@@ -2,7 +2,7 @@
 
 α と ε は局が進むほど下げる。探索手の直後は更新の目標にしない。
 8 回対称で一致するマスは同じ重みを共有し、空平面は使わない。
-既定の書き出しは models/rl.json。段階 2 のカタログ個体は models/rl-tied.json を読む。
+既定の書き出しは models/rl-tied.json。models/rl.json は手順を直す前のスナップショットとして残す。
 """
 
 from __future__ import annotations
@@ -30,7 +30,7 @@ from reversi.engine.rules import (
 )
 from reversi.engine.score import Score, official_score
 
-DEFAULT_OUT = Path(__file__).resolve().parents[4] / "models" / "rl.json"
+DEFAULT_OUT = Path(__file__).resolve().parents[4] / "models" / "rl-tied.json"
 DEFAULT_GAMES = 400
 DEFAULT_ALPHA = 0.001
 DEFAULT_EPSILON = 0.1

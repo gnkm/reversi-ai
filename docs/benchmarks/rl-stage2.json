@@ -42,7 +42,7 @@
       "勝率は（勝 + 0.5×分）/ 局数。石差は盤上の石数（段階 2 − 段階 1）。",
       "95% 区間は標本平均の正規近似。勝率の区間が 0.5 をまたぐときは「この局数では区別できない」と書く。差がない、とは書かない。",
       "改善と判定するのは、段階 2 側の勝率の 95% 区間が 0.5 を上回ったとき。",
-      "学習曲線は同じ相手（段階 1 の葉）・同じ開始局面で、学習局数ごとの重みを深さ 4 で測る。",
+      "学習曲線は同じ相手（段階 1 の葉）・同じ開始局面で、学習局数ごとの重みを深さ 2 で測る。",
       "既存の「強化学習 (自己対局)」と models/rl.json は残す。",
       "評価経路は WTHOR を読まない。対局時に NN 推論も OpenRouter も使わない。",
       "対局の再実行は CI に載せない。本スクリプトはホストで明示実行する。"
@@ -164,7 +164,7 @@
     {
       "games": 1000,
       "model": "/tmp/rl-hold/games-01000.json",
-      "depth": 4,
+      "depth": 2,
       "n_games": 400,
       "win_rate": 0.40875,
       "mean_stone_diff": -4.8,
@@ -192,7 +192,7 @@
     {
       "games": 2000,
       "model": "/tmp/rl-hold/games-02000.json",
-      "depth": 4,
+      "depth": 2,
       "n_games": 400,
       "win_rate": 0.45125,
       "mean_stone_diff": -4.02,
@@ -220,7 +220,7 @@
     {
       "games": 3000,
       "model": "/tmp/rl-hold/games-03000.json",
-      "depth": 4,
+      "depth": 2,
       "n_games": 400,
       "win_rate": 0.42625,
       "mean_stone_diff": -4.67,
@@ -248,7 +248,7 @@
     {
       "games": 4000,
       "model": "/tmp/rl-hold/games-04000.json",
-      "depth": 4,
+      "depth": 2,
       "n_games": 400,
       "win_rate": 0.4525,
       "mean_stone_diff": -3.7575,
@@ -276,7 +276,7 @@
     {
       "games": 5000,
       "model": "/tmp/rl-hold/games-05000.json",
-      "depth": 4,
+      "depth": 2,
       "n_games": 400,
       "win_rate": 0.4525,
       "mean_stone_diff": -3.7575,
@@ -304,7 +304,7 @@
     {
       "games": "final",
       "model": "models/rl-tied.json",
-      "depth": 4,
+      "depth": 2,
       "n_games": 400,
       "win_rate": 0.4525,
       "mean_stone_diff": -3.7575,

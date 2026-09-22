@@ -194,7 +194,7 @@ podman-compose run --rm train python -m reversi.train.nn \
   --wthor /data/wthor --games /data/games.sqlite --out /models/nn.onnx
 ```
 
-`models/rl.json` は「強化学習 (自己対局)」と「強化学習 (自己対局＋読み)」が読む、手順を直す前のスナップショットである。上の強化学習のコマンドはそれを置き換えず、`models/rl-tied.json` を書く。
+`models/rl.json` は「強化学習 (自己対局)」と「強化学習 (自己対局＋読み)」が読む、手順を直す前のスナップショットである。`python -m reversi.train.rl` の既定の書き出し先は `models/rl-tied.json` である。
 
 書き出したファイルを、すでに動いている対局が読むなら、サービスを起動し直してください。
 

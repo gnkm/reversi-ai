@@ -2120,6 +2120,9 @@ def test_rl_stage2_comparison_json_has_rates_and_flat_tail() -> None:
     assert by_games[4000]["mean_stone_diff"] == pytest.approx(
         by_games[5000]["mean_stone_diff"]
     )
+    assert {int(point["depth"]) for point in data["learning_curve"]} == {2}
+    depth2 = next(row for row in data["by_depth"] if int(row["depth"]) == 2)
+    assert by_games[5000]["win_rate"] == pytest.approx(depth2["win_rate"])
     assert data["candidate"]["specimen_id"] == rl_tied.SPECIMEN_ID
     assert data["baseline"]["specimen_id"] == rl_search.SPECIMEN_ID
     assert data["baseline"]["model"].endswith("models/rl.json")
@@ -2150,6 +2153,37 @@ def test_rl_stage2_comparison_json_has_rates_and_flat_tail() -> None:
             assert "ffothello.org" not in lowered
             assert ".wtb" not in lowered
             assert "openrouter.ai" not in lowered
+
+
+def test_rl_train_default_out_is_tied_model() -> None:
+    from reversi.agents.rl import DEFAULT_MODEL_PATH
+    from reversi.agents.rl_tied import DEFAULT_MODEL_PATH as tied_path
+    from reversi.train.rl import DEFAULT_OUT
+
+    assert DEFAULT_OUT == tied_path
+    assert DEFAULT_OUT.name == "rl-tied.json"
+    assert DEFAULT_OUT != DEFAULT_MODEL_PATH
+
+
+def test_rl_stage2_curve_point_records_requested_depth() -> None:
+    import importlib.util
+
+    path = Path(__file__).resolve().parents[2] / "docs" / "benchmarks" / "rl_stage2.py"
+    spec = importlib.util.spec_from_file_location("rl_stage2_curve", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    summary = {
+        "n_games": 4,
+        "win_rate": 0.5,
+        "mean_stone_diff": 0.0,
+        "ci95": {},
+        "verdict": {"code": "indistinguishable", "note": "この局数では区別できない"},
+    }
+    point = module._curve_point(1000, Path("models/rl-tied.json"), summary, 2)
+    assert point["depth"] == 2
+    assert point["games"] == 1000
+    assert module.CURVE_DEPTH == 4
 
 
 def test_rl_eval_ci_notes_when_interval_crosses_even() -> None:
