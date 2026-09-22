@@ -89,13 +89,12 @@ def _reaches_own(
     cells: tuple[tuple[Stone, ...], ...],
     file: int,
     rank: int,
-    color: Color,
+    own: Stone,
+    opponent: Stone,
     delta: tuple[int, int],
 ) -> bool:
     """その方向で相手石を挟める。マスオブジェクトは作らない。"""
     df, dr = delta
-    own = color.stone
-    opponent = color.opponent.stone
     seen = False
     file += df
     rank += dr
@@ -110,13 +109,18 @@ def _reaches_own(
     return False
 
 
+def _sides(color: Color) -> tuple[Stone, Stone]:
+    return color.stone, color.opponent.stone
+
+
 def can_place(board: Board, square: Square, color: Color) -> bool:
     """空マスで、少なくとも一方向に相手石を挟める。"""
     if board.stone_at(square) is not Stone.EMPTY:
         return False
     cells = board.cells
+    own, opponent = _sides(color)
     for delta in DIRECTIONS:
-        if _reaches_own(cells, square.file, square.rank, color, delta):
+        if _reaches_own(cells, square.file, square.rank, own, opponent, delta):
             return True
     return False
 
@@ -124,13 +128,14 @@ def can_place(board: Board, square: Square, color: Color) -> bool:
 def count_places(board: Board, color: Color) -> int:
     """合法手の数。着手の列は作らない。"""
     cells = board.cells
+    own, opponent = _sides(color)
     total = 0
     for rank, row in enumerate(cells):
         for file, stone in enumerate(row):
             if stone is not Stone.EMPTY:
                 continue
             for delta in DIRECTIONS:
-                if _reaches_own(cells, file, rank, color, delta):
+                if _reaches_own(cells, file, rank, own, opponent, delta):
                     total += 1
                     break
     return total
@@ -148,23 +153,30 @@ def flips_for(board: Board, square: Square, color: Color) -> tuple[Square, ...]:
 
 def has_place(board: Board, color: Color) -> bool:
     cells = board.cells
+    own, opponent = _sides(color)
     for rank, row in enumerate(cells):
         for file, stone in enumerate(row):
-            if stone is Stone.EMPTY and flips_for(board, SQUARES[rank][file], color):
-                return True
+            if stone is not Stone.EMPTY:
+                continue
+            for delta in DIRECTIONS:
+                if _reaches_own(cells, file, rank, own, opponent, delta):
+                    return True
     return False
 
 
 def legal_places(position: Position) -> tuple[Square, ...]:
     color = position.side_to_move
     cells = position.board.cells
+    own, opponent = _sides(color)
     found: list[Square] = []
     for rank, row in enumerate(cells):
         for file, stone in enumerate(row):
-            if stone is Stone.EMPTY:
-                square = SQUARES[rank][file]
-                if flips_for(position.board, square, color):
-                    found.append(square)
+            if stone is not Stone.EMPTY:
+                continue
+            for delta in DIRECTIONS:
+                if _reaches_own(cells, file, rank, own, opponent, delta):
+                    found.append(SQUARES[rank][file])
+                    break
     return tuple(found)
 
 
