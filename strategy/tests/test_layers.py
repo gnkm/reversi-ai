@@ -68,7 +68,7 @@ def _string_literals(source: str) -> tuple[str, ...]:
 
 
 def _agent_files() -> tuple[str, ...]:
-    names = ["rl.py", "rl_search.py"]
+    names = ["rl.py", "rl_search.py", "rl_tied.py"]
     if (_SRC / "agents" / "ml.py").is_file():
         names.append("ml.py")
     if (_SRC / "agents" / "lgbm.py").is_file():

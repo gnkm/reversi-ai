@@ -1,4 +1,9 @@
-"""自己対局の線形 TD。WTHOR を使わない。成果物は models/rl.json。"""
+"""自己対局の線形 TD。WTHOR を使わない。
+
+α と ε は局が進むほど下げる。探索手の直後は更新の目標にしない。
+8 回対称で一致するマスは同じ重みを共有し、空平面は使わない。
+既定の書き出しは models/rl.json。段階 2 のカタログ個体は models/rl-tied.json を読む。
+"""
 
 from __future__ import annotations
 
@@ -29,17 +34,80 @@ DEFAULT_OUT = Path(__file__).resolve().parents[4] / "models" / "rl.json"
 DEFAULT_GAMES = 400
 DEFAULT_ALPHA = 0.001
 DEFAULT_EPSILON = 0.1
+# 最終局の α は初期値のこの割合。ε は 0 まで下げる。
+ALPHA_FLOOR_RATIO = 0.1
+EPSILON_FLOOR_RATIO = 0.0
+PLANE = 64
+EMPTY_PLANE = 2 * PLANE
 
 __all__ = [
+    "ALPHA_FLOOR_RATIO",
     "DEFAULT_OUT",
+    "EPSILON_FLOOR_RATIO",
+    "SQUARE_ORBITS",
     "dump_policy",
+    "scheduled_rate",
     "train",
     "train_and_write",
 ]
 
 
+def _d4_images(file: int, rank: int) -> tuple[int, ...]:
+    """回転と反転で重なるマス。添字は rank * 8 + file。"""
+    last = 7
+    found: set[int] = set()
+    for rotations in range(4):
+        for mirrored in (False, True):
+            next_file, next_rank = file, rank
+            for _ in range(rotations):
+                next_file, next_rank = next_rank, last - next_file
+            if mirrored:
+                next_file = last - next_file
+            found.add(next_rank * 8 + next_file)
+    return tuple(sorted(found))
+
+
+def _square_orbits() -> tuple[tuple[int, ...], ...]:
+    seen: set[int] = set()
+    orbits: list[tuple[int, ...]] = []
+    for rank in range(8):
+        for file in range(8):
+            index = rank * 8 + file
+            if index in seen:
+                continue
+            orbit = _d4_images(file, rank)
+            seen.update(orbit)
+            orbits.append(orbit)
+    return tuple(orbits)
+
+
+SQUARE_ORBITS = _square_orbits()
+
+
+def scheduled_rate(
+    initial: float,
+    game_index: int,
+    games: int,
+    floor_ratio: float,
+) -> float:
+    """局が進むほど線形に下げる。最初の局は初期値、最後の局は初期値×floor_ratio。"""
+    if games < 1:
+        raise ValueError("対局数は 1 以上でなければなりません")
+    if game_index < 1 or game_index > games:
+        raise ValueError("局番号は 1 から対局数までです")
+    if floor_ratio < 0 or floor_ratio > 1:
+        raise ValueError("下限の割合は 0 以上 1 以下です")
+    if games == 1:
+        return float(initial)
+    progress = (game_index - 1) / (games - 1)
+    return float(initial) * (1.0 - progress * (1.0 - floor_ratio))
+
+
 def _features(board: Board) -> np.ndarray:
-    return np.asarray(encode(board).as_vector(), dtype=np.float64)
+    """黒・白だけを使う。空平面は黒＋白＋空＝1 で切片と線形従属なので 0 にする。"""
+    phi = np.asarray(encode(board).as_vector(), dtype=np.float64)
+    phi[EMPTY_PLANE:] = 0.0
+    return phi
 
 
 def _black_reward(score: Score) -> float:
@@ -58,9 +126,11 @@ def _self_play(
     rng: Random,
     policy: LinearPolicy,
     epsilon: float,
-) -> tuple[tuple[Board, ...], float]:
+) -> tuple[tuple[Board, ...], tuple[bool, ...], float]:
+    """afterstate と、その手を ε で選んだかの列を返す。"""
     position = initial_position()
     afterstates: list[Board] = []
+    exploratory: list[bool] = []
     while not is_over(position):
         if pass_is_legal(position):
             position = play(position, PassMove())
@@ -69,14 +139,22 @@ def _self_play(
         if rng.random() < epsilon:
             square = places[rng.randrange(len(places))]
             position = play(position, Place(square))
+            exploratory.append(True)
         else:
             move = greedy_place(position, policy)
             if move is None:
                 break
             position = play(position, move)
+            exploratory.append(False)
         afterstates.append(position.board)
     reward = _black_reward(official_score(position.board))
-    return tuple(afterstates), reward
+    return tuple(afterstates), tuple(exploratory), reward
+
+
+def _share_orbit(weights: np.ndarray, plane: int, orbit: tuple[int, ...], theta: float) -> None:
+    base = plane * PLANE
+    for index in orbit:
+        weights[base + index] = theta
 
 
 def _td_update(
@@ -85,18 +163,38 @@ def _td_update(
     boards: tuple[Board, ...],
     reward: float,
     alpha: float,
+    exploratory: tuple[bool, ...] | None = None,
 ) -> tuple[np.ndarray, float]:
+    """貪欲手の afterstate だけを更新する。探索手の直後は目標にしない。
+
+    黒平面と白平面は、8 回対称で一致するマスが同じ重みを共有する。空平面は更新しない。
+    """
+    flags = exploratory if exploratory is not None else tuple(False for _ in boards)
+    if len(flags) != len(boards):
+        raise ValueError("探索手の印は afterstate と同じ長さでなければなりません")
+    updated = weights.copy()
+    updated[EMPTY_PLANE:] = 0.0
     for index, board in enumerate(boards):
+        if flags[index]:
+            continue
         phi = _features(board)
-        current = float(weights @ phi + bias)
+        current = float(updated @ phi + bias)
         if index + 1 == len(boards):
             target = reward
+        elif flags[index + 1]:
+            continue
         else:
-            target = float(weights @ _features(boards[index + 1]) + bias)
+            target = float(updated @ _features(boards[index + 1]) + bias)
         delta = target - current
-        weights = weights + alpha * delta * phi
+        for plane in (0, 1):
+            base = plane * PLANE
+            for orbit in SQUARE_ORBITS:
+                gradient = float(sum(phi[base + square] for square in orbit))
+                theta = float(updated[base + orbit[0]]) + alpha * delta * gradient
+                _share_orbit(updated, plane, orbit, theta)
+        updated[EMPTY_PLANE:] = 0.0
         bias = bias + alpha * delta
-    return weights, bias
+    return updated, bias
 
 
 def _snapshot_name(games: int) -> str:
@@ -130,8 +228,17 @@ def train(
     bias = 0.0
     policy = _to_policy(weights, bias)
     for game_index in range(1, games + 1):
-        boards, reward = _self_play(rng, policy, epsilon)
-        weights, bias = _td_update(weights, bias, boards, reward, alpha)
+        alpha_t = scheduled_rate(alpha, game_index, games, ALPHA_FLOOR_RATIO)
+        epsilon_t = scheduled_rate(epsilon, game_index, games, EPSILON_FLOOR_RATIO)
+        boards, exploratory, reward = _self_play(rng, policy, epsilon_t)
+        weights, bias = _td_update(
+            weights,
+            bias,
+            boards,
+            reward,
+            alpha_t,
+            exploratory,
+        )
         policy = _to_policy(weights, bias)
         if snapshot_dir is not None and _should_snapshot(
             game_index, games, snapshot_every
@@ -184,7 +291,11 @@ def train_and_write(
         snapshot_every=snapshot_every,
         snapshot_dir=snapshot_dir,
     )
-    dump_policy(path, policy)
+    dump_policy(
+        path,
+        policy,
+        extra={"games": games, "seed": seed, "alpha": alpha, "epsilon": epsilon},
+    )
     load_policy(path)
     return policy
 
@@ -196,8 +307,18 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT)
     parser.add_argument("--games", type=int, default=DEFAULT_GAMES)
     parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument("--alpha", type=float, default=DEFAULT_ALPHA)
-    parser.add_argument("--epsilon", type=float, default=DEFAULT_EPSILON)
+    parser.add_argument(
+        "--alpha",
+        type=float,
+        default=DEFAULT_ALPHA,
+        help="最初の局の学習率。最後の局は初期値の 0.1 倍まで線形に下がる。",
+    )
+    parser.add_argument(
+        "--epsilon",
+        type=float,
+        default=DEFAULT_EPSILON,
+        help="最初の局の探索率。最後の局は 0 まで線形に下がる。",
+    )
     parser.add_argument(
         "--snapshot-every",
         type=int,

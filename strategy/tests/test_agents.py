@@ -1471,6 +1471,42 @@ def test_catalog_lists_rl_search_without_replacing_greedy_rl() -> None:
     assert rl.choose_move is not rl_search.choose_move
 
 
+def test_catalog_lists_tied_rl_without_replacing_earlier_rl() -> None:
+    from reversi.agents import rl, rl_search, rl_tied
+
+    item = _item_by_display_name("強化学習 (対称な読み)")
+    assert item.specimen_id == rl_tied.SPECIMEN_ID == "rl_tied"
+    assert item.category == rl_tied.CATEGORY == "reinforcement_learning"
+    assert item.display_name == rl_tied.DISPLAY_NAME
+    assert item.description == rl_tied.DESCRIPTION
+    assert "自己対局" in item.description
+    assert "数手先" in item.description
+    assert _JAPANESE.search(item.description)
+    assert len(item.description) <= 100
+    assert get(rl_tied.SPECIMEN_ID) == item
+    names = [listed.display_name for listed in items()]
+    assert names.count("強化学習 (自己対局)") == 1
+    assert names.count("強化学習 (自己対局＋読み)") == 1
+    assert names.count("強化学習 (対称な読み)") == 1
+    assert rl_tied.DEFAULT_MODEL_PATH != rl.DEFAULT_MODEL_PATH
+    assert rl_tied.DEFAULT_MODEL_PATH != rl_search.DEFAULT_MODEL_PATH
+    assert rl_tied.SEARCH_DEPTH == rl_search.SEARCH_DEPTH == 4
+    assert rl.choose_move is not rl_tied.choose_move
+    source = _module_source("rl_tied.py")
+    roots = _imported_roots(source)
+    assert roots.isdisjoint(_FORBIDDEN_IMPORT_ROOTS)
+    assert "torch" not in roots
+    assert "onnxruntime" not in roots
+    assert "openrouter" not in roots
+    tree = ast.parse(source)
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            lowered = node.value.lower()
+            assert "ffothello.org" not in lowered
+            assert ".wtb" not in lowered
+            assert "openrouter.ai" not in lowered
+
+
 def test_rl_greedy_maximizes_black_value() -> None:
     from reversi.agents import rl
 
@@ -1588,27 +1624,124 @@ def test_rl_training_does_not_read_wthor(
     assert load_policy(out).weights == policy.weights
 
 
+def _board_with(**stones: Stone) -> Board:
+    return empty_board().replacing(
+        {Square.parse(algebraic): stone for algebraic, stone in stones.items()}
+    )
+
+
 def test_rl_td_update_moves_weights_toward_terminal_reward() -> None:
     import numpy as np
 
-    from reversi.train.rl import _features, _td_update
+    from reversi.train.rl import EMPTY_PLANE, SQUARE_ORBITS, _td_update
 
-    board = initial_position().board
-    phi = _features(board)
+    board = _board_with(a1=Stone.BLACK)
     zeros = np.zeros(VECTOR_SIZE, dtype=np.float64)
     alpha = 0.5
     toward_win, bias_win = _td_update(zeros.copy(), 0.0, (board,), 1.0, alpha)
-    np.testing.assert_allclose(toward_win, alpha * phi)
     assert bias_win == pytest.approx(alpha)
+    corner = next(orbit for orbit in SQUARE_ORBITS if 0 in orbit)
+    for index in corner:
+        assert toward_win[index] == pytest.approx(alpha)
+    for orbit in SQUARE_ORBITS:
+        if orbit == corner:
+            continue
+        assert all(toward_win[index] == 0.0 for index in orbit)
+    assert all(toward_win[index] == 0.0 for index in range(64, VECTOR_SIZE))
+    assert all(value == 0.0 for value in toward_win[EMPTY_PLANE:])
 
     toward_loss, bias_loss = _td_update(zeros.copy(), 0.0, (board,), -1.0, alpha)
-    np.testing.assert_allclose(toward_loss, -alpha * phi)
+    np.testing.assert_allclose(toward_loss, -toward_win)
     assert bias_loss == pytest.approx(-alpha)
 
     later = empty_board()
     updated, _ = _td_update(zeros.copy(), 0.0, (board, later), 1.0, alpha)
-    # 先頭局面の TD 目標は次局面の価値 0 なので動かず、終端報酬は末局面だけに乗る。
-    np.testing.assert_allclose(updated, alpha * _features(later))
+    # 先頭の目標は次局面の価値 0。終端の空盤は黒白特徴が無いので重みは動かない。
+    np.testing.assert_allclose(updated, 0.0)
+
+
+def test_rl_alpha_and_epsilon_decay_as_games_advance(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from reversi.train import rl as rl_train
+
+    games = 5
+    alpha = 0.2
+    epsilon = 0.4
+    alphas = [
+        rl_train.scheduled_rate(alpha, index, games, rl_train.ALPHA_FLOOR_RATIO)
+        for index in range(1, games + 1)
+    ]
+    epsilons = [
+        rl_train.scheduled_rate(epsilon, index, games, rl_train.EPSILON_FLOOR_RATIO)
+        for index in range(1, games + 1)
+    ]
+    assert alphas[0] == pytest.approx(alpha)
+    assert alphas[-1] == pytest.approx(alpha * rl_train.ALPHA_FLOOR_RATIO)
+    assert alphas[0] > alphas[2] > alphas[-1]
+    assert epsilons[0] == pytest.approx(epsilon)
+    assert epsilons[-1] == pytest.approx(0.0)
+    assert epsilons[0] > epsilons[2] > epsilons[-1]
+    seen: list[float] = []
+
+    def spy(_rng: Random, _policy: object, epsilon_now: float):
+        seen.append(epsilon_now)
+        return (), (), 0.0
+
+    monkeypatch.setattr(rl_train, "_self_play", spy)
+    rl_train.train(games, seed=0, alpha=alpha, epsilon=epsilon)
+    assert seen == pytest.approx(epsilons)
+
+
+def test_rl_exploratory_afterstate_is_not_a_greedy_target() -> None:
+    import numpy as np
+
+    from reversi.train.rl import _td_update
+
+    anchor = _board_with(a1=Stone.BLACK)
+    other = _board_with(c3=Stone.BLACK)
+    alternate = _board_with(h8=Stone.WHITE)
+    zeros = np.zeros(VECTOR_SIZE, dtype=np.float64)
+    skipped_other, bias_other = _td_update(
+        zeros.copy(), 0.0, (anchor, other), 1.0, 0.5, (False, True)
+    )
+    skipped_alt, bias_alt = _td_update(
+        zeros.copy(), 0.0, (anchor, alternate), 1.0, 0.5, (False, True)
+    )
+    np.testing.assert_allclose(skipped_other, 0.0)
+    np.testing.assert_allclose(skipped_alt, skipped_other)
+    assert bias_other == pytest.approx(0.0)
+    assert bias_alt == pytest.approx(0.0)
+    learned, _ = _td_update(
+        zeros.copy(), 0.0, (anchor, other), 1.0, 0.5, (False, False)
+    )
+    assert not np.allclose(learned, skipped_other)
+    only_second, _ = _td_update(
+        zeros.copy(), 0.0, (anchor, other), 1.0, 0.5, (True, False)
+    )
+    without_anchor, _ = _td_update(zeros.copy(), 0.0, (other,), 1.0, 0.5, (False,))
+    np.testing.assert_allclose(only_second, without_anchor)
+
+
+def test_rl_training_shares_symmetry_and_ignores_empty_plane() -> None:
+    from reversi.train.rl import EMPTY_PLANE, SQUARE_ORBITS, train
+
+    covered = [index for orbit in SQUARE_ORBITS for index in orbit]
+    assert sorted(covered) == list(range(64))
+    assert len(SQUARE_ORBITS) == 10
+    policy = train(games=2, seed=0, alpha=0.05, epsilon=0.0)
+    weights = policy.weights
+    assert len(weights) == VECTOR_SIZE
+    assert all(value == 0.0 for value in weights[EMPTY_PLANE:])
+    assert any(value != 0.0 for value in weights[:EMPTY_PLANE])
+    for plane in (0, 1):
+        base = plane * 64
+        for orbit in SQUARE_ORBITS:
+            values = [weights[base + index] for index in orbit]
+            assert values == pytest.approx([values[0]] * len(orbit))
+    untouched = train(games=1, seed=1, alpha=0.5, epsilon=1.0)
+    assert all(value == 0.0 for value in untouched.weights)
+    assert untouched.bias == 0.0
 
 
 def _rl_eval_module():
