@@ -19,6 +19,7 @@ from reversi.agents import (
     positional,
     random_uniform,
     rl,
+    rl_search,
 )
 from reversi.engine.rules import Place, Position
 
@@ -37,6 +38,7 @@ __all__ = [
     "POSITIONAL",
     "RANDOM_UNIFORM",
     "RL",
+    "RL_SEARCH",
     "CatalogItem",
     "choose_move",
     "get",
@@ -108,6 +110,12 @@ RL = CatalogItem(
     display_name=rl.DISPLAY_NAME,
     description=rl.DESCRIPTION,
 )
+RL_SEARCH = CatalogItem(
+    specimen_id=rl_search.SPECIMEN_ID,
+    category=rl_search.CATEGORY,
+    display_name=rl_search.DISPLAY_NAME,
+    description=rl_search.DESCRIPTION,
+)
 NN = CatalogItem(
     specimen_id=nn.SPECIMEN_ID,
     category=nn.CATEGORY,
@@ -132,6 +140,7 @@ _BUILTIN: tuple[tuple[CatalogItem, Chooser], ...] = (
     (ML, ml.choose_move),
     (LGBM, lgbm.choose_move),
     (RL, rl.choose_move),
+    (RL_SEARCH, rl_search.choose_move),
     (NN, nn.choose_move),
     (JEV, jev.choose_move),
 )

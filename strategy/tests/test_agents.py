@@ -1445,6 +1445,32 @@ def test_catalog_lists_rl_self_play() -> None:
         get("reinforcement_learning")
 
 
+def test_catalog_lists_rl_search_without_replacing_greedy_rl() -> None:
+    from reversi.agents import rl, rl_search
+
+    greedy = _item_by_display_name("強化学習 (自己対局)")
+    assert greedy.specimen_id == rl.SPECIMEN_ID == "rl"
+    assert greedy.display_name == "強化学習 (自己対局)"
+    item = _item_by_display_name("強化学習 (自己対局＋読み)")
+    assert item.specimen_id == rl_search.SPECIMEN_ID == "rl_search"
+    assert item.category == rl_search.CATEGORY == "reinforcement_learning"
+    assert item.display_name == rl_search.DISPLAY_NAME
+    assert item.description == rl_search.DESCRIPTION
+    assert "自己対局" in item.description
+    assert "数手先" in item.description
+    assert _JAPANESE.search(item.description)
+    assert len(item.description) <= 100
+    assert get(rl_search.SPECIMEN_ID) == item
+    names = [listed.display_name for listed in items()]
+    assert names.count("強化学習 (自己対局)") == 1
+    assert names.count("強化学習 (自己対局＋読み)") == 1
+    rl_like = [listed for listed in items() if listed.category == "reinforcement_learning"]
+    assert len(rl_like) >= 2
+    assert rl_search.SEARCH_DEPTH == 4
+    assert rl_search.DEFAULT_MODEL_PATH == rl.DEFAULT_MODEL_PATH
+    assert rl.choose_move is not rl_search.choose_move
+
+
 def test_rl_greedy_maximizes_black_value() -> None:
     from reversi.agents import rl
 
@@ -1708,6 +1734,150 @@ def test_rl_stage0_baseline_has_metrics() -> None:
             assert ".wtb" not in lowered
             assert "openrouter.ai" not in lowered
     assert [item.display_name for item in items()].count("強化学習 (自己対局)") == 1
+
+
+def test_rl_value_of_matches_feature_dot_product() -> None:
+    from reversi.agents import rl
+    from reversi.encode import encode
+
+    weights = [0.0] * VECTOR_SIZE
+    weights[_black_feature_index(Square.parse("d4"))] = 0.3
+    weights[64] = 0.7
+    weights[128 + 1] = -0.4
+    policy = rl.LinearPolicy(tuple(weights), 0.05)
+    for board in (initial_position().board, empty_board()):
+        expected = policy.bias
+        for weight, feature in zip(
+            policy.weights, encode(board).as_vector(), strict=True
+        ):
+            expected += weight * feature
+        assert rl.value_of(board, policy) == pytest.approx(expected)
+        assert rl.perspective_value(board, Color.BLACK, policy) == pytest.approx(
+            expected
+        )
+        assert rl.perspective_value(board, Color.WHITE, policy) == pytest.approx(
+            -expected
+        )
+
+
+def _file_leaf(board: Board, color: Color) -> int:
+    """c 列の自石を好み、相手石を嫌う。差し替え葉の大小を見るための整数。"""
+    total = 0
+    for square in all_squares():
+        stone = board.stone_at(square)
+        if square.file != 2:
+            continue
+        if stone is color.stone:
+            total += 10
+        elif stone is color.opponent.stone:
+            total -= 10
+    return total
+
+
+def _brute_negamax(position: Position, remaining: int) -> int:
+    if remaining == 0 or is_over(position):
+        return _file_leaf(position.board, position.side_to_move)
+    best = -10_000
+    for move in legal_moves(position):
+        best = max(best, -_brute_negamax(play(position, move), remaining - 1))
+    return best
+
+
+def test_alphabeta_custom_leaf_matches_brute_force_and_adds_no_bonus() -> None:
+    position = initial_position()
+    for depth in (1, 2):
+        place, value, _nodes = alphabeta.search_stats(
+            position, depth, evaluate=_file_leaf
+        )
+        assert place is not None
+        best_square = None
+        best_value: int | None = None
+        for square in legal_places(position):
+            child = play(position, Place(square))
+            child_value = -_brute_negamax(child, depth - 1)
+            if best_value is None or child_value > best_value:
+                best_value = child_value
+                best_square = square
+        assert place == Place(best_square)
+        assert value == best_value
+        assert type(value) is int
+    default_place, default_value, _nodes = alphabeta.search_stats(position, 1)
+    assert type(default_value) is int
+    assert default_place == alphabeta.choose_at_depth(position, 1)
+
+
+def test_rl_search_depth_one_matches_greedy_and_plays_legal() -> None:
+    from reversi.agents import rl, rl_search
+
+    policy = _linear_policy({"c4": 4.0, "d3": 1.0})
+    for position in (
+        initial_position(),
+        play(initial_position(), Place(Square.parse("d3"))),
+    ):
+        searched = rl_search.choose_at_depth(position, 1, policy=policy)
+        greedy = rl.greedy_place(position, policy)
+        assert searched == greedy
+        assert searched is not None
+        assert searched.square in legal_places(position)
+    white_leaf = rl_search.leaf_score(
+        initial_position().board, Color.WHITE, policy
+    )
+    black_leaf = rl_search.leaf_score(
+        initial_position().board, Color.BLACK, policy
+    )
+    assert white_leaf == pytest.approx(-black_leaf)
+    source = _module_source("rl_search.py")
+    roots = _imported_roots(source)
+    assert roots.isdisjoint(_FORBIDDEN_IMPORT_ROOTS)
+    assert "torch" not in roots
+    assert "onnxruntime" not in roots
+    assert "openrouter" not in roots
+    assert "wthor" not in roots
+    tree = ast.parse(source)
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            lowered = node.value.lower()
+            assert "ffothello.org" not in lowered
+            assert ".wtb" not in lowered
+            assert "openrouter.ai" not in lowered
+    position = initial_position()
+    while not is_over(position):
+        if pass_is_legal(position):
+            position = play(position, PassMove())
+            continue
+        move = rl_search.choose_at_depth(position, 1, policy=policy)
+        assert move is not None
+        assert move.square in legal_places(position)
+        position = play(position, move)
+    assert is_over(position)
+
+
+def test_same_depth_position_leaf_and_rl_leaf_can_play() -> None:
+    """同じ深さの αβ で、葉が位置評価表の個体と葉が線形 v の個体を対局できる。"""
+    from reversi.agents import rl_search
+
+    start = initial_position()
+    position = start
+    depth = 1
+    rl_is_black = True
+    while not is_over(position):
+        places = legal_places(position)
+        if not places:
+            position = play(position, PassMove())
+            continue
+        is_rl = (position.side_to_move is Color.BLACK) == rl_is_black
+        if is_rl:
+            move = rl_search.choose_at_depth(position, depth)
+        else:
+            move = alphabeta.choose_at_depth(
+                position, depth, evaluate=minimax.leaf_score
+            )
+        assert move is not None
+        assert move.square in places
+        position = play(position, move)
+    assert is_over(position)
+    assert official_score(position.board) is not None
+    assert stone_counts(position.board).black + stone_counts(position.board).white == 64
 
 
 def test_rl_eval_ci_notes_when_interval_crosses_even() -> None:
