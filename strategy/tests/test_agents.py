@@ -1304,7 +1304,9 @@ def test_jev_stage4_margin_zero_matches_code_best_on_recorded_positions() -> Non
     spec = replace(jev._load_spec(), margin=0.0)
     losses: list[int] = []
     for row in positions:
-        position = _position_from_rank8_rows(tuple(row["board"]), Color(row["side_to_move"]))
+        position = _position_from_rank8_rows(
+            tuple(row["board"]), Color(row["side_to_move"])
+        )
         places = legal_places(position)
         focused = places[-1].algebraic
         chosen = jev._select_square(
@@ -1346,7 +1348,9 @@ def test_jev_stage5_record_has_paired_acceptance() -> None:
         chosen = data["candidate"]
         assert spec["selection"]["shortlist_size"] == chosen["shortlist_size"]
         assert spec["selection"]["margin"] == chosen["margin"]
-        assert spec["selection"]["confidence_threshold"] == chosen["confidence_threshold"]
+        assert (
+            spec["selection"]["confidence_threshold"] == chosen["confidence_threshold"]
+        )
     else:
         assert data.get("return_to_stage3_and_4") is True
         assert data.get("catalog_policy") == "code_only_v2_jev0"
@@ -1374,7 +1378,9 @@ def test_jev_catalog_default_calls_openrouter(
     assert jev.DEFAULT_STAGE1_CONFIG not in jev.STAGE1_CODE_ONLY
 
 
-def test_jev_gives_corner_newly_does_not_mark_all_when_opponent_already_has_corner() -> None:
+def test_jev_gives_corner_newly_does_not_mark_all_when_opponent_already_has_corner() -> (
+    None
+):
     rows = (
         "........",
         "........",
@@ -1389,7 +1395,9 @@ def test_jev_gives_corner_newly_does_not_mark_all_when_opponent_already_has_corn
     places = legal_places(position)
     assert len(places) >= 2
     opponent = Position(position.board, Color.WHITE)
-    assert any(place.algebraic in {"a1", "h1", "a8", "h8"} for place in legal_places(opponent))
+    assert any(
+        place.algebraic in {"a1", "h1", "a8", "h8"} for place in legal_places(opponent)
+    )
     spec = jev._load_spec()
     newly = replace(spec, gives_corner_newly=True)
     flags = [jev._gives_corner(position, square, newly) for square in places]
@@ -1464,7 +1472,9 @@ def test_catalog_lists_rl_search_without_replacing_greedy_rl() -> None:
     names = [listed.display_name for listed in items()]
     assert names.count("強化学習 (自己対局)") == 1
     assert names.count("強化学習 (自己対局＋読み)") == 1
-    rl_like = [listed for listed in items() if listed.category == "reinforcement_learning"]
+    rl_like = [
+        listed for listed in items() if listed.category == "reinforcement_learning"
+    ]
     assert len(rl_like) >= 2
     assert rl_search.SEARCH_DEPTH == 4
     assert rl_search.DEFAULT_MODEL_PATH == rl.DEFAULT_MODEL_PATH
@@ -1780,7 +1790,10 @@ def test_rl_openings_are_reproducible_with_seed() -> None:
     assert payload["seed"] == module.SEED
     regenerated = module.make_openings(Random(payload["seed"]), len(positions))
     assert regenerated == positions
-    assert module.resolve_openings(openings[-1], payload["seed"], len(positions)) == positions
+    assert (
+        module.resolve_openings(openings[-1], payload["seed"], len(positions))
+        == positions
+    )
     assert [item.display_name for item in items()].count("強化学習 (自己対局)") == 1
     assert rl_agent.SPECIMEN_ID == "rl"
     assert rl_agent.DISPLAY_NAME == "強化学習 (自己対局)"
@@ -1955,12 +1968,8 @@ def test_rl_search_depth_one_matches_greedy_and_plays_legal() -> None:
         assert searched == greedy
         assert searched is not None
         assert searched.square in legal_places(position)
-    white_leaf = rl_search.leaf_score(
-        initial_position().board, Color.WHITE, policy
-    )
-    black_leaf = rl_search.leaf_score(
-        initial_position().board, Color.BLACK, policy
-    )
+    white_leaf = rl_search.leaf_score(initial_position().board, Color.WHITE, policy)
+    black_leaf = rl_search.leaf_score(initial_position().board, Color.BLACK, policy)
     assert white_leaf == pytest.approx(-black_leaf)
     source = _module_source("rl_search.py")
     roots = _imported_roots(source)
@@ -2025,7 +2034,9 @@ def test_rl_stage1_comparison_json_has_depths_and_rates() -> None:
         name.startswith("強化学習") and name != "強化学習 (自己対局)" for name in names
     )
     rl_like = [
-        item for item in catalog.list_items() if item.category == "reinforcement_learning"
+        item
+        for item in catalog.list_items()
+        if item.category == "reinforcement_learning"
     ]
     assert len(rl_like) >= 2
     root = Path(__file__).resolve().parents[2] / "docs" / "benchmarks"
@@ -2127,7 +2138,9 @@ def test_rl_stage2_comparison_json_has_rates_and_flat_tail() -> None:
     assert data["baseline"]["specimen_id"] == rl_search.SPECIMEN_ID
     assert data["baseline"]["model"].endswith("models/rl.json")
     assert rl.DEFAULT_MODEL_PATH.name == "rl.json"
-    weights = json.loads(rl_tied.DEFAULT_MODEL_PATH.read_text(encoding="utf-8"))["weights"]
+    weights = json.loads(rl_tied.DEFAULT_MODEL_PATH.read_text(encoding="utf-8"))[
+        "weights"
+    ]
     assert len(weights) == VECTOR_SIZE
     assert all(value == 0.0 for value in weights[EMPTY_PLANE:])
     for plane in (0, 1):
@@ -2153,6 +2166,286 @@ def test_rl_stage2_comparison_json_has_rates_and_flat_tail() -> None:
             assert "ffothello.org" not in lowered
             assert ".wtb" not in lowered
             assert "openrouter.ai" not in lowered
+
+
+def test_pattern_mobility_matches_legal_place_counts() -> None:
+    from reversi.agents.pattern_eval import (
+        SCALAR_NAMES,
+        _pack,
+        black_value,
+        zero_policy,
+    )
+    from reversi.engine.rules import count_places, play
+
+    position = initial_position()
+    for _ in range(12):
+        places = legal_places(position)
+        if not places:
+            break
+        position = play(position, Place(places[0]))
+        cells = _pack(position.board).tolist()
+        black = count_places(position.board, Color.BLACK)
+        white = count_places(position.board, Color.WHITE)
+        policy = zero_policy()
+        mobility = SCALAR_NAMES.index("mobility")
+        policy.scalars[:, mobility] = 8.0
+        assert black_value(position.board, Color.BLACK, policy) == pytest.approx(
+            black - white
+        )
+        assert cells.count(0) == 64 - sum(
+            stone is not Stone.EMPTY
+            for row in position.board.cells
+            for stone in row
+        )
+
+
+def test_pattern_value_is_a_lookup_table_not_a_192_vector() -> None:
+    from reversi.agents.pattern_eval import (
+        EDGE_X_BLACK_CORNER_BLACK,
+        EDGE_X_BLACK_CORNER_EMPTY,
+        PATTERN_SPECS,
+        _transform,
+        black_value,
+        stage_of,
+        zero_policy,
+    )
+
+    edge = next(spec for spec in PATTERN_SPECS if spec.name == "edge_2x")
+    assert edge.size == 3**10
+    assert edge.size != VECTOR_SIZE
+    assert edge.n_instances == 4
+    policy = zero_policy()
+    policy.weights["edge_2x"][0, EDGE_X_BLACK_CORNER_BLACK] = 2.0
+    policy.weights["edge_2x"][0, EDGE_X_BLACK_CORNER_EMPTY] = -1.0
+    both = empty_board().replacing(
+        {
+            Square.parse("a1"): Stone.BLACK,
+            Square.parse("b2"): Stone.BLACK,
+        }
+    )
+    only_x = empty_board().replacing({Square.parse("b2"): Stone.BLACK})
+    assert stage_of(2) == 0
+    both_value = black_value(both, Color.BLACK, policy)
+    only_value = black_value(only_x, Color.BLACK, policy)
+    assert both_value == pytest.approx(2.0) or both_value == pytest.approx(4.0)
+    assert only_value < 0.0
+    assert both_value != pytest.approx(only_value)
+    rotated = empty_board()
+    updates = {}
+    for square in all_squares():
+        stone = both.stone_at(square)
+        if stone is Stone.EMPTY:
+            continue
+        file, rank = _transform(square.file, square.rank, 1, False)
+        updates[Square(file=file, rank=rank)] = stone
+    rotated = rotated.replacing(updates)
+    assert black_value(rotated, Color.BLACK, policy) == pytest.approx(2.0)
+
+
+def test_pattern_stage_bias_and_parity_change_the_value() -> None:
+    from reversi.agents.pattern_eval import (
+        SCALAR_NAMES,
+        black_value,
+        stage_of,
+        zero_policy,
+    )
+
+    policy = zero_policy()
+    policy.bias[0] = 1.0
+    policy.bias[3] = 5.0
+    opening = initial_position().board
+    assert stage_of(4) == 0
+    assert black_value(opening, Color.BLACK, policy) == pytest.approx(1.0)
+    stones = {square: Stone.BLACK for square in list(all_squares())[:22]}
+    later = empty_board().replacing(stones)
+    assert stage_of(22) == 3
+    assert black_value(later, Color.BLACK, policy) == pytest.approx(5.0)
+    parity = SCALAR_NAMES.index("parity")
+    policy.scalars[0, parity] = 3.0
+    assert black_value(opening, Color.BLACK, policy) == pytest.approx(1.0 - 3.0)
+    assert black_value(opening, Color.WHITE, policy) == pytest.approx(1.0 + 3.0)
+
+
+def test_pattern_xc_table_reads_sign_from_the_weight_table() -> None:
+    from reversi.agents.pattern_eval import (
+        CORNER_C_BLACK_CORNER_BLACK,
+        CORNER_C_BLACK_CORNER_EMPTY,
+        EDGE_X_BLACK_CORNER_BLACK,
+        EDGE_X_BLACK_CORNER_EMPTY,
+        xc_table,
+        zero_policy,
+    )
+
+    policy = zero_policy()
+    policy.weights["edge_2x"][0, EDGE_X_BLACK_CORNER_EMPTY] = -0.4
+    policy.weights["edge_2x"][0, EDGE_X_BLACK_CORNER_BLACK] = 0.2
+    policy.weights["corner_3x3"][1, CORNER_C_BLACK_CORNER_EMPTY] = 0.3
+    policy.weights["corner_3x3"][1, CORNER_C_BLACK_CORNER_BLACK] = -0.1
+    table = xc_table(policy)
+    assert table["x_sign_changes"] is True
+    assert table["c_sign_changes"] is True
+    assert table["stages"][0]["x_black_corner_empty"] == pytest.approx(-0.4)
+    assert table["stages"][0]["x_black_corner_black"] == pytest.approx(0.2)
+    assert table["stages"][1]["c_sign_changes"] is True
+
+
+def test_pattern_td_lambda_normalizes_alpha_and_skips_exploratory_moves(
+    tmp_path: Path,
+) -> None:
+    from reversi.agents.pattern_eval import active_count
+    from reversi.train.rl_pattern import _td_segment, train, train_and_write
+
+    policy = train(1, seed=0, alpha=active_count(), epsilon=1.0, lam=0.0)
+    assert policy.bias.tolist() == [0.0] * len(policy.bias)
+    opened = initial_position()
+    fresh = train(1, seed=0, alpha=0.0, epsilon=0.0, lam=0.0)
+    assert fresh.bias.tolist() == [0.0] * len(fresh.bias)
+    _td_segment(
+        fresh,
+        ((opened.board, opened.side_to_move),),
+        0,
+        1,
+        None,
+        1.0,
+        active_count(),
+        0.0,
+    )
+    assert fresh.bias[0] == pytest.approx(1.0)
+    assert fresh.bias[1] == pytest.approx(0.5)
+    learned = train(2, seed=1, alpha=0.05, epsilon=0.0, lam=0.5, reward="stone_diff")
+    assert learned.reward == "stone_diff"
+    moved = sum(float(abs(table).sum()) for table in learned.weights.values())
+    assert moved > 0.0
+    out = tmp_path / "rl-pattern.json"
+    train_and_write(out, games=1, seed=2, epsilon=0.0, lam=0.7, reward="win_loss")
+    text = out.read_text(encoding="utf-8").lower()
+    assert "pattern_td_lambda" in text
+    assert "ffothello.org" not in text
+    assert ".wtb" not in text
+
+
+def test_load_policy_rejects_mismatched_feature_layout(tmp_path: Path) -> None:
+    from reversi.agents.pattern_eval import dump_policy, load_policy, zero_policy
+
+    path = tmp_path / "rl-pattern.json"
+    dump_policy(path, zero_policy())
+    load_policy(path)
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    raw["patterns"]["edge_2x"]["squares"] = list(
+        reversed(raw["patterns"]["edge_2x"]["squares"])
+    )
+    path.write_text(json.dumps(raw), encoding="utf-8")
+    with pytest.raises(ValueError, match="squares"):
+        load_policy(path)
+    dump_policy(path, zero_policy())
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    raw["scalar_scale"] = 1.0
+    path.write_text(json.dumps(raw), encoding="utf-8")
+    with pytest.raises(ValueError, match="scalar_scale"):
+        load_policy(path)
+
+
+def test_rl_stage3_record_has_reward_and_pattern_metrics() -> None:
+    from reversi.agents import rl_pattern, rl_tied
+    from reversi.agents.pattern_eval import ALGORITHM, PATTERN_SPECS, load_policy
+
+    root = Path(__file__).resolve().parents[2] / "docs" / "benchmarks"
+    candidates = sorted(root.glob("rl-stage3*.json"))
+    assert candidates, "段階 3 の比較 JSON が docs/benchmarks/ に無い"
+    data = json.loads(candidates[-1].read_text(encoding="utf-8"))
+    for key in ("win_rate", "mean_stone_diff", "ci95", "reward", "train_games"):
+        assert key in data, key
+    assert data["reward"] in {"win_loss", "stone_diff"}
+    assert data["reward"] == "win_loss"
+    assert data["train_games"] == 16000
+    assert data["lambda"] == pytest.approx(0.9)
+    assert "win_rate" in data["ci95"] and "mean_stone_diff" in data["ci95"]
+    assert data["candidate"]["specimen_id"] == rl_pattern.SPECIMEN_ID
+    opponents = {block["opponent"] for block in data["by_opponent"]}
+    assert opponents >= {"stage2", "positional"}
+    depths = {int(block["depth"]) for block in data["by_opponent"]}
+    assert depths >= {1, 2, 4}
+    headline = next(
+        block
+        for block in data["by_opponent"]
+        if block["opponent"] == "stage2" and int(block["depth"]) == 4
+    )
+    assert data["win_rate"] == pytest.approx(headline["win_rate"])
+    assert data["mean_stone_diff"] == pytest.approx(headline["mean_stone_diff"])
+    curve = {int(point["games"]): point for point in data["learning_curve"]}
+    assert set(curve) >= {4000, 8000, 12000, 16000, 20000, 24000}
+    assert curve[16000]["win_rate"] == max(point["win_rate"] for point in curve.values())
+    assert data["xc"]["x_sign_changes"] is True
+    assert isinstance(data["xc"]["c_sign_changes"], bool)
+    assert any(trial["reward"] == "stone_diff" for trial in data["reward_trials"])
+    assert any(
+        trial["reward"] == "win_loss" and abs(float(trial["lambda"]) - 0.9) < 1e-9
+        for trial in data["reward_trials"]
+    )
+    policy = load_policy(rl_pattern.DEFAULT_MODEL_PATH)
+    assert policy.reward == "win_loss"
+    assert policy.lam == pytest.approx(0.9)
+    assert policy.games == 16000
+    edge = next(spec for spec in PATTERN_SPECS if spec.name == "edge_2x")
+    assert edge.size == 3**10
+    assert edge.size != VECTOR_SIZE
+    weights = json.loads(rl_pattern.DEFAULT_MODEL_PATH.read_text(encoding="utf-8"))
+    assert weights["algorithm"] == ALGORITHM
+    assert rl_tied.DEFAULT_MODEL_PATH.name == "rl-tied.json"
+    script = (root / "rl_stage3.py").read_text(encoding="utf-8")
+    tree = ast.parse(script)
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            lowered = node.value.lower()
+            assert "ffothello.org" not in lowered
+            assert ".wtb" not in lowered
+    train_source = Path(__file__).resolve().parents[1] / "src" / "reversi" / "train" / "rl.py"
+    train_tree = ast.parse(train_source.read_text(encoding="utf-8"))
+    for node in ast.walk(train_tree):
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            lowered = node.value.lower()
+            assert "ffothello.org" not in lowered
+            assert ".wtb" not in lowered
+
+
+def test_catalog_lists_pattern_rl_without_replacing_earlier_rl() -> None:
+    from reversi.agents import rl, rl_pattern, rl_search, rl_tied
+
+    item = _item_by_display_name("強化学習 (パターンの読み)")
+    assert item.specimen_id == rl_pattern.SPECIMEN_ID == "rl_pattern"
+    assert item.category == rl_pattern.CATEGORY == "reinforcement_learning"
+    assert item.display_name == rl_pattern.DISPLAY_NAME
+    assert item.description == rl_pattern.DESCRIPTION
+    assert "自己対局" in item.description
+    assert "数手先" in item.description
+    assert _JAPANESE.search(item.description)
+    assert len(item.description) <= 100
+    assert get(rl_pattern.SPECIMEN_ID) == item
+    names = [listed.display_name for listed in items()]
+    assert names.count("強化学習 (自己対局)") == 1
+    assert names.count("強化学習 (自己対局＋読み)") == 1
+    assert names.count("強化学習 (対称な読み)") == 1
+    assert names.count(rl_pattern.DISPLAY_NAME) == 1
+    assert rl_pattern.DEFAULT_MODEL_PATH != rl.DEFAULT_MODEL_PATH
+    assert rl_pattern.DEFAULT_MODEL_PATH != rl_tied.DEFAULT_MODEL_PATH
+    assert rl_pattern.SEARCH_DEPTH == rl_search.SEARCH_DEPTH == 4
+    assert rl.choose_move is not rl_pattern.choose_move
+    source = _module_source("rl_pattern.py")
+    roots = _imported_roots(source)
+    assert roots.isdisjoint(_FORBIDDEN_IMPORT_ROOTS)
+    assert "torch" not in roots
+    assert "onnxruntime" not in roots
+    assert "openrouter" not in roots
+    tree = ast.parse(source)
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            lowered = node.value.lower()
+            assert "ffothello.org" not in lowered
+            assert ".wtb" not in lowered
+            assert "openrouter.ai" not in lowered
+    move = rl_pattern.choose_at_depth(initial_position(), 1)
+    assert move is not None
+    assert move.square in legal_places(initial_position())
 
 
 def test_rl_train_default_out_is_tied_model() -> None:
@@ -3053,7 +3346,9 @@ def test_catalog_lists_alphabeta() -> None:
     assert minimax.SEARCH_DEPTH == 4
     assert get(alphabeta.SPECIMEN_ID) == item
     assert get(minimax.SPECIMEN_ID) == minimax_item
-    assert sum(1 for listed in items() if listed.specimen_id == alphabeta.SPECIMEN_ID) == 1
+    assert (
+        sum(1 for listed in items() if listed.specimen_id == alphabeta.SPECIMEN_ID) == 1
+    )
     with pytest.raises(KeyError):
         get("rule_based")
 
@@ -3557,9 +3852,10 @@ def test_alphabeta_eval_record_has_paired_acceptance() -> None:
         assert pair["white"]["result"] == white["result"]
         assert pair["black"]["stone_diff"] == black["stone_diff"]
         assert pair["white"]["stone_diff"] == white["stone_diff"]
-        assert pair["pair_stone_diff"] == (
-            int(black["stone_diff"]) + int(white["stone_diff"])
-        ) / 2
+        assert (
+            pair["pair_stone_diff"]
+            == (int(black["stone_diff"]) + int(white["stone_diff"])) / 2
+        )
     assert data.get("stop_reason") == "code_owner_instruction"
     assert data["catalog_policy"] == "keep_phase6"
     script = (root / "alphabeta_eval.py").read_text(encoding="utf-8")
@@ -3567,7 +3863,9 @@ def test_alphabeta_eval_record_has_paired_acceptance() -> None:
     assert "keep_depth4_no_exact" in script
     assert "keep_depth4_no_exact_until_retry" in script
     assert [item.display_name for item in items()].count("ルールベース (αβ)") == 1
-    assert [item.display_name for item in items()].count("ルールベース (ミニマックス)") == 1
+    assert [item.display_name for item in items()].count(
+        "ルールベース (ミニマックス)"
+    ) == 1
     report = root / "alphabeta-eval.md"
     assert report.is_file(), "αβ 評価のレポートが無い"
     text = report.read_text(encoding="utf-8")
@@ -3603,7 +3901,9 @@ def test_alphabeta_eval_resume_requires_endgame_empty() -> None:
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     data = json.loads(
-        (root / "docs" / "benchmarks" / "alphabeta-eval.json").read_text(encoding="utf-8")
+        (root / "docs" / "benchmarks" / "alphabeta-eval.json").read_text(
+            encoding="utf-8"
+        )
     )
     seed = int(data["protocol"]["seed"])
     n_starts = int(data["protocol"]["starts"])

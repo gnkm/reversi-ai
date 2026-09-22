@@ -26,6 +26,7 @@ SHORT_NAME = {
     "rl": "RL",
     "rl_search": "RL読",
     "rl_tied": "RL対称",
+    "rl_pattern": "RLパターン",
     "nn": "NN",
     "jev": "Jev",
 }

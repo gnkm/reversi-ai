@@ -1,0 +1,869 @@
+{
+  "recorded_at": "2026-09-22 12:11",
+  "stage": 3,
+  "reward": "win_loss",
+  "train_games": 16000,
+  "lambda": 0.9,
+  "win_rate": 0.8175,
+  "mean_stone_diff": 19.8375,
+  "ci95": {
+    "win_rate": {
+      "n": 400,
+      "mean": 0.8175,
+      "low": 0.7804025354242861,
+      "high": 0.854597464575714,
+      "crosses_even": false,
+      "note": null
+    },
+    "mean_stone_diff": {
+      "n": 400,
+      "mean": 19.8375,
+      "low": 17.716961486625635,
+      "high": 21.958038513374362
+    }
+  },
+  "candidate": {
+    "specimen_id": "rl_pattern",
+    "display_name": "強化学習 (パターンの読み)",
+    "category": "reinforcement_learning",
+    "model": "models/rl-pattern.json",
+    "catalog_depth": 4
+  },
+  "opponents": {
+    "stage2": {
+      "specimen_id": "rl_tied",
+      "model": "models/rl-tied.json",
+      "leaf": "stage2_linear_v"
+    },
+    "positional": {
+      "specimen_id": "minimax",
+      "leaf": "POSITION_SCORES",
+      "leaf_function": "minimax.leaf_score"
+    }
+  },
+  "protocol": {
+    "starts": 200,
+    "games_per_start": 2,
+    "seed": 20260922,
+    "openings": "docs/benchmarks/rl-openings.json",
+    "depths": [
+      1,
+      2,
+      4
+    ],
+    "workers": 4,
+    "notes": [
+      "比較は同じ深さの αβ。段階 3 の葉はパターン特徴。",
+      "相手は段階 2 の線形 v と、POSITION_SCORES の差（ミニマックスの葉）。",
+      "開始局面は段階 0 と同じ集合。各局面で先後を入れ替える。",
+      "勝率は段階 3 側の（勝 + 0.5×分）/ 局数。石差は盤上の石数。",
+      "白番の評価は符号反転する。葉の外に閾値や定数ボーナスは足さない。",
+      "終盤完全読みはしない。WTHOR も対局時の NN も OpenRouter も使わない。",
+      "学習は 24000 局まで回し、深さ 2 の段階 2 との勝率は 16000 局が最も高い。",
+      "カタログの models/rl-pattern.json は 16000 局の重みである。",
+      "報酬と λ は開始局面 40・深さ 2 の短い比較で選び、勝敗と λ=0.9 を採った。"
+    ],
+    "adopted_snapshot_games": 16000
+  },
+  "by_opponent": [
+    {
+      "opponent": "stage2",
+      "depth": 1,
+      "n_games": 400,
+      "wins": 301,
+      "draws": 7,
+      "losses": 92,
+      "win_rate": 0.76125,
+      "mean_stone_diff": 19.295,
+      "ci95": {
+        "win_rate": {
+          "n": 400,
+          "mean": 0.76125,
+          "low": 0.719925659195089,
+          "high": 0.802574340804911,
+          "crosses_even": false,
+          "note": null
+        },
+        "mean_stone_diff": {
+          "n": 400,
+          "mean": 19.295,
+          "low": 16.46312231069536,
+          "high": 22.126877689304642
+        }
+      },
+      "verdict": {
+        "code": "stage3",
+        "note": "段階 3 の勝率の 95% 区間が 0.5 を上回る"
+      }
+    },
+    {
+      "opponent": "stage2",
+      "depth": 2,
+      "n_games": 400,
+      "wins": 315,
+      "draws": 6,
+      "losses": 79,
+      "win_rate": 0.795,
+      "mean_stone_diff": 19.73,
+      "ci95": {
+        "win_rate": {
+          "n": 400,
+          "mean": 0.795,
+          "low": 0.7558467991774724,
+          "high": 0.8341532008225276,
+          "crosses_even": false,
+          "note": null
+        },
+        "mean_stone_diff": {
+          "n": 400,
+          "mean": 19.73,
+          "low": 17.5124407799317,
+          "high": 21.9475592200683
+        }
+      },
+      "verdict": {
+        "code": "stage3",
+        "note": "段階 3 の勝率の 95% 区間が 0.5 を上回る"
+      }
+    },
+    {
+      "opponent": "stage2",
+      "depth": 4,
+      "n_games": 400,
+      "wins": 322,
+      "draws": 10,
+      "losses": 68,
+      "win_rate": 0.8175,
+      "mean_stone_diff": 19.8375,
+      "ci95": {
+        "win_rate": {
+          "n": 400,
+          "mean": 0.8175,
+          "low": 0.7804025354242861,
+          "high": 0.854597464575714,
+          "crosses_even": false,
+          "note": null
+        },
+        "mean_stone_diff": {
+          "n": 400,
+          "mean": 19.8375,
+          "low": 17.716961486625635,
+          "high": 21.958038513374362
+        }
+      },
+      "verdict": {
+        "code": "stage3",
+        "note": "段階 3 の勝率の 95% 区間が 0.5 を上回る"
+      }
+    },
+    {
+      "opponent": "positional",
+      "depth": 1,
+      "n_games": 400,
+      "wins": 193,
+      "draws": 7,
+      "losses": 200,
+      "win_rate": 0.49125,
+      "mean_stone_diff": 0.7475,
+      "ci95": {
+        "win_rate": {
+          "n": 400,
+          "mean": 0.49125,
+          "low": 0.4426282897810389,
+          "high": 0.5398717102189612,
+          "crosses_even": true,
+          "note": "この局数では区別できない"
+        },
+        "mean_stone_diff": {
+          "n": 400,
+          "mean": 0.7475,
+          "low": -1.895340759531571,
+          "high": 3.390340759531571
+        }
+      },
+      "verdict": {
+        "code": "indistinguishable",
+        "note": "この局数では区別できない"
+      }
+    },
+    {
+      "opponent": "positional",
+      "depth": 2,
+      "n_games": 400,
+      "wins": 278,
+      "draws": 19,
+      "losses": 103,
+      "win_rate": 0.71875,
+      "mean_stone_diff": 11.875,
+      "ci95": {
+        "win_rate": {
+          "n": 400,
+          "mean": 0.71875,
+          "low": 0.6759493144473144,
+          "high": 0.7615506855526856,
+          "crosses_even": false,
+          "note": null
+        },
+        "mean_stone_diff": {
+          "n": 400,
+          "mean": 11.875,
+          "low": 9.819854018909947,
+          "high": 13.930145981090053
+        }
+      },
+      "verdict": {
+        "code": "stage3",
+        "note": "段階 3 の勝率の 95% 区間が 0.5 を上回る"
+      }
+    },
+    {
+      "opponent": "positional",
+      "depth": 4,
+      "n_games": 400,
+      "wins": 335,
+      "draws": 6,
+      "losses": 59,
+      "win_rate": 0.845,
+      "mean_stone_diff": 18.54,
+      "ci95": {
+        "win_rate": {
+          "n": 400,
+          "mean": 0.845,
+          "low": 0.8100016255850898,
+          "high": 0.8799983744149101,
+          "crosses_even": false,
+          "note": null
+        },
+        "mean_stone_diff": {
+          "n": 400,
+          "mean": 18.54,
+          "low": 16.822930313054403,
+          "high": 20.257069686945595
+        }
+      },
+      "verdict": {
+        "code": "stage3",
+        "note": "段階 3 の勝率の 95% 区間が 0.5 を上回る"
+      }
+    }
+  ],
+  "learning_curve": [
+    {
+      "games": 4000,
+      "model": "tmp/rl-final/snaps/games-04000.json",
+      "opponent": "stage2",
+      "depth": 2,
+      "win_rate": 0.5675,
+      "mean_stone_diff": 6.5325,
+      "ci95": {
+        "win_rate": {
+          "n": 400,
+          "mean": 0.5675,
+          "low": 0.5195115683115106,
+          "high": 0.6154884316884894,
+          "crosses_even": false,
+          "note": null
+        },
+        "mean_stone_diff": {
+          "n": 400,
+          "mean": 6.5325,
+          "low": 4.056916701340587,
+          "high": 9.008083298659413
+        }
+      },
+      "verdict": {
+        "code": "stage3",
+        "note": "段階 3 の勝率の 95% 区間が 0.5 を上回る"
+      },
+      "wins": 222,
+      "draws": 10,
+      "losses": 168,
+      "n_games": 400
+    },
+    {
+      "games": 8000,
+      "model": "tmp/rl-final/snaps/games-08000.json",
+      "opponent": "stage2",
+      "depth": 2,
+      "win_rate": 0.68875,
+      "mean_stone_diff": 11.565,
+      "ci95": {
+        "win_rate": {
+          "n": 400,
+          "mean": 0.68875,
+          "low": 0.6437855096922306,
+          "high": 0.7337144903077694,
+          "crosses_even": false,
+          "note": null
+        },
+        "mean_stone_diff": {
+          "n": 400,
+          "mean": 11.565,
+          "low": 9.20968736298521,
+          "high": 13.920312637014788
+        }
+      },
+      "verdict": {
+        "code": "stage3",
+        "note": "段階 3 の勝率の 95% 区間が 0.5 を上回る"
+      },
+      "wins": 272,
+      "draws": 7,
+      "losses": 121,
+      "n_games": 400
+    },
+    {
+      "games": 12000,
+      "model": "tmp/rl-final/snaps/games-12000.json",
+      "opponent": "stage2",
+      "depth": 2,
+      "win_rate": 0.7775,
+      "mean_stone_diff": 17.895,
+      "ci95": {
+        "win_rate": {
+          "n": 400,
+          "mean": 0.7775,
+          "low": 0.7374330369643513,
+          "high": 0.8175669630356487,
+          "crosses_even": false,
+          "note": null
+        },
+        "mean_stone_diff": {
+          "n": 400,
+          "mean": 17.895,
+          "low": 15.608563478459029,
+          "high": 20.18143652154097
+        }
+      },
+      "verdict": {
+        "code": "stage3",
+        "note": "段階 3 の勝率の 95% 区間が 0.5 を上回る"
+      },
+      "wins": 306,
+      "draws": 10,
+      "losses": 84,
+      "n_games": 400
+    },
+    {
+      "games": 16000,
+      "model": "tmp/rl-final/snaps/games-16000.json",
+      "opponent": "stage2",
+      "depth": 2,
+      "win_rate": 0.795,
+      "mean_stone_diff": 19.73,
+      "ci95": {
+        "win_rate": {
+          "n": 400,
+          "mean": 0.795,
+          "low": 0.7558467991774724,
+          "high": 0.8341532008225276,
+          "crosses_even": false,
+          "note": null
+        },
+        "mean_stone_diff": {
+          "n": 400,
+          "mean": 19.73,
+          "low": 17.5124407799317,
+          "high": 21.9475592200683
+        }
+      },
+      "verdict": {
+        "code": "stage3",
+        "note": "段階 3 の勝率の 95% 区間が 0.5 を上回る"
+      },
+      "wins": 315,
+      "draws": 6,
+      "losses": 79,
+      "n_games": 400
+    },
+    {
+      "games": 20000,
+      "model": "tmp/rl-final/snaps/games-20000.json",
+      "opponent": "stage2",
+      "depth": 2,
+      "win_rate": 0.7675,
+      "mean_stone_diff": 16.63,
+      "ci95": {
+        "win_rate": {
+          "n": 400,
+          "mean": 0.7675,
+          "low": 0.7267835097169811,
+          "high": 0.8082164902830188,
+          "crosses_even": false,
+          "note": null
+        },
+        "mean_stone_diff": {
+          "n": 400,
+          "mean": 16.63,
+          "low": 14.404140014327407,
+          "high": 18.85585998567259
+        }
+      },
+      "verdict": {
+        "code": "stage3",
+        "note": "段階 3 の勝率の 95% 区間が 0.5 を上回る"
+      },
+      "wins": 302,
+      "draws": 10,
+      "losses": 88,
+      "n_games": 400
+    },
+    {
+      "games": 24000,
+      "model": "tmp/rl-final/snaps/games-24000.json",
+      "opponent": "stage2",
+      "depth": 2,
+      "win_rate": 0.75125,
+      "mean_stone_diff": 15.1125,
+      "ci95": {
+        "win_rate": {
+          "n": 400,
+          "mean": 0.75125,
+          "low": 0.7094767005877202,
+          "high": 0.7930232994122798,
+          "crosses_even": false,
+          "note": null
+        },
+        "mean_stone_diff": {
+          "n": 400,
+          "mean": 15.1125,
+          "low": 12.9138798746624,
+          "high": 17.3111201253376
+        }
+      },
+      "verdict": {
+        "code": "stage3",
+        "note": "段階 3 の勝率の 95% 区間が 0.5 を上回る"
+      },
+      "wins": 296,
+      "draws": 9,
+      "losses": 95,
+      "n_games": 400
+    }
+  ],
+  "xc": {
+    "encoding": "empty=0, black=1, white=2, index=sum state_i * 3^i",
+    "edge_2x_squares": [
+      "a1",
+      "b1",
+      "c1",
+      "d1",
+      "e1",
+      "f1",
+      "g1",
+      "h1",
+      "b2",
+      "g2"
+    ],
+    "corner_3x3_squares": [
+      "a1",
+      "b1",
+      "c1",
+      "a2",
+      "b2",
+      "c2",
+      "a3",
+      "b3",
+      "c3"
+    ],
+    "x_note": "辺＋2X の b2 を黒にし、a1 が空のときと黒のときを比べる。他のマスは空。",
+    "c_note": "角 3×3 の b1 を黒にし、a1 が空のときと黒のときを比べる。他のマスは空。",
+    "stages": [
+      {
+        "stage": 0,
+        "discs_from": 4,
+        "discs_to": 9,
+        "x_black_corner_empty": -0.013348,
+        "x_black_corner_black": 0.001689,
+        "x_white_corner_empty": 0.006784,
+        "x_white_corner_white": -0.000933,
+        "x_sign_changes": true,
+        "c_black_corner_empty": 0.0,
+        "c_black_corner_black": 0.0,
+        "c_white_corner_empty": 0.0,
+        "c_white_corner_white": 0.0,
+        "c_sign_changes": false
+      },
+      {
+        "stage": 1,
+        "discs_from": 10,
+        "discs_to": 15,
+        "x_black_corner_empty": -0.035187,
+        "x_black_corner_black": 0.014888,
+        "x_white_corner_empty": 0.022844,
+        "x_white_corner_white": -0.013411,
+        "x_sign_changes": true,
+        "c_black_corner_empty": 0.0,
+        "c_black_corner_black": 0.0,
+        "c_white_corner_empty": 0.0,
+        "c_white_corner_white": 0.0,
+        "c_sign_changes": false
+      },
+      {
+        "stage": 2,
+        "discs_from": 16,
+        "discs_to": 21,
+        "x_black_corner_empty": -0.061311,
+        "x_black_corner_black": 0.044983,
+        "x_white_corner_empty": 0.045513,
+        "x_white_corner_white": -0.050372,
+        "x_sign_changes": true,
+        "c_black_corner_empty": 0.0,
+        "c_black_corner_black": 0.0,
+        "c_white_corner_empty": 0.0,
+        "c_white_corner_white": 0.0,
+        "c_sign_changes": false
+      },
+      {
+        "stage": 3,
+        "discs_from": 22,
+        "discs_to": 27,
+        "x_black_corner_empty": -0.07048,
+        "x_black_corner_black": 0.068863,
+        "x_white_corner_empty": 0.065564,
+        "x_white_corner_white": -0.086546,
+        "x_sign_changes": true,
+        "c_black_corner_empty": 0.0,
+        "c_black_corner_black": 0.0,
+        "c_white_corner_empty": 0.0,
+        "c_white_corner_white": 0.0,
+        "c_sign_changes": false
+      },
+      {
+        "stage": 4,
+        "discs_from": 28,
+        "discs_to": 33,
+        "x_black_corner_empty": -0.065741,
+        "x_black_corner_black": 0.067202,
+        "x_white_corner_empty": 0.070203,
+        "x_white_corner_white": -0.076416,
+        "x_sign_changes": true,
+        "c_black_corner_empty": 0.0,
+        "c_black_corner_black": 0.0,
+        "c_white_corner_empty": 0.0,
+        "c_white_corner_white": 0.0,
+        "c_sign_changes": false
+      },
+      {
+        "stage": 5,
+        "discs_from": 34,
+        "discs_to": 39,
+        "x_black_corner_empty": -0.057357,
+        "x_black_corner_black": 0.049597,
+        "x_white_corner_empty": 0.056069,
+        "x_white_corner_white": -0.037859,
+        "x_sign_changes": true,
+        "c_black_corner_empty": 0.0,
+        "c_black_corner_black": 0.0,
+        "c_white_corner_empty": 0.0,
+        "c_white_corner_white": 0.0,
+        "c_sign_changes": false
+      },
+      {
+        "stage": 6,
+        "discs_from": 40,
+        "discs_to": 45,
+        "x_black_corner_empty": -0.041025,
+        "x_black_corner_black": 0.029886,
+        "x_white_corner_empty": 0.031987,
+        "x_white_corner_white": -0.017485,
+        "x_sign_changes": true,
+        "c_black_corner_empty": 0.0,
+        "c_black_corner_black": 0.0,
+        "c_white_corner_empty": 0.0,
+        "c_white_corner_white": 0.0,
+        "c_sign_changes": false
+      },
+      {
+        "stage": 7,
+        "discs_from": 46,
+        "discs_to": 51,
+        "x_black_corner_empty": -0.018855,
+        "x_black_corner_black": 0.016571,
+        "x_white_corner_empty": 0.012029,
+        "x_white_corner_white": -0.013831,
+        "x_sign_changes": true,
+        "c_black_corner_empty": 0.0,
+        "c_black_corner_black": 0.0,
+        "c_white_corner_empty": 0.0,
+        "c_white_corner_white": 0.0,
+        "c_sign_changes": false
+      },
+      {
+        "stage": 8,
+        "discs_from": 52,
+        "discs_to": 57,
+        "x_black_corner_empty": -0.004041,
+        "x_black_corner_black": 0.00806,
+        "x_white_corner_empty": 0.00382,
+        "x_white_corner_white": -0.010134,
+        "x_sign_changes": true,
+        "c_black_corner_empty": 0.0,
+        "c_black_corner_black": 0.0,
+        "c_white_corner_empty": 0.0,
+        "c_white_corner_white": 0.0,
+        "c_sign_changes": false
+      },
+      {
+        "stage": 9,
+        "discs_from": 58,
+        "discs_to": 64,
+        "x_black_corner_empty": -0.000225,
+        "x_black_corner_black": 0.001901,
+        "x_white_corner_empty": 0.001204,
+        "x_white_corner_white": -0.003692,
+        "x_sign_changes": true,
+        "c_black_corner_empty": 0.0,
+        "c_black_corner_black": 0.0,
+        "c_white_corner_empty": 0.0,
+        "c_white_corner_white": 0.0,
+        "c_sign_changes": false
+      }
+    ],
+    "x_sign_changes": true,
+    "c_sign_changes": false
+  },
+  "game_records": [],
+  "reward_trials": [
+    {
+      "name": "win-l05",
+      "reward": "win_loss",
+      "lambda": 0.5,
+      "train_games": 2000,
+      "starts": 40,
+      "depth": 2,
+      "by_opponent": [
+        {
+          "opponent": "stage2",
+          "win_rate": 0.4125,
+          "mean_stone_diff": -4.5,
+          "ci95": {
+            "win_rate": {
+              "n": 80,
+              "mean": 0.4125,
+              "low": 0.3067815237865317,
+              "high": 0.5182184762134683,
+              "crosses_even": true,
+              "note": "この局数では区別できない"
+            },
+            "mean_stone_diff": {
+              "n": 80,
+              "mean": -4.5,
+              "low": -9.25549843124234,
+              "high": 0.25549843124233984
+            }
+          },
+          "verdict": {
+            "code": "indistinguishable",
+            "note": "この局数では区別できない"
+          }
+        },
+        {
+          "opponent": "positional",
+          "win_rate": 0.425,
+          "mean_stone_diff": -3.625,
+          "ci95": {
+            "win_rate": {
+              "n": 80,
+              "mean": 0.425,
+              "low": 0.3173938627180982,
+              "high": 0.5326061372819018,
+              "crosses_even": true,
+              "note": "この局数では区別できない"
+            },
+            "mean_stone_diff": {
+              "n": 80,
+              "mean": -3.625,
+              "low": -7.96977764193369,
+              "high": 0.7197776419336899
+            }
+          },
+          "verdict": {
+            "code": "indistinguishable",
+            "note": "この局数では区別できない"
+          }
+        }
+      ]
+    },
+    {
+      "name": "win-l07",
+      "reward": "win_loss",
+      "lambda": 0.7,
+      "train_games": 2000,
+      "starts": 40,
+      "depth": 2,
+      "by_opponent": [
+        {
+          "opponent": "stage2",
+          "win_rate": 0.425,
+          "mean_stone_diff": -5.8625,
+          "ci95": {
+            "win_rate": {
+              "n": 80,
+              "mean": 0.425,
+              "low": 0.3173938627180982,
+              "high": 0.5326061372819018,
+              "crosses_even": true,
+              "note": "この局数では区別できない"
+            },
+            "mean_stone_diff": {
+              "n": 80,
+              "mean": -5.8625,
+              "low": -11.40641612575679,
+              "high": -0.31858387424320966
+            }
+          },
+          "verdict": {
+            "code": "indistinguishable",
+            "note": "この局数では区別できない"
+          }
+        },
+        {
+          "opponent": "positional",
+          "win_rate": 0.34375,
+          "mean_stone_diff": -4.6125,
+          "ci95": {
+            "win_rate": {
+              "n": 80,
+              "mean": 0.34375,
+              "low": 0.24121470734240455,
+              "high": 0.4462852926575954,
+              "crosses_even": false,
+              "note": null
+            },
+            "mean_stone_diff": {
+              "n": 80,
+              "mean": -4.6125,
+              "low": -8.543188930197761,
+              "high": -0.6818110698022379
+            }
+          },
+          "verdict": {
+            "code": "positional",
+            "note": "段階 3 の勝率の 95% 区間が 0.5 を下回る（positional）"
+          }
+        }
+      ]
+    },
+    {
+      "name": "win-l09",
+      "reward": "win_loss",
+      "lambda": 0.9,
+      "train_games": 2000,
+      "starts": 40,
+      "depth": 2,
+      "by_opponent": [
+        {
+          "opponent": "stage2",
+          "win_rate": 0.45,
+          "mean_stone_diff": -1.7875,
+          "ci95": {
+            "win_rate": {
+              "n": 80,
+              "mean": 0.45,
+              "low": 0.34029607982023824,
+              "high": 0.5597039201797618,
+              "crosses_even": true,
+              "note": "この局数では区別できない"
+            },
+            "mean_stone_diff": {
+              "n": 80,
+              "mean": -1.7875,
+              "low": -7.116292704892771,
+              "high": 3.5412927048927716
+            }
+          },
+          "verdict": {
+            "code": "indistinguishable",
+            "note": "この局数では区別できない"
+          }
+        },
+        {
+          "opponent": "positional",
+          "win_rate": 0.4625,
+          "mean_stone_diff": -3.3,
+          "ci95": {
+            "win_rate": {
+              "n": 80,
+              "mean": 0.4625,
+              "low": 0.3539448436247006,
+              "high": 0.5710551563752995,
+              "crosses_even": true,
+              "note": "この局数では区別できない"
+            },
+            "mean_stone_diff": {
+              "n": 80,
+              "mean": -3.3,
+              "low": -7.77910519931523,
+              "high": 1.17910519931523
+            }
+          },
+          "verdict": {
+            "code": "indistinguishable",
+            "note": "この局数では区別できない"
+          }
+        }
+      ]
+    },
+    {
+      "name": "stone-l07",
+      "reward": "stone_diff",
+      "lambda": 0.7,
+      "train_games": 2000,
+      "starts": 40,
+      "depth": 2,
+      "by_opponent": [
+        {
+          "opponent": "stage2",
+          "win_rate": 0.4,
+          "mean_stone_diff": -4.3375,
+          "ci95": {
+            "win_rate": {
+              "n": 80,
+              "mean": 0.4,
+              "low": 0.2933869531259768,
+              "high": 0.5066130468740233,
+              "crosses_even": true,
+              "note": "この局数では区別できない"
+            },
+            "mean_stone_diff": {
+              "n": 80,
+              "mean": -4.3375,
+              "low": -9.731734564313472,
+              "high": 1.0567345643134711
+            }
+          },
+          "verdict": {
+            "code": "indistinguishable",
+            "note": "この局数では区別できない"
+          }
+        },
+        {
+          "opponent": "positional",
+          "win_rate": 0.21875,
+          "mean_stone_diff": -9.8125,
+          "ci95": {
+            "win_rate": {
+              "n": 80,
+              "mean": 0.21875,
+              "low": 0.1284274590168516,
+              "high": 0.3090725409831484,
+              "crosses_even": false,
+              "note": null
+            },
+            "mean_stone_diff": {
+              "n": 80,
+              "mean": -9.8125,
+              "low": -13.948385223643083,
+              "high": -5.676614776356916
+            }
+          },
+          "verdict": {
+            "code": "positional",
+            "note": "段階 3 の勝率の 95% 区間が 0.5 を下回る（positional）"
+          }
+        }
+      ]
+    }
+  ]
+}

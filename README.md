@@ -158,6 +158,7 @@ curl -sk https://127.0.0.1:3000/api/games \
 | 強化学習 (自己対局) | 自己対局で得た方針で着手する | [docs/catalog/rl.md](docs/catalog/rl.md) |
 | 強化学習 (自己対局＋読み) | 自己対局で学んだ評価を、数手先を読んで使う | [docs/catalog/rl_search.md](docs/catalog/rl_search.md) |
 | 強化学習 (対称な読み) | 減衰と対称を入れた評価を、数手先を読んで使う | [docs/catalog/rl_tied.md](docs/catalog/rl_tied.md) |
+| 強化学習 (パターンの読み) | パターン特徴の評価を、数手先を読んで使う | [docs/catalog/rl_pattern.md](docs/catalog/rl_pattern.md) |
 | ニューラルネットワーク (棋譜) | 対局前に学習したネットワークで着手する | [docs/catalog/nn.md](docs/catalog/nn.md) |
 | 生成 AI (Jev) | OpenRouter 上の Jev が合法手から選ぶ | [docs/catalog/jev.md](docs/catalog/jev.md) |
 
@@ -190,11 +191,14 @@ podman-compose run --rm train python -m reversi.train.lgbm \
 podman-compose run --rm train python -m reversi.train.rl \
   --out /models/rl-tied.json
 
+podman-compose run --rm train python -m reversi.train.rl_pattern \
+  --out /models/rl-pattern.json
+
 podman-compose run --rm train python -m reversi.train.nn \
   --wthor /data/wthor --games /data/games.sqlite --out /models/nn.onnx
 ```
 
-`models/rl.json` は「強化学習 (自己対局)」と「強化学習 (自己対局＋読み)」が読む、手順を直す前のスナップショットである。`python -m reversi.train.rl` の既定の書き出し先は `models/rl-tied.json` である。
+`models/rl.json` は「強化学習 (自己対局)」と「強化学習 (自己対局＋読み)」が読む、手順を直す前のスナップショットである。`python -m reversi.train.rl` の既定の書き出し先は `models/rl-tied.json` である。`python -m reversi.train.rl_pattern` はパターン特徴の TD(λ) で `models/rl-pattern.json` を書く。WTHOR は使わない。
 
 書き出したファイルを、すでに動いている対局が読むなら、サービスを起動し直してください。
 
