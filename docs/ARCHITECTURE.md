@@ -18,7 +18,7 @@ tech_stack_version: 0.2.20
 | 対象ソフトウェア | Reversi Agents |
 | 版 | 0.1.42 |
 | 状態 | 現行（設計。要求ではない） |
-| 日付 | 2026-09-21 |
+| 日付 | 2026-09-22 |
 | 入力 | [`docs/srs.md`](srs.md) 0.1.25、[`docs/tech-stack.md`](tech-stack.md) 0.2.20 |
 
 本文書は**配置と層**の設計正本である。ソフトウェア要求の正本は [`docs/srs.md`](srs.md) であり、本文書は shall を追加・変更・撤回しない。言語・ライブラリ・コンテナの選定は [`docs/tech-stack.md`](tech-stack.md) を正とする。ディレクトリ名は tech-stack 2.3 と一致させ、ファイル単位の置き場と目的は本文書を正とする。
