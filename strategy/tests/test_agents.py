@@ -2075,6 +2075,83 @@ def test_rl_stage1_comparison_json_has_depths_and_rates() -> None:
             assert "openrouter.ai" not in lowered
 
 
+def test_rl_stage2_comparison_json_has_rates_and_flat_tail() -> None:
+    from reversi.agents import rl, rl_search, rl_tied
+    from reversi.train.rl import EMPTY_PLANE, SQUARE_ORBITS
+
+    names = [item.display_name for item in items()]
+    assert names.count("強化学習 (自己対局)") == 1
+    assert rl_tied.DISPLAY_NAME in names
+    assert rl_tied.CATEGORY == "reinforcement_learning"
+    root = Path(__file__).resolve().parents[2] / "docs" / "benchmarks"
+    candidates = sorted(root.glob("rl-stage2*.json"))
+    assert candidates, "段階 2 の比較 JSON が docs/benchmarks/ に無い"
+    data = json.loads(candidates[-1].read_text(encoding="utf-8"))
+    for key in ("win_rate", "mean_stone_diff", "ci95", "depths", "learning_curve"):
+        assert key in data, key
+    assert set(data["depths"]) >= {1, 2, 4}
+    assert isinstance(data["win_rate"], float)
+    assert "win_rate" in data["ci95"] and "mean_stone_diff" in data["ci95"]
+    records = data["game_records"]
+    depth4 = next(row for row in data["by_depth"] if int(row["depth"]) == 4)
+    assert data["win_rate"] == pytest.approx(depth4["win_rate"])
+    assert data["mean_stone_diff"] == pytest.approx(depth4["mean_stone_diff"])
+    for depth in (1, 2, 4):
+        rows = [row for row in records if int(row["depth"]) == depth]
+        block = next(row for row in data["by_depth"] if int(row["depth"]) == depth)
+        assert block["n_games"] == len(rows) == 400
+        wins = sum(1 for row in rows if row["result"] == "win")
+        draws = sum(1 for row in rows if row["result"] == "draw")
+        mean = (wins + 0.5 * draws) / len(rows)
+        assert block["win_rate"] == pytest.approx(mean)
+        win_ci = block["ci95"]["win_rate"]
+        if win_ci.get("crosses_even"):
+            assert win_ci["note"] == "この局数では区別できない"
+            assert "差がない" not in (win_ci["note"] or "")
+        else:
+            assert win_ci.get("note") in {None, ""}
+            assert win_ci["low"] > 0.5 or win_ci["high"] < 0.5
+    by_games = {
+        point["games"]: point
+        for point in data["learning_curve"]
+        if point["games"] != "final"
+    }
+    assert by_games[4000]["win_rate"] == pytest.approx(by_games[5000]["win_rate"])
+    assert by_games[4000]["mean_stone_diff"] == pytest.approx(
+        by_games[5000]["mean_stone_diff"]
+    )
+    assert data["candidate"]["specimen_id"] == rl_tied.SPECIMEN_ID
+    assert data["baseline"]["specimen_id"] == rl_search.SPECIMEN_ID
+    assert data["baseline"]["model"].endswith("models/rl.json")
+    assert rl.DEFAULT_MODEL_PATH.name == "rl.json"
+    weights = json.loads(rl_tied.DEFAULT_MODEL_PATH.read_text(encoding="utf-8"))["weights"]
+    assert len(weights) == VECTOR_SIZE
+    assert all(value == 0.0 for value in weights[EMPTY_PLANE:])
+    for plane in (0, 1):
+        base = plane * 64
+        for orbit in SQUARE_ORBITS:
+            values = [weights[base + index] for index in orbit]
+            assert values == pytest.approx([values[0]] * len(orbit))
+    script = (root / "rl_stage2.py").read_text(encoding="utf-8")
+    tree = ast.parse(script)
+    imported: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            imported.update(alias.name.split(".")[0] for alias in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            imported.add(node.module.split(".")[0])
+    assert "wthor" not in imported
+    assert "torch" not in imported
+    assert "onnxruntime" not in imported
+    assert "openrouter" not in imported
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            lowered = node.value.lower()
+            assert "ffothello.org" not in lowered
+            assert ".wtb" not in lowered
+            assert "openrouter.ai" not in lowered
+
+
 def test_rl_eval_ci_notes_when_interval_crosses_even() -> None:
     module = _rl_eval_module()
     even = module.mean_and_ci95([0.0, 1.0] * 20)
