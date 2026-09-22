@@ -1880,6 +1880,65 @@ def test_same_depth_position_leaf_and_rl_leaf_can_play() -> None:
     assert stone_counts(position.board).black + stone_counts(position.board).white == 64
 
 
+def test_rl_stage1_comparison_json_has_depths_and_rates() -> None:
+    from reversi.agents import catalog
+
+    names = {item.display_name for item in catalog.list_items()}
+    assert "強化学習 (自己対局)" in names
+    assert any(
+        name.startswith("強化学習") and name != "強化学習 (自己対局)" for name in names
+    )
+    rl_like = [
+        item for item in catalog.list_items() if item.category == "reinforcement_learning"
+    ]
+    assert len(rl_like) >= 2
+    root = Path(__file__).resolve().parents[2] / "docs" / "benchmarks"
+    candidates = sorted(root.glob("rl-stage1*.json"))
+    assert candidates, "段階 1 の比較 JSON が docs/benchmarks/ に無い"
+    data = json.loads(candidates[-1].read_text(encoding="utf-8"))
+    for key in ("win_rate", "mean_stone_diff", "ci95", "depths"):
+        assert key in data, key
+    assert set(data["depths"]) >= {1, 2, 4}
+    assert set(data["win_rate"]) >= {"1", "2", "4"}
+    assert set(data["mean_stone_diff"]) >= {"1", "2", "4"}
+    assert set(data["ci95"]) >= {"1", "2", "4"}
+    records = data["game_records"]
+    for depth in (1, 2, 4):
+        rows = [row for row in records if int(row["depth"]) == depth]
+        block = next(row for row in data["by_depth"] if int(row["depth"]) == depth)
+        assert block["n_games"] == len(rows) == 400
+        wins = sum(1 for row in rows if row["result"] == "win")
+        draws = sum(1 for row in rows if row["result"] == "draw")
+        mean = (wins + 0.5 * draws) / len(rows)
+        assert block["win_rate"] == pytest.approx(mean)
+        assert data["win_rate"][str(depth)] == pytest.approx(mean)
+        win_ci = block["ci95"]["win_rate"]
+        if win_ci.get("crosses_even"):
+            assert win_ci["note"] == "この局数では区別できない"
+            assert "差がない" not in (win_ci["note"] or "")
+        else:
+            assert win_ci.get("note") in {None, ""}
+            assert win_ci["low"] > 0.5 or win_ci["high"] < 0.5
+    script = (root / "rl_stage1.py").read_text(encoding="utf-8")
+    tree = ast.parse(script)
+    imported: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            imported.update(alias.name.split(".")[0] for alias in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            imported.add(node.module.split(".")[0])
+    assert "wthor" not in imported
+    assert "torch" not in imported
+    assert "onnxruntime" not in imported
+    assert "openrouter" not in imported
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            lowered = node.value.lower()
+            assert "ffothello.org" not in lowered
+            assert ".wtb" not in lowered
+            assert "openrouter.ai" not in lowered
+
+
 def test_rl_eval_ci_notes_when_interval_crosses_even() -> None:
     module = _rl_eval_module()
     even = module.mean_and_ci95([0.0, 1.0] * 20)

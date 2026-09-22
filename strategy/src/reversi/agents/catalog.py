@@ -43,6 +43,7 @@ __all__ = [
     "choose_move",
     "get",
     "items",
+    "list_items",
 ]
 
 
@@ -191,6 +192,11 @@ def _by_id() -> dict[str, tuple[CatalogItem, Chooser]]:
 def items() -> tuple[CatalogItem, ...]:
     """登録されている個体。"""
     return tuple(item for item, _ in _registry())
+
+
+def list_items() -> tuple[CatalogItem, ...]:
+    """`items` の別名。検証手順がこの名前で一覧する。"""
+    return items()
 
 
 def get(specimen_id: str) -> CatalogItem:
