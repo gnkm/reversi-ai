@@ -2324,6 +2324,69 @@ def test_pattern_td_lambda_normalizes_alpha_and_skips_exploratory_moves(
     assert ".wtb" not in text
 
 
+def test_rl_stage3_record_has_reward_and_pattern_metrics() -> None:
+    from reversi.agents import rl_pattern, rl_tied
+    from reversi.agents.pattern_eval import ALGORITHM, PATTERN_SPECS, load_policy
+
+    root = Path(__file__).resolve().parents[2] / "docs" / "benchmarks"
+    candidates = sorted(root.glob("rl-stage3*.json"))
+    assert candidates, "段階 3 の比較 JSON が docs/benchmarks/ に無い"
+    data = json.loads(candidates[-1].read_text(encoding="utf-8"))
+    for key in ("win_rate", "mean_stone_diff", "ci95", "reward", "train_games"):
+        assert key in data, key
+    assert data["reward"] in {"win_loss", "stone_diff"}
+    assert data["reward"] == "win_loss"
+    assert data["train_games"] == 16000
+    assert data["lambda"] == pytest.approx(0.9)
+    assert "win_rate" in data["ci95"] and "mean_stone_diff" in data["ci95"]
+    assert data["candidate"]["specimen_id"] == rl_pattern.SPECIMEN_ID
+    opponents = {block["opponent"] for block in data["by_opponent"]}
+    assert opponents >= {"stage2", "positional"}
+    depths = {int(block["depth"]) for block in data["by_opponent"]}
+    assert depths >= {1, 2, 4}
+    headline = next(
+        block
+        for block in data["by_opponent"]
+        if block["opponent"] == "stage2" and int(block["depth"]) == 4
+    )
+    assert data["win_rate"] == pytest.approx(headline["win_rate"])
+    assert data["mean_stone_diff"] == pytest.approx(headline["mean_stone_diff"])
+    curve = {int(point["games"]): point for point in data["learning_curve"]}
+    assert set(curve) >= {4000, 8000, 12000, 16000, 20000, 24000}
+    assert curve[16000]["win_rate"] == max(point["win_rate"] for point in curve.values())
+    assert data["xc"]["x_sign_changes"] is True
+    assert isinstance(data["xc"]["c_sign_changes"], bool)
+    assert any(trial["reward"] == "stone_diff" for trial in data["reward_trials"])
+    assert any(
+        trial["reward"] == "win_loss" and abs(float(trial["lambda"]) - 0.9) < 1e-9
+        for trial in data["reward_trials"]
+    )
+    policy = load_policy(rl_pattern.DEFAULT_MODEL_PATH)
+    assert policy.reward == "win_loss"
+    assert policy.lam == pytest.approx(0.9)
+    assert policy.games == 16000
+    edge = next(spec for spec in PATTERN_SPECS if spec.name == "edge_2x")
+    assert edge.size == 3**10
+    assert edge.size != VECTOR_SIZE
+    weights = json.loads(rl_pattern.DEFAULT_MODEL_PATH.read_text(encoding="utf-8"))
+    assert weights["algorithm"] == ALGORITHM
+    assert rl_tied.DEFAULT_MODEL_PATH.name == "rl-tied.json"
+    script = (root / "rl_stage3.py").read_text(encoding="utf-8")
+    tree = ast.parse(script)
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            lowered = node.value.lower()
+            assert "ffothello.org" not in lowered
+            assert ".wtb" not in lowered
+    train_source = Path(__file__).resolve().parents[1] / "src" / "reversi" / "train" / "rl.py"
+    train_tree = ast.parse(train_source.read_text(encoding="utf-8"))
+    for node in ast.walk(train_tree):
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            lowered = node.value.lower()
+            assert "ffothello.org" not in lowered
+            assert ".wtb" not in lowered
+
+
 def test_catalog_lists_pattern_rl_without_replacing_earlier_rl() -> None:
     from reversi.agents import rl, rl_pattern, rl_search, rl_tied
 
