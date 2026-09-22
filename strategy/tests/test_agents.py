@@ -2418,6 +2418,7 @@ def test_catalog_lists_pattern_rl_without_replacing_earlier_rl() -> None:
     assert item.description == rl_pattern.DESCRIPTION
     assert "自己対局" in item.description
     assert "数手先" in item.description
+    assert "終局" in item.description
     assert _JAPANESE.search(item.description)
     assert len(item.description) <= 100
     assert get(rl_pattern.SPECIMEN_ID) == item
@@ -2429,6 +2430,10 @@ def test_catalog_lists_pattern_rl_without_replacing_earlier_rl() -> None:
     assert rl_pattern.DEFAULT_MODEL_PATH != rl.DEFAULT_MODEL_PATH
     assert rl_pattern.DEFAULT_MODEL_PATH != rl_tied.DEFAULT_MODEL_PATH
     assert rl_pattern.SEARCH_DEPTH == rl_search.SEARCH_DEPTH == 4
+    assert rl_pattern.EXACT_EMPTY >= 1
+    assert not hasattr(rl, "EXACT_EMPTY")
+    assert not hasattr(rl_search, "EXACT_EMPTY")
+    assert not hasattr(rl_tied, "EXACT_EMPTY")
     assert rl.choose_move is not rl_pattern.choose_move
     source = _module_source("rl_pattern.py")
     roots = _imported_roots(source)
@@ -2446,6 +2451,132 @@ def test_catalog_lists_pattern_rl_without_replacing_earlier_rl() -> None:
     move = rl_pattern.choose_at_depth(initial_position(), 1)
     assert move is not None
     assert move.square in legal_places(initial_position())
+
+
+def test_pattern_rl_below_empty_threshold_reads_to_terminal() -> None:
+    from reversi.agents import rl, rl_pattern, rl_search, rl_tied
+
+    position = _position_from_rank8_rows(_ENDGAME_WIN_ON_A1, Color.BLACK)
+    assert _empty_squares(position.board) == 8
+    assert 8 <= rl_pattern.EXACT_EMPTY
+    move, value, nodes = rl_pattern.search_stats(position, rl_pattern.SEARCH_DEPTH)
+    assert move == Place(Square.parse("a1"))
+    assert value == 44
+    assert abs(value) <= BOARD_SIZE * BOARD_SIZE
+    assert nodes >= 1
+    _off_move, off_value, _off_nodes = rl_pattern.search_stats(
+        position, rl_pattern.SEARCH_DEPTH, exact_empty=0
+    )
+    assert off_value != 44
+    assert rl_pattern.choose_move(position) == move
+    assert catalog_choose(rl_pattern.SPECIMEN_ID, position) == move
+    assert rl_pattern.choose_at_depth(position, 1) == move
+    assert rl.choose_move(position) is not None
+    assert rl_search.choose_move(position) is not None
+    assert rl_tied.choose_move(position) is not None
+    two = _two_empty_white_plays_a1()
+    two_move, two_value, _ = rl_pattern.search_stats(two, rl_pattern.SEARCH_DEPTH)
+    assert two_move == Place(Square.parse("a1"))
+    after_two = play(two, two_move)
+    assert is_over(after_two)
+    disc = _disc_diff(after_two.board, Color.WHITE)
+    official = official_score(after_two.board)
+    assert disc == 63
+    assert official.white - official.black == 64
+    assert two_value == disc
+    assert two_value != official.white - official.black
+
+
+def test_pattern_rl_above_empty_threshold_keeps_pattern_leaf() -> None:
+    from reversi.agents import rl_pattern
+
+    opened = initial_position()
+    assert _empty_squares(opened.board) > rl_pattern.EXACT_EMPTY
+    default_move, default_value, _ = rl_pattern.search_stats(opened, 1)
+    off_move, off_value, _ = rl_pattern.search_stats(opened, 1, exact_empty=0)
+    assert default_move == off_move
+    assert default_value == pytest.approx(off_value)
+    ten = _position_from_rank8_rows(_ENDGAME_TEN_EMPTY, Color.BLACK)
+    assert _empty_squares(ten.board) == 10
+    assert 10 <= rl_pattern.EXACT_EMPTY
+    _ten_move, ten_value, _ = rl_pattern.search_stats(ten, 4)
+    assert abs(ten_value) <= BOARD_SIZE * BOARD_SIZE
+    _ten_off, ten_off_value, _ = rl_pattern.search_stats(ten, 4, exact_empty=0)
+    assert ten_off_value != ten_value
+    eleven = _position_from_rank8_rows(_MIDGAME_ELEVEN_EMPTY, Color.WHITE)
+    empty = _empty_squares(eleven.board)
+    assert empty == 11
+    _move, value, _ = rl_pattern.search_stats(eleven, rl_pattern.SEARCH_DEPTH)
+    if empty <= rl_pattern.EXACT_EMPTY:
+        assert abs(value) <= BOARD_SIZE * BOARD_SIZE
+        _off, off_value, _ = rl_pattern.search_stats(
+            eleven, rl_pattern.SEARCH_DEPTH, exact_empty=0
+        )
+        assert off_value != value
+    else:
+        _off, off_value, _ = rl_pattern.search_stats(
+            eleven, rl_pattern.SEARCH_DEPTH, exact_empty=0
+        )
+        assert value == pytest.approx(off_value)
+
+
+def test_rl_stage4_record_compares_exact_search() -> None:
+    from reversi.agents import rl, rl_pattern, rl_search, rl_tied
+
+    root = Path(__file__).resolve().parents[2] / "docs" / "benchmarks"
+    candidates = sorted(root.glob("rl-stage4*.json"))
+    assert candidates, "段階 4 の比較 JSON が docs/benchmarks/ に無い"
+    data = json.loads(candidates[-1].read_text(encoding="utf-8"))
+    for key in ("win_rate", "mean_stone_diff", "ci95", "exact_empty_threshold"):
+        assert key in data, key
+    assert data["exact_empty_threshold"] >= 1
+    assert data["exact_empty_threshold"] == rl_pattern.EXACT_EMPTY
+    assert "win_rate" in data["ci95"] and "mean_stone_diff" in data["ci95"]
+    assert data["candidate"]["specimen_id"] == rl_pattern.SPECIMEN_ID
+    assert data["candidate"]["exact_empty"] == data["exact_empty_threshold"]
+    assert data["baseline"]["exact_empty"] == 0
+    assert data["candidate"]["model"] == data["baseline"]["model"]
+    assert data["baseline"]["specimen_id"] == rl_pattern.SPECIMEN_ID
+    assert data["candidate"]["catalog_depth"] == rl_pattern.SEARCH_DEPTH
+    assert data["baseline"]["catalog_depth"] == rl_pattern.SEARCH_DEPTH
+    script = (root / "rl_stage4.py").read_text(encoding="utf-8")
+    tree = ast.parse(script)
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            lowered = node.value.lower()
+            assert "ffothello.org" not in lowered
+            assert ".wtb" not in lowered
+    for name in ("rl.py", "rl_search.py", "rl_tied.py"):
+        source = _module_source(name)
+        assert "EXACT_EMPTY" not in source
+    assert "EXACT_EMPTY" in _module_source("rl_pattern.py")
+    assert rl.SPECIMEN_ID == "rl"
+    assert rl_search.SPECIMEN_ID == "rl_search"
+    assert rl_tied.SPECIMEN_ID == "rl_tied"
+
+
+def test_rl_stage4_threshold_adopts_none_when_no_sample_fits() -> None:
+    import importlib.util
+
+    from reversi.agents import rl_pattern
+    from reversi.agents.pattern_eval import load_policy
+
+    path = Path(__file__).resolve().parents[2] / "docs" / "benchmarks" / "rl_stage4.py"
+    spec = importlib.util.spec_from_file_location("rl_stage4_threshold", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    policy = load_policy(rl_pattern.DEFAULT_MODEL_PATH)
+    result = module.measure_threshold(
+        [],
+        policy,
+        (10, 12, 14),
+        samples=1,
+        think_limit=2.0,
+    )
+    assert result["adopted"] is None
+    assert all(not row["within_limit"] for row in result["by_empty"])
+    assert all(int(row["n"]) == 0 for row in result["by_empty"])
 
 
 def test_rl_train_default_out_is_tied_model() -> None:

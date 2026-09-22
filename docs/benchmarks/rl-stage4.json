@@ -1,0 +1,121 @@
+{
+  "recorded_at": "2026-09-22 13:29",
+  "stage": 4,
+  "exact_empty_threshold": 10,
+  "win_rate": 0.59,
+  "mean_stone_diff": 6.575,
+  "ci95": {
+    "win_rate": {
+      "n": 400,
+      "mean": 0.59,
+      "low": 0.5421163843576089,
+      "high": 0.637883615642391,
+      "crosses_even": false,
+      "note": null
+    },
+    "mean_stone_diff": {
+      "n": 400,
+      "mean": 6.575,
+      "low": 4.175638604063206,
+      "high": 8.974361395936794
+    }
+  },
+  "candidate": {
+    "specimen_id": "rl_pattern",
+    "display_name": "強化学習 (パターンの読み)",
+    "category": "reinforcement_learning",
+    "model": "models/rl-pattern.json",
+    "catalog_depth": 4,
+    "exact_empty": 10,
+    "leaf": "pattern_features_or_terminal_disc"
+  },
+  "baseline": {
+    "specimen_id": "rl_pattern",
+    "display_name": "強化学習 (パターンの読み)",
+    "model": "models/rl-pattern.json",
+    "catalog_depth": 4,
+    "exact_empty": 0,
+    "leaf": "pattern_features"
+  },
+  "threshold": {
+    "think_limit_seconds": 2.0,
+    "samples_per_empty": 8,
+    "by_empty": [
+      {
+        "empty": 10,
+        "n": 8,
+        "mean_seconds": 0.4386934889999736,
+        "max_seconds": 0.9066633920000413,
+        "mean_nodes": 8990.875,
+        "within_limit": true
+      },
+      {
+        "empty": 12,
+        "n": 8,
+        "mean_seconds": 2.5310300088749926,
+        "max_seconds": 4.244475403000024,
+        "mean_nodes": 50372.0,
+        "within_limit": false
+      },
+      {
+        "empty": 14,
+        "n": 8,
+        "mean_seconds": 17.084084562749993,
+        "max_seconds": 26.917344089999915,
+        "mean_nodes": 330706.375,
+        "within_limit": false
+      }
+    ],
+    "adopted": 10,
+    "code_constant": 10,
+    "notes": [
+      "上限以内で完全読みし切れる最大の空きマス数を採る。",
+      "コードの EXACT_EMPTY と一致させる。shall ではない。"
+    ]
+  },
+  "protocol": {
+    "starts": 200,
+    "games_per_start": 2,
+    "seed": 20260922,
+    "openings": "docs/benchmarks/rl-openings.json",
+    "depth": 4,
+    "workers": 4,
+    "notes": [
+      "比較は同じ評価関数（段階 3 のパターン特徴）。完全読みの有無だけを変える。",
+      "候補は空きマスが閾値以下なら終局まで読む。相手は同じ葉で終盤延長しない。",
+      "開始局面は段階 0 と同じ集合。各局面で先後を入れ替える。",
+      "勝率は完全読みあり側の（勝 + 0.5×分）/ 局数。石差は盤上の石数。",
+      "白番の評価は符号反転する。葉の外に定数ボーナスは足さない。",
+      "既存の線形 RL は置き換えない。WTHOR も対局時の NN も OpenRouter も使わない。"
+    ]
+  },
+  "summary": {
+    "n_games": 400,
+    "wins": 233,
+    "draws": 6,
+    "losses": 161,
+    "win_rate": 0.59,
+    "mean_stone_diff": 6.575,
+    "ci95": {
+      "win_rate": {
+        "n": 400,
+        "mean": 0.59,
+        "low": 0.5421163843576089,
+        "high": 0.637883615642391,
+        "crosses_even": false,
+        "note": null
+      },
+      "mean_stone_diff": {
+        "n": 400,
+        "mean": 6.575,
+        "low": 4.175638604063206,
+        "high": 8.974361395936794
+      }
+    },
+    "verdict": {
+      "code": "exact",
+      "note": "完全読みありの勝率の 95% 区間が 0.5 を上回る"
+    }
+  },
+  "game_records": []
+}
